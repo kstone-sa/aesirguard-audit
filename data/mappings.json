@@ -1,0 +1,8 @@
+{
+  "result": {
+    "yes": "success",
+    "no": "failure",
+    "success": "success",
+    "failed": "failure"
+  }
+}
