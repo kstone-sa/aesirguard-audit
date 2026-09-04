@@ -2,7 +2,7 @@
 
 ## Install
 
-Install the release binary as `/usr/bin/audit2json`. For a dedicated service account, install the supplied sysusers, tmpfiles, and systemd unit files, then run the platform equivalents of `systemd-sysusers` and `systemd-tmpfiles --create`.
+Install the release binary as `/usr/bin/audit2json`. For a dedicated service account, install the supplied sysusers, tmpfiles, and systemd unit files, then run the platform equivalents of `systemd-sysusers` and `systemd-tmpfiles --create`. The unit creates the private `/run/audit2json` lock directory through `RuntimeDirectory=` on every start.
 
 The service account must be able to read the active Audit log and retained rotations. Prefer configuring auditd's `log_group` for the `audit2json` group instead of running the collector as root. Verify the resulting Audit log mode and group after restarting auditd; distro defaults differ.
 
