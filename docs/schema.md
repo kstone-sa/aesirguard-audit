@@ -2,102 +2,140 @@
 
 ## Status
 
-The current v0.1 output uses the compact fields documented below. The canonical schema described later in this document is a target and is not frozen or implemented yet.
+Canonical schema v0.2 is implemented and emitted by default. The former compact v0.1 output remains available with `--schema v0.1` for controlled migration.
 
-Output is newline-delimited JSON: one logical Audit event per line. Empty fields, null values, and empty arrays are omitted.
+Output is newline-delimited JSON: one logical Audit event per line. Empty optional objects, fields, and arrays are omitted. Fields documented as arrays never change to scalars.
 
-## Current v0.1 fields
+The v0.2 schema is versioned but not yet declared stable. Additive refinement is expected before v1.0.
 
-| Field | Meaning |
-|---|---|
-| `id` | Audit ID in timestamp:serial form |
-| `key` | Local audit rule key |
-| `type` | Record-type fallback when no key is available |
-| `res` | Source result value |
-| `auid` | Audit user ID |
-| `uid` | User ID |
-| `euid` | Effective user ID |
-| `gid` | Group ID |
-| `egid` | Effective group ID |
-| `ses` | Audit session ID |
-| `pid` | Process ID |
-| `ppid` | Parent process ID |
-| `arch` | Audit architecture code |
-| `sc` | Syscall number |
-| `exe` | Executable path |
-| `cmd` | Reconstructed display command |
-| `cwd` | Current working directory |
-| `path` | Single affected path |
-| `paths` | Multiple affected paths |
-| `tty` | Terminal |
+## Top-level contract
 
-This schema is compact but loses fields required for broad Audit coverage and contains unstable semantics such as scalar-versus-array paths and conditional event type.
+| Field | Type | Meaning |
+|---|---|---|
+| `schema_version` | string | Canonical schema version; currently `0.2` |
+| `audit` | object | Source Audit ID, event time, and serial |
+| `source` | object | Optional host and boot identity |
+| `event` | object | Record type, completion, result, and integrity metadata |
+| `rule` | object | Local Audit rule keys |
+| `actor` | object | Source user, group, and session identifiers |
+| `process` | object | Process, executable, command, and syscall source values |
+| `paths` | array | Ordered PATH records with their associated metadata |
+| `unmapped` | array | Per-record fields not represented elsewhere |
 
-## Canonical-schema principles
+The objects remain separate deliberately: a local rule key is not an event type, the actor is not necessarily the effective process identity, and source codes are not normalized names.
 
-The target schema must:
+## Audit envelope
 
-- remain independent from backend data models;
-- carry a schema version;
-- expose event time and serial separately from the source audit ID;
-- include source identity sufficient to distinguish events from different hosts and boots;
-- keep event type and local audit rule key independent;
-- use stable JSON types;
-- preserve argument boundaries instead of relying only on a display command;
-- preserve repeated PATH records and their roles;
-- distinguish source values from normalized values where interpretation can vary;
-- retain unsupported security-relevant fields in a controlled fallback structure;
-- identify incomplete, malformed, truncated, or recovered events;
-- support deterministic optional human-readable rendering;
-- avoid empty values and unnecessary duplication.
+`audit.id` preserves the original `timestamp:serial` identifier. When valid, it is also split into:
 
-Field names remain compact because output size may affect ingestion cost, but compactness must not destroy meaning or type stability.
+- `audit.time`: UTC RFC 3339 timestamp;
+- `audit.serial`: unsigned JSON number.
 
-## Canonical event identity
+An invalid identifier is retained in `audit.id`; derived fields are omitted and `event.issues` contains `invalid_audit_id`. Evidence is not discarded because an envelope could not be normalized.
 
-The source audit ID is not globally unique. The target event identity must account for at least:
+## Source identity
 
-- source host identity;
-- boot or equivalent source generation when available;
-- Audit timestamp and serial.
+`source.host` is taken from an explicit `--source-host` option when supplied, otherwise from the Audit `node` field. `source.boot_id` is supplied explicitly with `--source-boot-id`.
 
-The exact serialized form will be decided before the schema is frozen.
+The Audit ID alone is not globally unique. Consumers that require stable identity across hosts and reboots must provide both host and boot identity. The batch converter does not guess a boot ID for historical files; automatic local source discovery belongs to the persistent collector.
 
-## Normalized and source values
+## Event metadata
 
-Mappings must not silently replace evidence. For values such as syscall, architecture, errno, result, account identity, and permissions, retain the original representation whenever normalization could fail or vary by platform.
+| Field | Type | Meaning |
+|---|---|---|
+| `event.type` | string | Deterministic primary Linux Audit record type |
+| `event.record_types` | array of strings | Unique physical record types in first-observed order |
+| `event.record_count` | number | Number of physical records assembled |
+| `event.complete` | boolean | Whether a recognized complete boundary was observed |
+| `event.completion` | string | `eoe`, `proctitle`, `single_record`, `watermark`, `timeout`, or `eof` |
+| `event.result.raw` | string | Original `success` or `res` value |
+| `event.issues` | array | Structured conversion or integrity issues |
 
-A field must not alternate between a numeric code and a textual name. Use separate fields when both representations are needed.
+`event.type` is source classification, not a portable activity code. Canonical event codes and normalized result values belong to the next normalization milestone.
 
-## Repeated data
+EOE, PROCTITLE, and known single-record boundaries are currently reported as complete. Watermark, inactivity timeout, and EOF flushes are reported as incomplete so downstream consumers can make an explicit policy decision.
 
-A field must not change between scalar and array based on cardinality. EXECVE arguments and PATH records require stable repeated-value structures. PATH metadata such as item, name type, inode, device, mode, owner, and group must remain associated with the corresponding path.
+## Rule, actor, and process
 
-## Event classification
+`rule.keys` is always an array because an event may carry more than one local Audit rule key.
 
-Canonical event codes describe technical Linux activity, for example process execution, authentication, file activity, policy changes, or mandatory-access-control decisions.
+Actor identifiers remain source strings in v0.2: `auid`, `uid`, `euid`, `gid`, `egid`, and `session`. Account-name resolution is not performed.
 
-Classification must be deterministic and evidence-based. Local rule keys are deployment metadata. Risk, threat, and detection conclusions belong to the backend.
+The process object may contain:
 
-## Human-readable message
+- `pid`, `ppid`, `executable`, `cwd`, and `tty`;
+- `argv`, always an array preserving EXECVE argument boundaries;
+- `command`, a deterministic display form derived from `argv` or PROCTITLE;
+- `arch_raw` and `syscall_raw`, which deliberately preserve source codes.
 
-An optional message may summarize the normalized event for analysts. It must:
+The display command is not a shell-escaped reconstruction and must not replace `argv` in analytical logic.
 
-- be deterministic and versioned;
-- use normalized fields only;
-- never be the sole representation of a fact;
-- avoid unsupported causal or security conclusions;
-- remain optional so consumers can minimize indexed volume.
+## PATH records
 
-## Backend adapters
+`paths` is always an array of objects, sorted by numeric `item` where present and then by source order. Each object keeps the association between:
 
-Backend adapters may map the canonical event to Splunk CIM, Sentinel ASIM, Elastic ECS, or another model. Such mappings, aliases, calculated fields, tags, and detections are deliberately outside this schema.
+- `item`;
+- `name` and `name_type`;
+- `inode` and `device`;
+- `mode`;
+- `ouid` and `ogid`.
 
-## Compatibility
+No scalar-versus-array switch occurs when an event contains one path.
 
-Once the canonical schema is declared stable:
+## Loss-aware fallback
 
-- existing fields retain their meaning and JSON type;
-- additive fields are preferred;
-- incompatible changes require a schema-version change;
-- mapping and renderer versions are reported separately from the schema version.
+`unmapped` contains one object for each physical record that still has fields not represented by v0.2. Each object has a record `type` and a `fields` map. Every map value is an array of strings, even when only one value exists.
+
+This preserves repeated and nested fields without forcing unsupported record families into an incorrect model. Envelope fields and values already represented canonically are omitted. Some raw EXECVE fields are intentionally retained because their quoting and encoding semantics may differ from the derived `argv`.
+
+## Example
+
+A process event has this shape:
+
+```json
+{
+  "schema_version": "0.2",
+  "audit": {
+    "id": "1721721600.123:42",
+    "time": "2024-07-23T08:00:00.123Z",
+    "serial": 42
+  },
+  "source": {
+    "host": "workstation-01",
+    "boot_id": "8b9c..."
+  },
+  "event": {
+    "type": "SYSCALL",
+    "record_types": ["SYSCALL", "EXECVE", "PATH", "EOE"],
+    "record_count": 4,
+    "complete": true,
+    "completion": "eoe",
+    "result": {"raw": "yes"}
+  },
+  "rule": {"keys": ["privileged"]},
+  "process": {
+    "pid": "200",
+    "executable": "/usr/bin/sudo",
+    "argv": ["sudo", "cat", "/etc/shadow"],
+    "arch_raw": "c000003e",
+    "syscall_raw": "59"
+  },
+  "paths": [
+    {"item": 0, "name": "/etc/shadow", "name_type": "NORMAL"}
+  ]
+}
+```
+
+The golden fixture in `testdata/execve.v0.2.json` documents a complete emitted event.
+
+## v0.1 compatibility
+
+Use `--schema v0.1` to emit the former compact fields: `id`, `key`, `type`, `res`, identity strings, process fields, and scalar-or-array path output.
+
+This mode exists for migration only. New integrations should consume v0.2 and branch on `schema_version`.
+
+## Future normalization and rendering
+
+The next milestone may add normalized architecture, syscall, errno, permissions, capabilities, socket-family values, deterministic event codes, mapping versions, and an optional analyst-readable message.
+
+Normalized values will be added alongside source evidence. Splunk CIM, Sentinel ASIM, Elastic ECS, aliases, tags, detections, and risk classifications remain backend responsibilities.

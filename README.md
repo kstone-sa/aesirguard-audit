@@ -6,15 +6,17 @@ The project is intended to become a persistent, low-latency collector that follo
 
 ## Current status
 
-The repository currently contains the v0.1 batch parser. It can:
+The repository currently contains the v0.2 batch converter. It can:
 
 - read stdin or one existing file;
-- parse a limited subset of Audit records;
-- group records by audit ID;
-- reconstruct basic EXECVE and PROCTITLE data;
-- emit one compact JSON object per line.
+- preserve ordered and repeated Audit fields;
+- group interleaved records by audit ID with explicit completion metadata;
+- reconstruct EXECVE arguments and structured PATH records;
+- emit the canonical v0.2 schema by default;
+- retain unmapped fields in a stable loss-aware fallback;
+- emit the former compact schema with `--schema v0.1`.
 
-The current implementation exits at EOF and relies mainly on EOE records or final EOF to flush events. Persistent following, complete event-boundary handling, checkpoints, rotation, singleton execution, and file output are planned and are not implemented yet.
+The current implementation still exits at EOF. Semantic mappings, human-readable rendering, persistent following, checkpoints, rotation, singleton execution, and managed file output are planned and are not implemented yet.
 
 See `ROADMAP.md` for delivery order.
 
@@ -47,7 +49,7 @@ audit.log
 
 Stdout is the default sink for consumers such as a Splunk scripted input. An append-only file sink is planned for file-monitoring agents and other SIEMs. Backend-specific parsing, data-model mapping, tags, aliases, and dashboards are outside this repository.
 
-## Build the current parser
+## Build the current converter
 
 ```bash
 go test ./...
@@ -57,16 +59,23 @@ go build -o audit2json ./cmd/audit2json
 
 ## Run the current parser
 
-Read a sample file:
+Read a sample file using canonical v0.2 output:
 
 ```bash
-./audit2json testdata/audit.log
+./audit2json testdata/execve.audit
 ```
 
-Read stdin:
+Read stdin and supply source identity not present in the records:
 
 ```bash
-cat testdata/audit.log | ./audit2json
+cat /var/log/audit/audit.log | ./audit2json \
+  --source-host host01 --source-boot-id 8b9c...
+```
+
+Request the former compact output during migration:
+
+```bash
+./audit2json --schema v0.1 testdata/execve.audit
 ```
 
 Write current output to a file:

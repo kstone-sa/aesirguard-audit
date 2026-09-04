@@ -20,7 +20,7 @@ Inspect additional files only when an observed dependency requires them.
 
 ## Status guardrail
 
-The current implementation is the v0.1 batch parser. Persistent following, complete event-boundary handling, normalization, checkpoints, rotation, singleton execution, and file sinks are target capabilities documented for later milestones. Never describe a planned capability as implemented.
+The current implementation is the v0.2 batch converter with canonical output by default and an explicit v0.1 compatibility mode. Persistent following, semantic normalization and rendering, checkpoints, rotation, singleton execution, and file sinks are target capabilities documented for later milestones. Never describe a planned capability as implemented.
 
 ## Design rules
 
