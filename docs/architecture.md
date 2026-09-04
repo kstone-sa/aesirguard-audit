@@ -4,7 +4,7 @@
 
 audit2json converts Linux Audit streams into canonical newline-delimited JSON. The core understands Linux Audit semantics but does not understand Splunk CIM, Sentinel ASIM, Elastic ECS, or any other backend schema.
 
-The milestone v0.3 branch is a batch converter with one canonical schema, CIS-oriented semantic classification, and deterministic rendering for the supported CIS Linux Audit families. This document describes the target persistent architecture; planned collector components must not be treated as implemented.
+The milestone v0.4 branch adds a persistent follower for one open file generation, bounded event state, synchronous stdout and file sinks, graceful shutdown, and singleton locking. Checkpoint recovery and input rotation remain target behavior and must not be treated as implemented.
 
 ## Target data flow
 
@@ -36,6 +36,8 @@ Each stage has one responsibility and can be tested independently.
 ### Collector
 
 Owns file descriptors, polling, partial lines, EOF waiting, checkpoints, and input rotation. It does not parse Audit fields.
+
+The v0.4 follower opens at offset zero, preserves partial lines, and waits at EOF. It deliberately remains attached to that inode. Detecting and switching file generations is implemented separately in v0.6.
 
 A file descriptor remains attached to its inode after rename. On rotation, the collector drains the old descriptor before opening the new file and preserves the assembler across the transition.
 
@@ -73,7 +75,7 @@ Security conclusions such as privilege escalation or credential theft belong to 
 
 The stdout sink writes one event per line and blocks naturally when the consumer applies back-pressure.
 
-The file sink appends NDJSON durably for agents that monitor files. Output-file rotation and durability are separate from input-log rotation.
+The file sink appends NDJSON directly without a userspace queue. Optional per-event sync provides a local durability boundary. Output-file rotation remains separate from input-log rotation and is not implemented in v0.4.
 
 Diagnostics never share the event stream and are written to stderr.
 

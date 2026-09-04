@@ -6,7 +6,7 @@ The project is intended to become a persistent, low-latency collector that follo
 
 ## Current status
 
-The milestone v0.3 development branch contains the batch converter and CIS-oriented semantic classifier. It can:
+The milestone v0.4 development branch contains the canonical converter, CIS-oriented semantic classifier, and first persistent collector. It can:
 
 - read stdin or one existing file;
 - preserve ordered and repeated Audit fields;
@@ -18,8 +18,14 @@ The milestone v0.3 development branch contains the batch converter and CIS-orien
 - decode non-empty file capability masks to Linux capability names;
 - classify the Linux Audit activity families covered by the selected CIS Linux server baselines;
 - optionally add deterministic analyst-readable messages for those families.
+- follow one growing audit file with configurable low-latency polling;
+- preserve incomplete physical lines until their newline arrives;
+- apply explicit bounds to line and unresolved-event state;
+- write synchronously to stdout or an append-only managed file;
+- stop cleanly on SIGINT or SIGTERM;
+- enforce a non-blocking singleton lock per followed input.
 
-The current implementation still exits at EOF. Broader event-family mappings and rendering, persistent following, checkpoints, rotation, singleton execution, and managed file output are planned and are not implemented yet.
+Batch mode still exits at EOF. Follow mode waits at EOF, but it does not yet checkpoint progress or switch to a new inode after input rotation. Those guarantees belong to milestones v0.5 and v0.6.
 
 See `ROADMAP.md` for delivery order.
 
@@ -88,7 +94,24 @@ Write current output to a file:
 ./audit2json /var/log/audit/audit.log > audit.json
 ```
 
-This redirection is batch behavior, not the planned managed file sink.
+This redirection is batch behavior, not the managed file sink.
+
+Follow a live Audit log and emit to stdout:
+
+```bash
+./audit2json --follow --render-message /var/log/audit/audit.log
+```
+
+Repeated scheduled invocations are safe: while one healthy process owns the per-input lock, another exits successfully without emitting data.
+The default lock is stored in a private per-user temporary directory and is derived from the absolute input path. Use `--lock-file` to place it in a service-managed runtime directory.
+
+Use the managed append-only file sink:
+
+```bash
+./audit2json --follow --output-file /var/log/audit2json/events.ndjson /var/log/audit/audit.log
+```
+
+Add `--sync-output` only when every emitted line must cross the local filesystem durability boundary before processing continues. It deliberately trades throughput for durability.
 
 ## Documentation map
 

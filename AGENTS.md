@@ -20,7 +20,7 @@ Inspect additional files only when an observed dependency requires them.
 
 ## Status guardrail
 
-The milestone v0.3 branch is a batch converter with a canonical schema, CIS-oriented semantic classification, and deterministic rendering for the supported CIS Linux Audit families. Persistent following, broader non-CIS event normalization, checkpoints, rotation, singleton execution, and file sinks remain planned. Never describe a planned capability as implemented.
+The milestone v0.4 branch adds persistent single-file following, synchronous stdout and append-only file sinks, bounded unresolved state, graceful shutdown, and per-input singleton locking. Broader non-CIS normalization, checkpoints, recovery, and rotation handling remain planned. Never describe a planned capability as implemented.
 
 ## Design rules
 

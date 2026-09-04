@@ -1,6 +1,7 @@
 package audit
 
 import (
+	"fmt"
 	"sort"
 	"strconv"
 	"strings"
@@ -10,7 +11,9 @@ import (
 // Assembler groups interleaved records and emits deterministic logical events.
 type Assembler struct {
 	timeout         time.Duration
+	limits          AssemblerLimits
 	pending         map[string]*pendingEvent
+	pendingBytes    int
 	nextSequence    uint64
 	latestAuditTime time.Time
 }
@@ -23,6 +26,25 @@ type pendingEvent struct {
 	hasAuditTS bool
 }
 
+// AssemblerLimits bounds unresolved event state. Every value must be positive
+// when limits are enabled.
+type AssemblerLimits struct {
+	MaxPendingEvents  int
+	MaxRecordsPerEvent int
+	MaxPendingBytes   int
+}
+
+// AssemblerLimitError reports a record that could not be retained without
+// exceeding a configured memory bound.
+type AssemblerLimitError struct {
+	Limit string
+	Value int
+}
+
+func (err *AssemblerLimitError) Error() string {
+	return fmt.Sprintf("assembler %s limit reached (%d)", err.Limit, err.Value)
+}
+
 // Completion describes why an assembled event was emitted.
 type Completion string
 
@@ -33,6 +55,7 @@ const (
 	CompletionWatermark    Completion = "watermark"
 	CompletionTimeout      Completion = "timeout"
 	CompletionEOF          Completion = "eof"
+	CompletionShutdown     Completion = "shutdown"
 )
 
 // AssembledEvent retains the physical records and their event boundary.
@@ -57,19 +80,49 @@ func NewAssembler(timeout time.Duration) *Assembler {
 	}
 }
 
+// NewBoundedAssembler creates an assembler with explicit unresolved-state
+// limits for long-running collection.
+func NewBoundedAssembler(timeout time.Duration, limits AssemblerLimits) (*Assembler, error) {
+	if limits.MaxPendingEvents <= 0 || limits.MaxRecordsPerEvent <= 0 || limits.MaxPendingBytes <= 0 {
+		return nil, fmt.Errorf("assembler limits must be positive")
+	}
+	assembler := NewAssembler(timeout)
+	assembler.limits = limits
+	return assembler, nil
+}
+
 // Add adds a record using the current time for inactivity tracking.
 func (assembler *Assembler) Add(record Record) []AssembledEvent {
-	return assembler.AddAt(record, time.Now())
+	events, _ := assembler.addAt(record, time.Now())
+	return events
 }
 
 // AddAt adds a record using an explicit observation time for deterministic tests.
 func (assembler *Assembler) AddAt(record Record, observedAt time.Time) []AssembledEvent {
+	events, _ := assembler.addAt(record, observedAt)
+	return events
+}
+
+// AddChecked adds a record and reports configured state-limit violations.
+func (assembler *Assembler) AddChecked(record Record) ([]AssembledEvent, error) {
+	return assembler.addAt(record, time.Now())
+}
+
+// AddCheckedAt is AddChecked with an explicit observation time.
+func (assembler *Assembler) AddCheckedAt(record Record, observedAt time.Time) ([]AssembledEvent, error) {
+	return assembler.addAt(record, observedAt)
+}
+
+func (assembler *Assembler) addAt(record Record, observedAt time.Time) ([]AssembledEvent, error) {
 	ready := make([]readyEvent, 0, 2)
 	pending, exists := assembler.pending[record.ID]
 
 	// An EOE without cached records contains no event data. This also consumes
 	// EOE records that arrive after a PROCTITLE-triggered completion.
 	if record.Type != "EOE" || exists {
+		if err := assembler.checkLimits(record, pending, exists); err != nil {
+			return nil, err
+		}
 		if !exists {
 			pending = &pendingEvent{sequence: assembler.nextSequence}
 			assembler.nextSequence++
@@ -83,6 +136,7 @@ func (assembler *Assembler) AddAt(record Record, observedAt time.Time) []Assembl
 			assembler.pending[record.ID] = pending
 		}
 		pending.records = append(pending.records, record)
+		assembler.pendingBytes += record.SourceBytes
 		pending.lastSeen = observedAt
 
 		if isTerminalRecord(record.Type) {
@@ -91,7 +145,7 @@ func (assembler *Assembler) AddAt(record Record, observedAt time.Time) []Assembl
 	}
 
 	ready = append(ready, assembler.expired(observedAt)...)
-	return orderedEvents(ready)
+	return orderedEvents(ready), nil
 }
 
 // FlushExpired emits events whose watermark or inactivity timeout has elapsed.
@@ -101,9 +155,14 @@ func (assembler *Assembler) FlushExpired(now time.Time) []AssembledEvent {
 
 // FlushAll emits all pending events in first-observed order.
 func (assembler *Assembler) FlushAll() []AssembledEvent {
+	return assembler.FlushAllWith(CompletionEOF)
+}
+
+// FlushAllWith emits all pending events with the supplied incomplete boundary.
+func (assembler *Assembler) FlushAllWith(completion Completion) []AssembledEvent {
 	ready := make([]readyEvent, 0, len(assembler.pending))
 	for id := range assembler.pending {
-		ready = append(ready, assembler.finish(id, CompletionEOF, false))
+		ready = append(ready, assembler.finish(id, completion, false))
 	}
 	return orderedEvents(ready)
 }
@@ -113,9 +172,17 @@ func (assembler *Assembler) Pending() int {
 	return len(assembler.pending)
 }
 
+// PendingBytes returns source bytes retained by unresolved events.
+func (assembler *Assembler) PendingBytes() int {
+	return assembler.pendingBytes
+}
+
 func (assembler *Assembler) finish(id string, completion Completion, complete bool) readyEvent {
 	pending := assembler.pending[id]
 	delete(assembler.pending, id)
+	for _, record := range pending.records {
+		assembler.pendingBytes -= record.SourceBytes
+	}
 	return readyEvent{
 		sequence: pending.sequence,
 		event: AssembledEvent{
@@ -125,6 +192,22 @@ func (assembler *Assembler) finish(id string, completion Completion, complete bo
 			Completion: completion,
 		},
 	}
+}
+
+func (assembler *Assembler) checkLimits(record Record, pending *pendingEvent, exists bool) error {
+	if assembler.limits.MaxPendingEvents == 0 {
+		return nil
+	}
+	if !exists && len(assembler.pending) >= assembler.limits.MaxPendingEvents {
+		return &AssemblerLimitError{Limit: "pending events", Value: assembler.limits.MaxPendingEvents}
+	}
+	if exists && len(pending.records) >= assembler.limits.MaxRecordsPerEvent {
+		return &AssemblerLimitError{Limit: "records per event", Value: assembler.limits.MaxRecordsPerEvent}
+	}
+	if assembler.pendingBytes+record.SourceBytes > assembler.limits.MaxPendingBytes {
+		return &AssemblerLimitError{Limit: "pending bytes", Value: assembler.limits.MaxPendingBytes}
+	}
+	return nil
 }
 
 func (assembler *Assembler) expired(now time.Time) []readyEvent {

@@ -23,6 +23,7 @@ type Record struct {
 	Fields    map[string]string
 	Values    map[string][]string
 	AllFields []Field
+	SourceBytes int
 }
 
 // ParseRecord parses one auditd line without depending on libauparse.
@@ -37,6 +38,7 @@ func ParseRecord(line string) (Record, error) {
 		Values:    values,
 		AllFields: allFields,
 		Type:      firstValue(values, "type"),
+		SourceBytes: len(line),
 	}
 	for _, msg := range values["msg"] {
 		if id := auditIDFromMessage(msg); id != "" {

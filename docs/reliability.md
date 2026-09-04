@@ -13,6 +13,10 @@ The target collector prioritizes:
 
 These guarantees apply to audit2json and its selected sink. End-to-end indexing guarantees depend on the backend and its acknowledgement model.
 
+## Implementation status
+
+Milestone v0.4 implements bounded single-generation following, complete-line handling, synchronous sinks, graceful shutdown, and singleton locking. It does not yet persist checkpoints or follow input rotation. Consequently, restart recovery and cross-generation losslessness described below remain target behavior until v0.5 and v0.6 are complete.
+
 ## Delivery semantics
 
 The target delivery model is at-least-once.
@@ -115,7 +119,7 @@ For ambiguous events, use:
 
 This avoids unnecessary delay while reading historical backlog and bounds live-event latency when an explicit terminator is absent.
 
-Pending events, records, and bytes have configured upper bounds. Reaching a bound produces a visible incomplete or overflow event and operational error; it never causes silent eviction.
+Pending events, records, and bytes have configured upper bounds. Reaching a bound produces a visible operational error; it never causes silent eviction.
 
 ## Singleton and supervision
 
@@ -141,12 +145,12 @@ The managed file sink:
 
 - writes append-only NDJSON;
 - makes completed lines visible promptly;
-- applies a configurable flush and sync policy;
-- syncs durable output before advancing a durability-dependent input checkpoint;
-- supports managed rename-based rotation or an explicit reopen signal;
+- optionally syncs each accepted event;
+- will sync durable output before advancing a durability-dependent input checkpoint;
+- will support managed rename-based rotation or an explicit reopen signal;
 - never relies on unmanaged shell redirection for long-running rotation.
 
-Input-log rotation and output-file rotation are independent state machines.
+Input-log rotation and output-file rotation are independent state machines. Managed output rotation and checkpoint coupling are not implemented in v0.4.
 
 ## Failure reporting
 

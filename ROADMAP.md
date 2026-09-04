@@ -35,9 +35,9 @@ Known gaps:
 
 ## v0.2 - Parser correctness, canonical schema, and renderer
 
-**Status: in progress**
+**Status: implemented**
 
-Parser correctness, deterministic event assembly, the security-oriented canonical v0.2 schema, ENRICHED identity handling, and the optional process renderer are implemented in development branches. Broader real-world and multi-distribution corpus validation remains pending.
+Parser correctness, deterministic event assembly, the security-oriented canonical schema, ENRICHED identity handling, and the optional process renderer are implemented. Multi-distribution CIS coverage is delivered by v0.3.
 
 Goal: make record parsing and event assembly safe enough to support persistent collection.
 
@@ -56,7 +56,7 @@ Deliverables:
 
 ## v0.3 - Extended normalization and CIS event families
 
-**Status: in progress**
+**Status: implemented**
 
 Goal: translate Linux Audit semantics without introducing backend-specific schemas. Initial guaranteed coverage targets CIS Server Level 1 and Level 2 Audit event families across Debian 12/13, Ubuntu 22.04/24.04, RHEL 8/9, and Oracle Linux 8/9.
 
@@ -76,6 +76,8 @@ Splunk CIM, Sentinel ASIM, Elastic ECS, detections, and risk classifications rem
 
 ## v0.4 - Persistent collector and sinks
 
+**Status: in progress**
+
 Goal: run continuously with low latency.
 
 Deliverables:
@@ -90,6 +92,8 @@ Deliverables:
 - append-only file sink;
 - non-blocking per-input singleton lock;
 - clean success exit when another healthy instance owns the lock.
+
+The development branch implements these deliverables for one open file generation. Checkpoint recovery and input rotation are intentionally deferred to v0.5 and v0.6.
 
 ## v0.5 - Checkpoint and crash recovery
 
