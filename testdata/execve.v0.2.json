@@ -1,0 +1,50 @@
+{
+  "schema_version": "0.2",
+  "audit": {
+    "id": "1721721600.123:42",
+    "time": "2024-07-23T08:00:00.123Z"
+  },
+  "event": {
+    "type": "SYSCALL",
+    "success": true
+  },
+  "rule": {
+    "keys": ["privileged"]
+  },
+  "actor": {
+    "user": "mario"
+  },
+  "process": {
+    "pid": "200",
+    "ppid": "100",
+    "user": "root",
+    "real_user": "svc_backup",
+    "name": "sudo",
+    "executable": "/usr/bin/sudo",
+    "argv": ["sudo", "cat", "--", "/etc/shadow"],
+    "cwd": "/home/mario",
+    "tty": "pts0",
+    "syscall": "execve",
+    "return_value": "0"
+  },
+  "paths": [
+    {
+      "name": "/usr/bin/sudo",
+      "name_type": "NORMAL",
+      "owner": "root",
+      "group": "root"
+    },
+    {
+      "name": "/etc/shadow",
+      "name_type": "NORMAL",
+      "owner": "root",
+      "group": "shadow",
+      "capabilities": {
+        "permitted": ["CAP_NET_RAW"],
+        "effective": true
+      }
+    }
+  ],
+  "message": "mario executed /usr/bin/sudo as root with arguments: cat -- /etc/shadow",
+  "renderer_version": "1"
+}

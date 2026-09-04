@@ -6,15 +6,19 @@ The project is intended to become a persistent, low-latency collector that follo
 
 ## Current status
 
-The repository currently contains the v0.1 batch parser. It can:
+The repository currently contains the v0.2 batch converter. It can:
 
 - read stdin or one existing file;
-- parse a limited subset of Audit records;
-- group records by audit ID;
-- reconstruct basic EXECVE and PROCTITLE data;
-- emit one compact JSON object per line.
+- preserve ordered and repeated Audit fields;
+- group interleaved records by audit ID with explicit completion metadata;
+- reconstruct EXECVE arguments and structured PATH records;
+- emit one security-oriented canonical v0.2 schema;
+- prefer names supplied by Audit ENRICHED records and fall back to explicit ID fields;
+- collapse identical login, real, and effective identities;
+- decode non-empty file capability masks to Linux capability names;
+- optionally add a deterministic analyst-readable process message.
 
-The current implementation exits at EOF and relies mainly on EOE records or final EOF to flush events. Persistent following, complete event-boundary handling, checkpoints, rotation, singleton execution, and file output are planned and are not implemented yet.
+The current implementation still exits at EOF. Broader event-family mappings and rendering, persistent following, checkpoints, rotation, singleton execution, and managed file output are planned and are not implemented yet.
 
 See `ROADMAP.md` for delivery order.
 
@@ -33,8 +37,6 @@ See `ROADMAP.md` for delivery order.
 
 ## Target runtime model
 
-The target process is long-running:
-
 ```text
 audit.log
     -> file follower
@@ -47,7 +49,7 @@ audit.log
 
 Stdout is the default sink for consumers such as a Splunk scripted input. An append-only file sink is planned for file-monitoring agents and other SIEMs. Backend-specific parsing, data-model mapping, tags, aliases, and dashboards are outside this repository.
 
-## Build the current parser
+## Build the current converter
 
 ```bash
 go test ./...
@@ -55,18 +57,26 @@ go vet ./...
 go build -o audit2json ./cmd/audit2json
 ```
 
-## Run the current parser
+## Run the current converter
 
-Read a sample file:
+Read a sample file using canonical v0.2 output:
 
 ```bash
-./audit2json testdata/audit.log
+./audit2json testdata/execve.audit
 ```
 
-Read stdin:
+Read stdin and explicitly include source identity:
 
 ```bash
-cat testdata/audit.log | ./audit2json
+cat /var/log/audit/audit.log | ./audit2json --source-host host01
+```
+
+`source` is omitted by default because the collecting backend commonly supplies host metadata itself.
+
+Include the optional analyst-readable message:
+
+```bash
+./audit2json --render-message testdata/execve.audit
 ```
 
 Write current output to a file:
@@ -90,7 +100,7 @@ This redirection is batch behavior, not the planned managed file sink.
 ```text
 cmd/audit2json/      command-line program
 internal/audit/      current parser and event builder
-data/                static mapping data
+data/                embedded static mapping data
 docs/                architecture, schema, reliability, and development guidance
 testdata/            reviewable Linux Audit samples
 AGENTS.md             scoped instructions for humans and coding agents

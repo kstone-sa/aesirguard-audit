@@ -33,11 +33,11 @@ Known gaps:
 - synthetic happy-path test coverage only;
 - nondeterministic flush order for incomplete events.
 
-## v0.2 - Parser correctness and canonical schema
+## v0.2 - Parser correctness, canonical schema, and renderer
 
 **Status: in progress**
 
-Parser correctness and deterministic event assembly are implemented in the first development slice. The canonical schema, normalization-ready metadata, and real multi-distribution corpus remain pending.
+Parser correctness, deterministic event assembly, the security-oriented canonical v0.2 schema, ENRICHED identity handling, and the optional process renderer are implemented in development branches. Broader real-world and multi-distribution corpus validation remains pending.
 
 Goal: make record parsing and event assembly safe enough to support persistent collection.
 
@@ -50,10 +50,11 @@ Deliverables:
 - deterministic ordering;
 - EOE, PROCTITLE, single-record, watermark, and timeout boundaries;
 - interleaved and out-of-order record handling;
-- loss-aware fallback for unsupported fields and records;
-- golden tests using real Linux Audit samples.
+- explicit issues for unsupported record families without copying arbitrary fields;
+- optional deterministic human-readable process messages;
+- golden tests using representative Linux Audit samples.
 
-## v0.3 - Normalization and optional rendering
+## v0.3 - Extended normalization and event families
 
 Goal: translate Linux Audit semantics without introducing backend-specific schemas.
 
@@ -64,7 +65,7 @@ Deliverables:
 - permissions, capabilities, signals, socket families, and message-type mappings;
 - record-family classifiers for process, authentication, file, policy, and network activity;
 - stable canonical event codes;
-- optional deterministic human-readable messages;
+- additional deterministic human-readable templates;
 - raw and normalized values kept distinct where interpretation may vary;
 - mapping version metadata.
 

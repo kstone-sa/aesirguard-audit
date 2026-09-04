@@ -25,30 +25,6 @@ type Record struct {
 	AllFields []Field
 }
 
-// Event is the compact JSON representation emitted by audit2json.
-type Event struct {
-	ID    string   `json:"id"`
-	Key   string   `json:"key,omitempty"`
-	Type  string   `json:"type,omitempty"`
-	Res   string   `json:"res,omitempty"`
-	AUID  string   `json:"auid,omitempty"`
-	UID   string   `json:"uid,omitempty"`
-	EUID  string   `json:"euid,omitempty"`
-	GID   string   `json:"gid,omitempty"`
-	EGID  string   `json:"egid,omitempty"`
-	Ses   string   `json:"ses,omitempty"`
-	PID   string   `json:"pid,omitempty"`
-	PPID  string   `json:"ppid,omitempty"`
-	Arch  string   `json:"arch,omitempty"`
-	SC    string   `json:"sc,omitempty"`
-	Exe   string   `json:"exe,omitempty"`
-	Cmd   string   `json:"cmd,omitempty"`
-	CWD   string   `json:"cwd,omitempty"`
-	Path  string   `json:"path,omitempty"`
-	Paths []string `json:"paths,omitempty"`
-	TTY   string   `json:"tty,omitempty"`
-}
-
 // ParseRecord parses one auditd line without depending on libauparse.
 func ParseRecord(line string) (Record, error) {
 	allFields, fields, values, err := parseFields(line)
@@ -75,104 +51,6 @@ func ParseRecord(line string) (Record, error) {
 		return Record{}, fmt.Errorf("record type not found for audit id %s", r.ID)
 	}
 	return r, nil
-}
-
-// BuildEvent merges all records sharing one audit ID into one compact event.
-func BuildEvent(records []Record) Event {
-	e := Event{}
-	argv := map[int]*execArg{}
-	var paths []pathEntry
-
-	for recordIndex, r := range records {
-		if e.ID == "" {
-			e.ID = r.ID
-		}
-		set := func(dst *string, key string) {
-			if *dst == "" {
-				*dst = recordValue(r, key)
-			}
-		}
-
-		set(&e.Key, "key")
-		set(&e.AUID, "auid")
-		set(&e.UID, "uid")
-		set(&e.EUID, "euid")
-		set(&e.GID, "gid")
-		set(&e.EGID, "egid")
-		set(&e.Ses, "ses")
-		set(&e.PID, "pid")
-		set(&e.PPID, "ppid")
-		set(&e.Arch, "arch")
-		set(&e.SC, "syscall")
-		set(&e.Exe, "exe")
-		set(&e.CWD, "cwd")
-		set(&e.TTY, "tty")
-
-		if e.Res == "" {
-			if v := recordValue(r, "success"); v != "" {
-				e.Res = v
-			} else if v := recordValue(r, "res"); v != "" {
-				e.Res = v
-			}
-		}
-
-		switch r.Type {
-		case "EXECVE":
-			collectExecArgs(argv, r.AllFields)
-		case "PROCTITLE":
-			if e.Cmd == "" {
-				e.Cmd = decodeProctitle(recordValue(r, "proctitle"))
-			}
-		case "PATH":
-			if name := recordValue(r, "name"); name != "" {
-				entry := pathEntry{name: name, recordIndex: recordIndex}
-				if item, err := strconv.Atoi(recordValue(r, "item")); err == nil {
-					entry.item = item
-					entry.hasItem = true
-				}
-				paths = append(paths, entry)
-			}
-		}
-	}
-
-	if len(argv) > 0 {
-		idx := make([]int, 0, len(argv))
-		for n := range argv {
-			idx = append(idx, n)
-		}
-		sort.Ints(idx)
-		parts := make([]string, 0, len(idx))
-		for _, n := range idx {
-			if value, ok := argv[n].value(); ok {
-				parts = append(parts, value)
-			}
-		}
-		e.Cmd = strings.Join(parts, " ")
-	}
-
-	sort.SliceStable(paths, func(i, j int) bool {
-		if paths[i].hasItem != paths[j].hasItem {
-			return paths[i].hasItem
-		}
-		if paths[i].hasItem && paths[i].item != paths[j].item {
-			return paths[i].item < paths[j].item
-		}
-		return paths[i].recordIndex < paths[j].recordIndex
-	})
-	pathNames := make([]string, 0, len(paths))
-	for _, path := range paths {
-		pathNames = append(pathNames, path.name)
-	}
-	pathNames = unique(pathNames)
-	if len(pathNames) == 1 {
-		e.Path = pathNames[0]
-	} else if len(pathNames) > 1 {
-		e.Paths = pathNames
-	}
-	if e.Key == "" {
-		e.Type = primaryRecordType(records)
-	}
-	return e
 }
 
 func parseFields(line string) ([]Field, map[string]string, map[string][]string, error) {
@@ -389,13 +267,6 @@ func decodeProctitle(value string) string {
 	return strings.TrimSpace(strings.ReplaceAll(string(decoded), "\x00", " "))
 }
 
-type pathEntry struct {
-	name        string
-	item        int
-	hasItem     bool
-	recordIndex int
-}
-
 func primaryRecordType(records []Record) string {
 	seen := map[string]struct{}{}
 	for _, record := range records {
@@ -426,17 +297,4 @@ func primaryRecordType(records []Record) string {
 		return fallback[0]
 	}
 	return ""
-}
-
-func unique(values []string) []string {
-	seen := map[string]struct{}{}
-	out := make([]string, 0, len(values))
-	for _, value := range values {
-		if _, exists := seen[value]; exists {
-			continue
-		}
-		seen[value] = struct{}{}
-		out = append(out, value)
-	}
-	return out
 }

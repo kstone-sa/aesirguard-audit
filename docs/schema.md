@@ -2,102 +2,130 @@
 
 ## Status
 
-The current v0.1 output uses the compact fields documented below. The canonical schema described later in this document is a target and is not frozen or implemented yet.
+Canonical schema v0.2 is implemented and is the only event output. There is no legacy schema mode.
 
-Output is newline-delimited JSON: one logical Audit event per line. Empty fields, null values, and empty arrays are omitted.
+Output is newline-delimited JSON: one logical Linux Audit event per line. Empty optional objects, fields, and arrays are omitted. Fields documented as arrays never change to scalars.
 
-## Current v0.1 fields
+The v0.2 schema is versioned but not yet frozen. Additive refinement is expected before v1.0.
 
-| Field | Meaning |
-|---|---|
-| `id` | Audit ID in timestamp:serial form |
-| `key` | Local audit rule key |
-| `type` | Record-type fallback when no key is available |
-| `res` | Source result value |
-| `auid` | Audit user ID |
-| `uid` | User ID |
-| `euid` | Effective user ID |
-| `gid` | Group ID |
-| `egid` | Effective group ID |
-| `ses` | Audit session ID |
-| `pid` | Process ID |
-| `ppid` | Parent process ID |
-| `arch` | Audit architecture code |
-| `sc` | Syscall number |
-| `exe` | Executable path |
-| `cmd` | Reconstructed display command |
-| `cwd` | Current working directory |
-| `path` | Single affected path |
-| `paths` | Multiple affected paths |
-| `tty` | Terminal |
+## Security-oriented boundary
 
-This schema is compact but loses fields required for broad Audit coverage and contains unstable semantics such as scalar-versus-array paths and conditional event type.
+The parser retains source records while assembling an event, but the canonical output is not a JSON copy of auditd. It emits fields with defined security or forensic meaning.
 
-## Canonical-schema principles
+Unsupported record families are reported through `event.issues`; arbitrary source fields are not copied into the event. This keeps delivery lossless at event level without treating every auditd implementation detail as indexed security data.
 
-The target schema must:
+## Top-level contract
 
-- remain independent from backend data models;
-- carry a schema version;
-- expose event time and serial separately from the source audit ID;
-- include source identity sufficient to distinguish events from different hosts and boots;
-- keep event type and local audit rule key independent;
-- use stable JSON types;
-- preserve argument boundaries instead of relying only on a display command;
-- preserve repeated PATH records and their roles;
-- distinguish source values from normalized values where interpretation can vary;
-- retain unsupported security-relevant fields in a controlled fallback structure;
-- identify incomplete, malformed, truncated, or recovered events;
-- support deterministic optional human-readable rendering;
-- avoid empty values and unnecessary duplication.
+| Field | Type | Meaning |
+|---|---|---|
+| `schema_version` | string | Canonical schema version; currently `0.2` |
+| `audit` | object | Original Audit ID and event time |
+| `source` | object | Optional explicitly configured source host |
+| `event` | object | Event type, outcome, integrity anomalies, and conversion issues |
+| `rule` | object | Local Audit rule keys |
+| `actor` | object | Login identity |
+| `process` | object | Effective process identity and execution data |
+| `paths` | array | Ordered file objects with associated metadata |
+| `message` | string | Optional deterministic analyst-readable message |
+| `renderer_version` | string | Renderer template version, present only with `message` |
 
-Field names remain compact because output size may affect ingestion cost, but compactness must not destroy meaning or type stability.
+A local rule key is never used as a portable event type.
 
-## Canonical event identity
+## Audit envelope and source
 
-The source audit ID is not globally unique. The target event identity must account for at least:
+`audit.id` preserves the original `timestamp:serial` identifier used to correlate the physical records. `audit.time` is its UTC RFC 3339 representation.
 
-- source host identity;
-- boot or equivalent source generation when available;
-- Audit timestamp and serial.
+An invalid ID remains in `audit.id`; `audit.time` is omitted and `event.issues` reports `invalid_audit_id`.
 
-The exact serialized form will be decided before the schema is frozen.
+`source` is omitted by default. `source.host` is emitted only when `--source-host` is supplied; the Audit `node` field is not copied automatically because collecting backends commonly attach source identity themselves. Boot identity belongs to collector and checkpoint state and is not repeated in every event.
 
-## Normalized and source values
+## Event metadata
 
-Mappings must not silently replace evidence. For values such as syscall, architecture, errno, result, account identity, and permissions, retain the original representation whenever normalization could fail or vary by platform.
+| Field | Type | Meaning |
+|---|---|---|
+| `event.type` | string | Deterministic primary Linux Audit record type |
+| `event.success` | boolean | Normalized source result when recognized |
+| `event.integrity` | object | Present only for incomplete events |
+| `event.issues` | array | Present only for invalid or unsupported input |
 
-A field must not alternate between a numeric code and a textual name. Use separate fields when both representations are needed.
+Normal EOE, PROCTITLE, and known single-record completions add no assembly metadata. Timeout, watermark, or EOF flushes produce:
 
-## Repeated data
+```json
+"integrity": {
+  "state": "incomplete",
+  "reason": "timeout"
+}
+```
 
-A field must not change between scalar and array based on cardinality. EXECVE arguments and PATH records require stable repeated-value structures. PATH metadata such as item, name type, inode, device, mode, owner, and group must remain associated with the corresponding path.
+Unknown result values and unsupported record families are reported explicitly without copying their arbitrary fields.
 
-## Event classification
+## Identity handling
 
-Canonical event codes describe technical Linux activity, for example process execution, authentication, file activity, policy changes, or mandatory-access-control decisions.
+Audit `log_format=ENRICHED` is strongly recommended. ENRICHED names are preferred because they represent the account resolution performed when auditd wrote the event.
 
-Classification must be deterministic and evidence-based. Local rule keys are deployment metadata. Risk, threat, and detection conclusions belong to the backend.
+When an interpreted name is unavailable, the raw numeric identifier is emitted in a separate `*_id` field. A numeric value is never placed in a name field.
 
-## Human-readable message
+`actor.user` or `actor.user_id` represents the login identity derived from AUID. Process identities are collapsed:
 
-An optional message may summarize the normalized event for analysts. It must:
+- effective process identity is omitted when equal to the login identity;
+- real process identity is omitted when equal to either login or effective identity;
+- differing identities use `process.user` or `process.user_id`, and `process.real_user` or `process.real_user_id`.
 
-- be deterministic and versioned;
-- use normalized fields only;
-- never be the sole representation of a fact;
-- avoid unsupported causal or security conclusions;
-- remain optional so consumers can minimize indexed volume.
+SUID, FSUID, SGID, FSGID, and their interpreted forms are not emitted.
 
-## Backend adapters
+## Process data
 
-Backend adapters may map the canonical event to Splunk CIM, Sentinel ASIM, Elastic ECS, or another model. Such mappings, aliases, calculated fields, tags, and detections are deliberately outside this schema.
+The process object may contain:
 
-## Compatibility
+- `pid` and `ppid`, retained for process correlation and tree reconstruction;
+- `name`, `executable`, `cwd`, and `tty`;
+- `argv`, always an array preserving EXECVE argument boundaries;
+- `syscall` when an ENRICHED name is available;
+- `syscall_number` and `architecture_code` together as the RAW fallback, because a syscall number is architecture-dependent;
+- `return_value`, derived from the Audit `exit` field.
 
-Once the canonical schema is declared stable:
+The ENRICHED architecture name is not emitted because it adds no useful context once the syscall is named. No derived command-line string is emitted by default. Backend adapters can derive one from `argv` without paying the indexed-volume cost twice.
 
-- existing fields retain their meaning and JSON type;
-- additive fields are preferred;
-- incompatible changes require a schema-version change;
-- mapping and renderer versions are reported separately from the schema version.
+## PATH records
+
+`paths` is always an array of objects sorted internally by Audit `item`; the item number itself is not emitted.
+
+A path may contain:
+
+- `name` and `name_type`, with `name_type` retaining the Audit operation role such as `CREATE`, `DELETE`, `PARENT`, or `NORMAL`;
+- `owner` and `group` from ENRICHED data;
+- `owner_id` and `group_id` only when names are unavailable;
+- semantic non-empty file capabilities.
+
+Inode, device, and raw mode values are not emitted. A capability mask is decoded to ordered Linux names in `permitted` or `inheritable`; `effective` is a boolean. Zero masks, capability format and root-ID metadata, and raw hexadecimal masks are omitted. Invalid or unknown capability encodings produce `event.issues` rather than silently disappearing.
+
+## Optional human renderer
+
+`--render-message` adds `message` and `renderer_version` when a supported deterministic template exists.
+
+The renderer:
+
+- consumes canonical fields only;
+- never replaces structured evidence;
+- does not infer malicious intent or unsupported causality;
+- quotes ambiguous arguments;
+- omits itself for unsupported event families.
+
+Renderer version `1` currently supports process execution messages backed by a named `execve`/`execveat` syscall or reconstructed `argv`. Merely having an executable path is not treated as evidence of a new process execution. Additional event-family templates belong to the extended-normalization milestone.
+
+## Example and validation
+
+`testdata/execve.v0.2.json` is the intentionally verbose golden event. It exercises:
+
+- ENRICHED login, real, and effective identities that differ;
+- a named syscall and correlated PID/PPID;
+- multiple PATH objects and their operation roles;
+- owner and group names;
+- decoded non-empty file capabilities;
+- the optional human renderer.
+
+Ordinary events are smaller because equal identities, empty capabilities, integrity metadata, issues, source, and renderer fields are omitted.
+
+## Backend boundary
+
+Splunk CIM, Sentinel ASIM, Elastic ECS, aliases, calculated command lines, tags, detections, and risk classifications remain backend responsibilities.

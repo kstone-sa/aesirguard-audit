@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io"
 	"os"
@@ -18,15 +19,23 @@ func main() {
 }
 
 func run(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
+	flags := flag.NewFlagSet("audit2json", flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	sourceHost := flags.String("source-host", "", "include this source host in canonical events")
+	renderMessage := flags.Bool("render-message", false, "include a deterministic analyst-readable message")
+	if err := flags.Parse(args); err != nil {
+		return err
+	}
+
 	var input io.Reader = stdin
 	var file *os.File
 
-	if len(args) > 1 {
-		return fmt.Errorf("usage: audit2json [audit.log]")
+	if flags.NArg() > 1 {
+		return fmt.Errorf("usage: audit2json [options] [audit.log]")
 	}
-	if len(args) == 1 {
+	if flags.NArg() == 1 {
 		var err error
-		file, err = os.Open(args[0])
+		file, err = os.Open(flags.Arg(0))
 		if err != nil {
 			return err
 		}
@@ -37,9 +46,14 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	enc := json.NewEncoder(stdout)
 	enc.SetEscapeHTML(false)
 	assembler := audit.NewAssembler(0)
-	emit := func(events []audit.Event) error {
+	canonicalOptions := audit.CanonicalOptions{Host: *sourceHost}
+	emit := func(events []audit.AssembledEvent) error {
 		for _, event := range events {
-			if err := enc.Encode(event); err != nil {
+			output := audit.BuildCanonicalEvent(event, canonicalOptions)
+			if *renderMessage {
+				output = audit.WithHumanMessage(output)
+			}
+			if err := enc.Encode(output); err != nil {
 				return err
 			}
 		}
