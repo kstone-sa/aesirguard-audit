@@ -137,6 +137,9 @@ func (follower *RotatingFollower) Next(ctx context.Context) (SourceLine, bool, e
 		return SourceLine{}, false, fmt.Errorf("retained source chain ended before current input path")
 	}
 	pathInfo, err := os.Stat(follower.inputPath)
+	if errors.Is(err, os.ErrNotExist) {
+		return SourceLine{}, false, nil
+	}
 	if err != nil {
 		return SourceLine{}, false, err
 	}

@@ -74,6 +74,30 @@ func TestRotatingFollowerReadsLateWriteToOldDescriptor(t *testing.T) {
 	}
 }
 
+func TestRotatingFollowerWaitsThroughMissingPathWindow(t *testing.T) {
+	directory := t.TempDir()
+	path := filepath.Join(directory, "audit.log")
+	if err := os.WriteFile(path, []byte("old\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	follower := mustOpenRotatingFollower(t, path, nil)
+	defer follower.Close()
+	mustNextRotatingLine(t, follower)
+	if err := os.Rename(path, path+".1"); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok, err := follower.Next(context.Background()); err != nil || ok {
+		t.Fatalf("missing-path window = %v, %v", ok, err)
+	}
+	if err := os.WriteFile(path, []byte("new\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	line := mustNextRotatingLine(t, follower)
+	if line.Text != "new" {
+		t.Fatalf("replacement line = %#v", line)
+	}
+}
+
 func TestRotatingFollowerQueuesRapidRotations(t *testing.T) {
 	directory := t.TempDir()
 	path := filepath.Join(directory, "audit.log")
