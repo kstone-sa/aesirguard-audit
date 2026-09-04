@@ -68,7 +68,7 @@ The canonical model is SIEM-agnostic. A local audit rule key is preserved as met
 
 ### Human renderer
 
-Optionally derives a deterministic analyst-readable message from normalized fields. Renderer version 2 covers the supported CIS Linux Audit families. The message is not authoritative, must not replace structured fields, and may be disabled to minimize output volume.
+Optionally derives a deterministic analyst-readable message from normalized fields. Renderer version 3 covers the supported CIS Linux Audit families and the explicitly mapped security-event families. The message is not authoritative, must not replace structured fields, and may be disabled to minimize output volume.
 
 Security conclusions such as privilege escalation or credential theft belong to backend detections, not to this renderer.
 

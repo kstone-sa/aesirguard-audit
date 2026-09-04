@@ -18,13 +18,16 @@ type Field struct {
 
 // Record is one raw auditd record parsed into key/value fields.
 type Record struct {
-	Type        string
-	ID          string
-	Fields      map[string]string
-	Values      map[string][]string
-	AllFields   []Field
-	SourceBytes int
-	Source      SourcePosition
+	Type               string
+	ID                 string
+	Fields             map[string]string
+	Values             map[string][]string
+	AllFields          []Field
+	EmbeddedFields     map[string]string
+	EmbeddedValues     map[string][]string
+	EmbeddedParseError string
+	SourceBytes        int
+	Source             SourcePosition
 }
 
 // SourcePosition identifies a complete physical source line. It is internal
@@ -41,7 +44,7 @@ type SourcePosition struct {
 
 // ParseRecord parses one auditd line without depending on libauparse.
 func ParseRecord(line string) (Record, error) {
-	allFields, fields, values, err := parseFields(line)
+	allFields, fields, values, err := parseFields(normalizeKnownRecordSyntax(line))
 	if err != nil {
 		return Record{}, err
 	}
@@ -65,7 +68,70 @@ func ParseRecord(line string) (Record, error) {
 	if r.Type == "" {
 		return Record{}, fmt.Errorf("record type not found for audit id %s", r.ID)
 	}
+	r.EmbeddedFields, r.EmbeddedValues, r.EmbeddedParseError = parseEmbeddedMessages(values["msg"])
 	return r, nil
+}
+
+// normalizeKnownRecordSyntax converts the small amount of documented Audit
+// prose surrounding otherwise structured fields. Unknown bare tokens remain
+// parse errors instead of making the general field grammar permissive.
+func normalizeKnownRecordSyntax(line string) string {
+	boundary := strings.Index(line, "): ")
+	if boundary < 0 {
+		return line
+	}
+	return line[:boundary+3] + normalizeAuditPayload(line[boundary+3:])
+}
+
+func normalizeAuditPayload(payload string) string {
+	if strings.HasPrefix(payload, "user ") {
+		return normalizeAuditPayload(payload[len("user "):])
+	}
+	if !strings.HasPrefix(payload, "avc:") {
+		return payload
+	}
+
+	remainder := strings.TrimSpace(strings.TrimPrefix(payload, "avc:"))
+	decisionEnd := strings.IndexByte(remainder, ' ')
+	if decisionEnd <= 0 {
+		return payload
+	}
+	decision := remainder[:decisionEnd]
+	remainder = strings.TrimSpace(remainder[decisionEnd+1:])
+	if !strings.HasPrefix(remainder, "{") {
+		return payload
+	}
+	permissionsEnd := strings.IndexByte(remainder, '}')
+	if permissionsEnd < 0 {
+		return payload
+	}
+	permissions := strings.TrimSpace(remainder[1:permissionsEnd])
+	remainder = strings.TrimSpace(remainder[permissionsEnd+1:])
+	remainder = strings.TrimSpace(strings.TrimPrefix(remainder, "for"))
+	return "decision=" + strconv.Quote(decision) + " permissions=" + strconv.Quote(permissions) + " " + remainder
+}
+
+func parseEmbeddedMessages(messages []string) (map[string]string, map[string][]string, string) {
+	first := map[string]string{}
+	values := map[string][]string{}
+	for _, message := range messages {
+		if auditIDFromMessage(message) != "" || !strings.Contains(message, "=") {
+			continue
+		}
+		_, parsedFirst, parsedValues, err := parseFields(normalizeAuditPayload(message))
+		if err != nil {
+			return first, values, err.Error()
+		}
+		for key, value := range parsedFirst {
+			if _, exists := first[key]; !exists {
+				first[key] = value
+			}
+		}
+		for key, entries := range parsedValues {
+			values[key] = append(values[key], entries...)
+		}
+	}
+	return first, values, ""
 }
 
 func parseFields(line string) ([]Field, map[string]string, map[string][]string, error) {
@@ -173,6 +239,16 @@ func recordValue(record Record, key string) string {
 		return firstValue(record.Values, key)
 	}
 	return record.Fields[key]
+}
+
+func semanticRecordValue(record Record, key string) string {
+	if value := recordValue(record, key); value != "" {
+		return value
+	}
+	if record.EmbeddedValues != nil {
+		return firstValue(record.EmbeddedValues, key)
+	}
+	return record.EmbeddedFields[key]
 }
 
 type execArg struct {

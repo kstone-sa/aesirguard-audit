@@ -25,6 +25,9 @@ Unsupported record families are reported through `event.issues`; arbitrary sourc
 | `rule` | object | Local Audit rule keys |
 | `actor` | object | Login identity |
 | `process` | object | Effective process identity and execution data |
+| `target` | object | Account, service, or named object affected by the event |
+| `origin` | object | Remote address, host, and terminal supplied by the producer |
+| `security` | object | Mandatory access-control decision and policy context |
 | `paths` | array | Ordered file objects with associated metadata |
 | `message` | string | Optional deterministic analyst-readable message |
 | `renderer_version` | string | Renderer template version, present only with `message` |
@@ -46,6 +49,7 @@ An invalid ID remains in `audit.id`; `audit.time` is omitted and `event.issues` 
 | `event.type` | string | Deterministic primary Linux Audit record type |
 | `event.category` | string | SIEM-agnostic semantic category such as `process`, `file`, or `configuration` |
 | `event.action` | string | Stable semantic action used by renderers and backend adapters |
+| `event.original_action` | string | Optional source operation such as a PAM operation; never used instead of the stable action |
 | `event.success` | boolean | Normalized source result when recognized |
 | `event.integrity` | object | Present only for incomplete events |
 | `event.issues` | array | Present only for invalid or unsupported input |
@@ -60,6 +64,14 @@ Normal EOE and known single-record completions add no assembly metadata. Timeout
 ```
 
 Unknown result values and unsupported record families are reported explicitly without copying their arbitrary fields.
+
+## Target, origin, and security context
+
+`target` is intentionally narrow. It can contain `user` or `user_id`, `service`, and `name`. Account names from `acct` are preferred; a numeric account is kept in `user_id`. Audit placeholders such as `?`, `unset`, and `(none)` are omitted.
+
+`origin` can contain `address`, `host`, and `terminal`. It represents connection or authentication origin supplied by the event producer and is independent from the configured collector `source`.
+
+`security` is emitted only for security, integrity, and access-control families. It can contain a normalized `decision`, ordered `permissions`, subject and target security contexts, target class, policy profile, and a boolean permissive-mode indicator. SELinux/AppArmor context is not repeated on unrelated authentication or lifecycle events merely because a `subj` field exists.
 
 ## Identity handling
 
@@ -113,9 +125,11 @@ The renderer:
 - quotes ambiguous arguments;
 - omits itself for unsupported event families.
 
-Renderer version `2` covers the Linux Audit activity families selected by the supported CIS Server L1+L2 baselines. Process execution messages require a named `execve`/`execveat` syscall or reconstructed `argv`; merely having an executable path is not treated as execution evidence.
+Renderer version `3` covers the Linux Audit activity families selected by the supported CIS Server L1+L2 baselines plus the security-event families in `security-event-coverage.md`. Process execution messages require a named `execve`/`execveat` syscall or reconstructed `argv`; merely having an executable path is not treated as execution evidence.
 
 Classification uses reconstructed execution evidence, normalized syscall and outcome, normalized rule keys, and conservatively matched paths. Rule keys are locally configurable and therefore are not the sole contract. A security-relevant path is accepted without a recognized key only when the syscall itself proves a mutation. See `cis-coverage.md` for the supported baseline and family matrix.
+
+Some user-space Audit records embed a second key/value payload inside `msg`. The parser extracts that payload without copying it wholesale. Recognized standalone user-space, lifecycle, and audit-daemon records complete immediately; kernel security records such as `AVC`, `SECCOMP`, and `BPF` continue to wait for `EOE` or the normal assembler boundary because they may be part of a compound event.
 
 ## Example and validation
 

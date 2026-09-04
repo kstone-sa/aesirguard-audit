@@ -262,7 +262,7 @@ func (assembler *Assembler) expired(now time.Time) []readyEvent {
 }
 
 func isTerminalRecord(recordType string) bool {
-	return recordType == "EOE" || recordType == "KERNEL"
+	return recordType == "EOE" || recordType == "KERNEL" || isKnownSingleRecordType(recordType)
 }
 
 func terminalCompletion(recordType string) Completion {
