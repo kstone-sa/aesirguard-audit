@@ -70,7 +70,6 @@ func runContext(ctx context.Context, args []string, stdin io.Reader, stdout, std
 		return err
 	}
 
-	var lock *collector.FileLock
 	if options.follow {
 		lockPath := options.lockPath
 		if lockPath == "" {
