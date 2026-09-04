@@ -26,3 +26,32 @@ func TestWithHumanMessageLeavesUnsupportedEventUntouched(t *testing.T) {
 		t.Fatalf("rendered event = %#v", got)
 	}
 }
+
+func TestWithHumanMessageDoesNotDescribeNonExecutionSyscallAsExecution(t *testing.T) {
+	event := CanonicalEvent{
+		Actor: &CanonicalActor{User: "mario"},
+		Process: &CanonicalProcess{
+			Executable: "/usr/bin/cat",
+			Syscall:    "openat",
+		},
+	}
+
+	got := WithHumanMessage(event)
+	if got.Message != "" || got.Renderer != "" {
+		t.Fatalf("rendered non-execution event = %#v", got)
+	}
+}
+
+func TestWithHumanMessageRendersNamedExecveWithoutArguments(t *testing.T) {
+	event := CanonicalEvent{
+		Process: &CanonicalProcess{
+			Executable: "/usr/bin/true",
+			Syscall:    "execve",
+		},
+	}
+
+	got := WithHumanMessage(event)
+	if got.Message != "A process executed /usr/bin/true" || got.Renderer != HumanRendererVersion {
+		t.Fatalf("rendered execution event = %#v", got)
+	}
+}

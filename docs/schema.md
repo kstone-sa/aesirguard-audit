@@ -111,7 +111,7 @@ The renderer:
 - quotes ambiguous arguments;
 - omits itself for unsupported event families.
 
-Renderer version `1` currently supports process execution messages. Additional event-family templates belong to the extended-normalization milestone.
+Renderer version `1` currently supports process execution messages backed by a named `execve`/`execveat` syscall or reconstructed `argv`. Merely having an executable path is not treated as evidence of a new process execution. Additional event-family templates belong to the extended-normalization milestone.
 
 ## Example and validation
 

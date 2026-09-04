@@ -26,6 +26,9 @@ func renderProcessMessage(event CanonicalEvent) (string, bool) {
 		return "", false
 	}
 	process := event.Process
+	if process.Syscall != "execve" && process.Syscall != "execveat" && len(process.Argv) == 0 {
+		return "", false
+	}
 	executable := process.Executable
 	if executable == "" && len(process.Argv) > 0 {
 		executable = process.Argv[0]
