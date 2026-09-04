@@ -38,12 +38,12 @@ jobs:
           ./scripts/package-release.sh ci "${GITHUB_SHA}" "${source_date_epoch}" "$dist"
           test "$(find "$dist" -maxdepth 1 -name '*_standalone.tar.gz' | wc -l)" -eq 2
           test "$(find "$dist" -maxdepth 1 -name '*_systemd.tar.gz' | wc -l)" -eq 2
-          tar -tzf "$dist/audit2json_ci_linux_amd64_standalone.tar.gz" | grep -q '/audit2json$'
+          tar -tzf "$dist/audit2json_ci_linux_amd64_standalone.tar.gz" | grep '/audit2json$' >/dev/null
           if tar -tzf "$dist/audit2json_ci_linux_amd64_standalone.tar.gz" | grep -q '/packaging/'; then
             exit 1
           fi
           tar -tzf "$dist/audit2json_ci_linux_amd64_systemd.tar.gz" | \
-            grep -q '/packaging/systemd/audit2json.service$'
+            grep '/packaging/systemd/audit2json.service$' >/dev/null
           tar -xzf "$dist/audit2json_ci_linux_amd64_standalone.tar.gz" -C "$RUNNER_TEMP"
           "$RUNNER_TEMP/audit2json_ci_linux_amd64_standalone/audit2json" --version
           (cd "$dist" && sha256sum -c SHA256SUMS)
