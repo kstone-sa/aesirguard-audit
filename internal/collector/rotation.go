@@ -112,7 +112,7 @@ func OpenRotatingFollower(inputPath string, options RotationOptions, checkpoint 
 	}
 	return &RotatingFollower{
 		inputPath: canonicalInput, options: options, current: follower, currentAtPath: first.current,
-		queued: candidates[index+1:],
+		queued:   candidates[index+1:],
 		complete: SourcePosition{Identity: expected, Offset: checkpoint.Offset},
 	}, nil
 }

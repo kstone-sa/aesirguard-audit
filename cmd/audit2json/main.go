@@ -249,8 +249,8 @@ func runFollower(ctx context.Context, options commandOptions, processor *eventPr
 	}
 	follower, err := collector.OpenRotatingFollower(options.inputPath, collector.RotationOptions{
 		FollowerOptions: collector.FollowerOptions{PollInterval: options.pollInterval, MaxLineBytes: options.maxLineBytes},
-		DrainInterval: options.rotationDrain,
-		ExcludePaths: []string{options.outputPath, options.checkpointPath, options.lockPath},
+		DrainInterval:   options.rotationDrain,
+		ExcludePaths:    []string{options.outputPath, options.checkpointPath, options.lockPath},
 	}, checkpoint)
 	if err != nil {
 		return err
