@@ -229,6 +229,46 @@ func TestRotatingFollowerWaitsForMissingPathDuringRecovery(t *testing.T) {
 	}
 }
 
+func TestRotatingFollowerReportsQueuedGenerationRemoval(t *testing.T) {
+	directory := t.TempDir()
+	path := filepath.Join(directory, "audit.log")
+	oldest := path + ".2"
+	middle := path + ".1"
+	for candidate, contents := range map[string]string{oldest: "old\n", middle: "middle\n", path: "current\n"} {
+		if err := os.WriteFile(candidate, []byte(contents), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	now := time.Now()
+	if err := os.Chtimes(oldest, now.Add(-2*time.Second), now.Add(-2*time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chtimes(middle, now.Add(-time.Second), now.Add(-time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(oldest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	identity, err := identityFromFileInfo(info)
+	if err != nil {
+		t.Fatal(err)
+	}
+	follower := mustOpenRotatingFollower(t, path, &Checkpoint{Device: identity.Device, Inode: identity.Inode})
+	defer follower.Close()
+	if line := mustNextRotatingLine(t, follower); line.Text != "old" {
+		t.Fatalf("old line = %#v", line)
+	}
+	if err := os.Remove(middle); err != nil {
+		t.Fatal(err)
+	}
+	_, _, err = follower.Next(context.Background())
+	var gap *SourceGapError
+	if !errors.As(err, &gap) || gap.Identity == follower.current.Identity() {
+		t.Fatalf("queued generation gap = %#v, %v", gap, err)
+	}
+}
+
 func TestRotatingFollowerPreservesPartialLineAcrossRotation(t *testing.T) {
 	directory := t.TempDir()
 	path := filepath.Join(directory, "audit.log")

@@ -206,6 +206,7 @@ func (follower *RotatingFollower) Next(ctx context.Context) (SourceLine, bool, e
 }
 
 func (follower *RotatingFollower) refreshQueue() error {
+	previous := follower.queued
 	candidates, err := discoverCandidates(follower.inputPath, follower.options.ExcludePaths)
 	if err != nil {
 		return err
@@ -225,12 +226,25 @@ func (follower *RotatingFollower) refreshQueue() error {
 	if currentIndex < 0 || currentIndex+1 >= len(candidates) {
 		return &SourceGapError{Identity: follower.current.Identity()}
 	}
-	follower.queued = candidates[currentIndex+1:]
+	refreshed := candidates[currentIndex+1:]
+	for _, known := range previous {
+		found := false
+		for _, candidate := range refreshed {
+			if candidate.identity == known.identity {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return &SourceGapError{Identity: known.identity}
+		}
+	}
+	follower.queued = refreshed
 	return nil
 }
 
 func rotationPending(err error) bool {
-	return errors.Is(err, errInputPathPending) || errors.Is(err, os.ErrNotExist)
+	return errors.Is(err, errInputPathPending)
 }
 
 func (follower *RotatingFollower) stableForSwitch(next FileIdentity) (bool, error) {
