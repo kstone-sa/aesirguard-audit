@@ -155,6 +155,9 @@ func TestAssemblerHandlesInterleavedEventsAndConsumesStandaloneEOE(t *testing.T)
 	if len(events) != 1 || events[0].ID != first.ID {
 		t.Fatalf("terminal events = %#v", events)
 	}
+	if !events[0].Complete || events[0].Completion != CompletionProctitle {
+		t.Fatalf("terminal completion = %#v", events[0])
+	}
 	if events := assembler.Add(eoe); len(events) != 0 {
 		t.Fatalf("standalone EOE produced events: %#v", events)
 	}
@@ -177,6 +180,9 @@ func TestAssemblerFlushesExpiredEvents(t *testing.T) {
 	if len(events) != 1 || events[0].ID != record.ID {
 		t.Fatalf("expired events = %#v", events)
 	}
+	if events[0].Complete || events[0].Completion != CompletionTimeout {
+		t.Fatalf("expired completion = %#v", events[0])
+	}
 }
 
 func TestAssemblerUsesAuditTimeWatermark(t *testing.T) {
@@ -189,6 +195,9 @@ func TestAssemblerUsesAuditTimeWatermark(t *testing.T) {
 	events := assembler.AddAt(newRecord, observed)
 	if len(events) != 1 || events[0].ID != oldRecord.ID {
 		t.Fatalf("watermark events = %#v", events)
+	}
+	if events[0].Complete || events[0].Completion != CompletionWatermark {
+		t.Fatalf("watermark completion = %#v", events[0])
 	}
 }
 

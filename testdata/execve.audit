@@ -1,0 +1,5 @@
+node=workstation-01 type=SYSCALL msg=audit(1721721600.123:42): arch=c000003e syscall=59 success=yes exit=0 auid=1000 uid=0 euid=0 gid=0 egid=0 tty=pts0 ses=3 pid=200 ppid=100 exe="/usr/bin/sudo" key="privileged"
+node=workstation-01 type=EXECVE msg=audit(1721721600.123:42): argc=3 a0="sudo" a1="cat" a2="/etc/shadow"
+node=workstation-01 type=CWD msg=audit(1721721600.123:42): cwd="/home/mario"
+node=workstation-01 type=PATH msg=audit(1721721600.123:42): item=0 name="/etc/shadow" inode=123 dev=08:01 mode=0100640 ouid=0 ogid=42 nametype=NORMAL cap_fp=none
+node=workstation-01 type=EOE msg=audit(1721721600.123:42):

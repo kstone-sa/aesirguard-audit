@@ -23,9 +23,30 @@ type pendingEvent struct {
 	hasAuditTS bool
 }
 
+// Completion describes why an assembled event was emitted.
+type Completion string
+
+const (
+	CompletionEOE          Completion = "eoe"
+	CompletionProctitle    Completion = "proctitle"
+	CompletionSingleRecord Completion = "single_record"
+	CompletionWatermark    Completion = "watermark"
+	CompletionTimeout      Completion = "timeout"
+	CompletionEOF          Completion = "eof"
+)
+
+// AssembledEvent retains the physical records and their event boundary.
+// Normalizers decide how those records are represented in an output schema.
+type AssembledEvent struct {
+	ID         string
+	Records    []Record
+	Complete   bool
+	Completion Completion
+}
+
 type readyEvent struct {
 	sequence uint64
-	event    Event
+	event    AssembledEvent
 }
 
 // NewAssembler creates an event assembler. A zero timeout disables expiry.
@@ -37,12 +58,12 @@ func NewAssembler(timeout time.Duration) *Assembler {
 }
 
 // Add adds a record using the current time for inactivity tracking.
-func (assembler *Assembler) Add(record Record) []Event {
+func (assembler *Assembler) Add(record Record) []AssembledEvent {
 	return assembler.AddAt(record, time.Now())
 }
 
 // AddAt adds a record using an explicit observation time for deterministic tests.
-func (assembler *Assembler) AddAt(record Record, observedAt time.Time) []Event {
+func (assembler *Assembler) AddAt(record Record, observedAt time.Time) []AssembledEvent {
 	ready := make([]readyEvent, 0, 2)
 	pending, exists := assembler.pending[record.ID]
 
@@ -65,7 +86,7 @@ func (assembler *Assembler) AddAt(record Record, observedAt time.Time) []Event {
 		pending.lastSeen = observedAt
 
 		if isTerminalRecord(record.Type) {
-			ready = append(ready, assembler.finish(record.ID))
+			ready = append(ready, assembler.finish(record.ID, terminalCompletion(record.Type), true))
 		}
 	}
 
@@ -74,15 +95,15 @@ func (assembler *Assembler) AddAt(record Record, observedAt time.Time) []Event {
 }
 
 // FlushExpired emits events whose watermark or inactivity timeout has elapsed.
-func (assembler *Assembler) FlushExpired(now time.Time) []Event {
+func (assembler *Assembler) FlushExpired(now time.Time) []AssembledEvent {
 	return orderedEvents(assembler.expired(now))
 }
 
 // FlushAll emits all pending events in first-observed order.
-func (assembler *Assembler) FlushAll() []Event {
+func (assembler *Assembler) FlushAll() []AssembledEvent {
 	ready := make([]readyEvent, 0, len(assembler.pending))
 	for id := range assembler.pending {
-		ready = append(ready, assembler.finish(id))
+		ready = append(ready, assembler.finish(id, CompletionEOF, false))
 	}
 	return orderedEvents(ready)
 }
@@ -92,12 +113,17 @@ func (assembler *Assembler) Pending() int {
 	return len(assembler.pending)
 }
 
-func (assembler *Assembler) finish(id string) readyEvent {
+func (assembler *Assembler) finish(id string, completion Completion, complete bool) readyEvent {
 	pending := assembler.pending[id]
 	delete(assembler.pending, id)
 	return readyEvent{
 		sequence: pending.sequence,
-		event:    BuildEvent(pending.records),
+		event: AssembledEvent{
+			ID:         id,
+			Records:    pending.records,
+			Complete:   complete,
+			Completion: completion,
+		},
 	}
 }
 
@@ -118,7 +144,12 @@ func (assembler *Assembler) expired(now time.Time) []readyEvent {
 	})
 	ready := make([]readyEvent, 0, len(ids))
 	for _, id := range ids {
-		ready = append(ready, assembler.finish(id))
+		pending := assembler.pending[id]
+		completion := CompletionTimeout
+		if pending.hasAuditTS && !assembler.latestAuditTime.Before(pending.auditTime.Add(assembler.timeout)) {
+			completion = CompletionWatermark
+		}
+		ready = append(ready, assembler.finish(id, completion, false))
 	}
 	return ready
 }
@@ -127,11 +158,22 @@ func isTerminalRecord(recordType string) bool {
 	return recordType == "EOE" || recordType == "PROCTITLE" || recordType == "KERNEL"
 }
 
-func orderedEvents(ready []readyEvent) []Event {
+func terminalCompletion(recordType string) Completion {
+	switch recordType {
+	case "EOE":
+		return CompletionEOE
+	case "PROCTITLE":
+		return CompletionProctitle
+	default:
+		return CompletionSingleRecord
+	}
+}
+
+func orderedEvents(ready []readyEvent) []AssembledEvent {
 	sort.SliceStable(ready, func(i, j int) bool {
 		return ready[i].sequence < ready[j].sequence
 	})
-	events := make([]Event, 0, len(ready))
+	events := make([]AssembledEvent, 0, len(ready))
 	for _, item := range ready {
 		events = append(events, item.event)
 	}

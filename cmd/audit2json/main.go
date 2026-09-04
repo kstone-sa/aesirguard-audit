@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io"
 	"os"
@@ -18,15 +19,27 @@ func main() {
 }
 
 func run(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
+	flags := flag.NewFlagSet("audit2json", flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	schema := flags.String("schema", "v0.2", "output schema: v0.2 or v0.1")
+	sourceHost := flags.String("source-host", "", "source host override for canonical identity")
+	sourceBootID := flags.String("source-boot-id", "", "source boot ID for canonical identity")
+	if err := flags.Parse(args); err != nil {
+		return err
+	}
+	if *schema != "v0.2" && *schema != "v0.1" {
+		return fmt.Errorf("unsupported schema %q: expected v0.2 or v0.1", *schema)
+	}
+
 	var input io.Reader = stdin
 	var file *os.File
 
-	if len(args) > 1 {
-		return fmt.Errorf("usage: audit2json [audit.log]")
+	if flags.NArg() > 1 {
+		return fmt.Errorf("usage: audit2json [options] [audit.log]")
 	}
-	if len(args) == 1 {
+	if flags.NArg() == 1 {
 		var err error
-		file, err = os.Open(args[0])
+		file, err = os.Open(flags.Arg(0))
 		if err != nil {
 			return err
 		}
@@ -37,9 +50,16 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	enc := json.NewEncoder(stdout)
 	enc.SetEscapeHTML(false)
 	assembler := audit.NewAssembler(0)
-	emit := func(events []audit.Event) error {
+	canonicalOptions := audit.CanonicalOptions{Host: *sourceHost, BootID: *sourceBootID}
+	emit := func(events []audit.AssembledEvent) error {
 		for _, event := range events {
-			if err := enc.Encode(event); err != nil {
+			var output any
+			if *schema == "v0.1" {
+				output = audit.BuildEvent(event.Records)
+			} else {
+				output = audit.BuildCanonicalEvent(event, canonicalOptions)
+			}
+			if err := enc.Encode(output); err != nil {
 				return err
 			}
 		}

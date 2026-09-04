@@ -1,0 +1,77 @@
+{
+  "schema_version": "0.2",
+  "audit": {
+    "id": "1721721600.123:42",
+    "time": "2024-07-23T08:00:00.123Z",
+    "serial": 42
+  },
+  "source": {
+    "host": "workstation-01"
+  },
+  "event": {
+    "type": "SYSCALL",
+    "record_types": ["SYSCALL", "EXECVE", "CWD", "PATH", "EOE"],
+    "record_count": 5,
+    "complete": true,
+    "completion": "eoe",
+    "result": {
+      "raw": "yes"
+    }
+  },
+  "rule": {
+    "keys": ["privileged"]
+  },
+  "actor": {
+    "auid": "1000",
+    "uid": "0",
+    "euid": "0",
+    "gid": "0",
+    "egid": "0",
+    "session": "3"
+  },
+  "process": {
+    "pid": "200",
+    "ppid": "100",
+    "executable": "/usr/bin/sudo",
+    "command": "sudo cat /etc/shadow",
+    "argv": ["sudo", "cat", "/etc/shadow"],
+    "cwd": "/home/mario",
+    "tty": "pts0",
+    "arch_raw": "c000003e",
+    "syscall_raw": "59"
+  },
+  "paths": [
+    {
+      "item": 0,
+      "name": "/etc/shadow",
+      "name_type": "NORMAL",
+      "inode": "123",
+      "device": "08:01",
+      "mode": "0100640",
+      "ouid": "0",
+      "ogid": "42"
+    }
+  ],
+  "unmapped": [
+    {
+      "type": "SYSCALL",
+      "fields": {
+        "exit": ["0"]
+      }
+    },
+    {
+      "type": "EXECVE",
+      "fields": {
+        "a0": ["sudo"],
+        "a1": ["cat"],
+        "a2": ["/etc/shadow"]
+      }
+    },
+    {
+      "type": "PATH",
+      "fields": {
+        "cap_fp": ["none"]
+      }
+    }
+  ]
+}
