@@ -114,3 +114,68 @@ func TestBuildCanonicalEventOmitsEmptyCapabilities(t *testing.T) {
 		t.Fatalf("paths = %#v", got.Paths)
 	}
 }
+
+func TestBuildCanonicalEventDecodesCapabilities(t *testing.T) {
+	record := mustParseRecord(t, `type=PATH msg=audit(1721721604.000:46): item=0 name="/usr/bin/tool" cap_fp=0000000000003000 cap_fi=0000000000000400 cap_fe=1`)
+	assembled := AssembledEvent{ID: record.ID, Records: []Record{record}, Completion: CompletionEOF}
+
+	got := BuildCanonicalEvent(assembled, CanonicalOptions{})
+	if len(got.Paths) != 1 || got.Paths[0].Capabilities == nil {
+		t.Fatalf("paths = %#v", got.Paths)
+	}
+	wantPermitted := []string{"CAP_NET_ADMIN", "CAP_NET_RAW"}
+	wantInheritable := []string{"CAP_NET_BIND_SERVICE"}
+	capabilities := got.Paths[0].Capabilities
+	if !reflect.DeepEqual(capabilities.Permitted, wantPermitted) ||
+		!reflect.DeepEqual(capabilities.Inheritable, wantInheritable) ||
+		!capabilities.Effective {
+		t.Fatalf("capabilities = %#v", capabilities)
+	}
+}
+
+func TestBuildCanonicalEventReportsInvalidCapabilities(t *testing.T) {
+	record := mustParseRecord(t, `type=PATH msg=audit(1721721604.000:46): item=0 name="/usr/bin/tool" cap_fp=invalid`)
+	assembled := AssembledEvent{ID: record.ID, Records: []Record{record}, Complete: true, Completion: CompletionEOE}
+
+	got := BuildCanonicalEvent(assembled, CanonicalOptions{})
+	want := []CanonicalIssue{{
+		Code:       "invalid_capability_mask",
+		RecordType: "PATH",
+		Field:      "paths.capabilities.permitted",
+		Value:      "invalid",
+	}}
+	if !reflect.DeepEqual(got.Event.Issues, want) {
+		t.Fatalf("issues = %#v, want %#v", got.Event.Issues, want)
+	}
+}
+
+func TestBuildCanonicalEventKeepsArchitectureOnlyForRawSyscall(t *testing.T) {
+	enriched := mustParseRecord(t, `type=SYSCALL msg=audit(1721721605.000:47): arch=c000003e syscall=59 ARCH=x86_64 SYSCALL=execve`)
+	assembled := AssembledEvent{ID: enriched.ID, Records: []Record{enriched}, Complete: true, Completion: CompletionEOE}
+
+	got := BuildCanonicalEvent(assembled, CanonicalOptions{})
+	if got.Process == nil || got.Process.Syscall != "execve" || got.Process.SyscallNumber != "" || got.Process.ArchitectureCode != "" {
+		t.Fatalf("enriched process = %#v", got.Process)
+	}
+
+	raw := mustParseRecord(t, `type=SYSCALL msg=audit(1721721606.000:48): arch=c000003e syscall=59`)
+	assembled = AssembledEvent{ID: raw.ID, Records: []Record{raw}, Complete: true, Completion: CompletionEOE}
+	got = BuildCanonicalEvent(assembled, CanonicalOptions{})
+	if got.Process == nil || got.Process.SyscallNumber != "59" || got.Process.ArchitectureCode != "c000003e" || got.Process.Syscall != "" {
+		t.Fatalf("raw process = %#v", got.Process)
+	}
+}
+
+func TestBuildCanonicalEventEmitsSourceOnlyWhenConfigured(t *testing.T) {
+	record := mustParseRecord(t, `node=workstation-01 type=SYSCALL msg=audit(1721721607.000:49): syscall=1`)
+	assembled := AssembledEvent{ID: record.ID, Records: []Record{record}, Complete: true, Completion: CompletionEOE}
+
+	withoutSource := BuildCanonicalEvent(assembled, CanonicalOptions{})
+	if withoutSource.Source != nil {
+		t.Fatalf("implicit source = %#v", withoutSource.Source)
+	}
+	withSource := BuildCanonicalEvent(assembled, CanonicalOptions{Host: "configured-host"})
+	if withSource.Source == nil || withSource.Source.Host != "configured-host" {
+		t.Fatalf("configured source = %#v", withSource.Source)
+	}
+}

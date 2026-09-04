@@ -21,7 +21,7 @@ func main() {
 func run(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	flags := flag.NewFlagSet("audit2json", flag.ContinueOnError)
 	flags.SetOutput(stderr)
-	sourceHost := flags.String("source-host", "", "source host override for canonical identity")
+	sourceHost := flags.String("source-host", "", "include this source host in canonical events")
 	renderMessage := flags.Bool("render-message", false, "include a deterministic analyst-readable message")
 	if err := flags.Parse(args); err != nil {
 		return err

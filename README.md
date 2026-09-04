@@ -15,6 +15,7 @@ The repository currently contains the v0.2 batch converter. It can:
 - emit one security-oriented canonical v0.2 schema;
 - prefer names supplied by Audit ENRICHED records and fall back to explicit ID fields;
 - collapse identical login, real, and effective identities;
+- decode non-empty file capability masks to Linux capability names;
 - optionally add a deterministic analyst-readable process message.
 
 The current implementation still exits at EOF. Broader event-family mappings and rendering, persistent following, checkpoints, rotation, singleton execution, and managed file output are planned and are not implemented yet.
@@ -36,8 +37,6 @@ See `ROADMAP.md` for delivery order.
 
 ## Target runtime model
 
-The target process is long-running:
-
 ```text
 audit.log
     -> file follower
@@ -58,7 +57,7 @@ go vet ./...
 go build -o audit2json ./cmd/audit2json
 ```
 
-## Run the current parser
+## Run the current converter
 
 Read a sample file using canonical v0.2 output:
 
@@ -66,11 +65,13 @@ Read a sample file using canonical v0.2 output:
 ./audit2json testdata/execve.audit
 ```
 
-Read stdin and supply source identity not present in the records:
+Read stdin and explicitly include source identity:
 
 ```bash
 cat /var/log/audit/audit.log | ./audit2json --source-host host01
 ```
+
+`source` is omitted by default because the collecting backend commonly supplies host metadata itself.
 
 Include the optional analyst-readable message:
 
@@ -99,7 +100,7 @@ This redirection is batch behavior, not the planned managed file sink.
 ```text
 cmd/audit2json/      command-line program
 internal/audit/      current parser and event builder
-data/                static mapping data
+data/                embedded static mapping data
 docs/                architecture, schema, reliability, and development guidance
 testdata/            reviewable Linux Audit samples
 AGENTS.md             scoped instructions for humans and coding agents

@@ -20,7 +20,7 @@ Unsupported record families are reported through `event.issues`; arbitrary sourc
 |---|---|---|
 | `schema_version` | string | Canonical schema version; currently `0.2` |
 | `audit` | object | Original Audit ID and event time |
-| `source` | object | Optional source host |
+| `source` | object | Optional explicitly configured source host |
 | `event` | object | Event type, outcome, integrity anomalies, and conversion issues |
 | `rule` | object | Local Audit rule keys |
 | `actor` | object | Login identity |
@@ -37,7 +37,7 @@ A local rule key is never used as a portable event type.
 
 An invalid ID remains in `audit.id`; `audit.time` is omitted and `event.issues` reports `invalid_audit_id`.
 
-`source.host` comes from `--source-host` when supplied, otherwise from the Audit `node` field. Boot identity belongs to collector and checkpoint state and is not repeated in every event.
+`source` is omitted by default. `source.host` is emitted only when `--source-host` is supplied; the Audit `node` field is not copied automatically because collecting backends commonly attach source identity themselves. Boot identity belongs to collector and checkpoint state and is not repeated in every event.
 
 ## Event metadata
 
@@ -77,13 +77,14 @@ SUID, FSUID, SGID, FSGID, and their interpreted forms are not emitted.
 
 The process object may contain:
 
-- `pid`, `ppid`, `name`, `executable`, `cwd`, and `tty`;
+- `pid` and `ppid`, retained for process correlation and tree reconstruction;
+- `name`, `executable`, `cwd`, and `tty`;
 - `argv`, always an array preserving EXECVE argument boundaries;
-- `architecture` and `syscall` when ENRICHED names are available;
-- `architecture_code` and `syscall_number` only as RAW fallbacks;
+- `syscall` when an ENRICHED name is available;
+- `syscall_number` and `architecture_code` together as the RAW fallback, because a syscall number is architecture-dependent;
 - `return_value`, derived from the Audit `exit` field.
 
-No derived command-line string is emitted by default. Backend adapters can derive one from `argv` without paying the indexed-volume cost twice.
+The ENRICHED architecture name is not emitted because it adds no useful context once the syscall is named. No derived command-line string is emitted by default. Backend adapters can derive one from `argv` without paying the indexed-volume cost twice.
 
 ## PATH records
 
@@ -91,13 +92,12 @@ No derived command-line string is emitted by default. Backend adapters can deriv
 
 A path may contain:
 
-- `name` and `name_type`;
-- `inode`, `device`, and `mode`;
+- `name` and `name_type`, with `name_type` retaining the Audit operation role such as `CREATE`, `DELETE`, `PARENT`, or `NORMAL`;
 - `owner` and `group` from ENRICHED data;
 - `owner_id` and `group_id` only when names are unavailable;
-- non-empty file capabilities.
+- semantic non-empty file capabilities.
 
-Values such as `none`, zero capability masks, and empty capability metadata are omitted.
+Inode, device, and raw mode values are not emitted. A capability mask is decoded to ordered Linux names in `permitted` or `inheritable`; `effective` is a boolean. Zero masks, capability format and root-ID metadata, and raw hexadecimal masks are omitted. Invalid or unknown capability encodings produce `event.issues` rather than silently disappearing.
 
 ## Optional human renderer
 
@@ -118,13 +118,13 @@ Renderer version `1` currently supports process execution messages. Additional e
 `testdata/execve.v0.2.json` is the intentionally verbose golden event. It exercises:
 
 - ENRICHED login, real, and effective identities that differ;
-- architecture and syscall names;
-- multiple PATH objects;
+- a named syscall and correlated PID/PPID;
+- multiple PATH objects and their operation roles;
 - owner and group names;
-- non-empty file capabilities;
+- decoded non-empty file capabilities;
 - the optional human renderer.
 
-Ordinary events are smaller because equal identities, empty capabilities, integrity metadata, issues, and renderer fields are omitted.
+Ordinary events are smaller because equal identities, empty capabilities, integrity metadata, issues, source, and renderer fields are omitted.
 
 ## Backend boundary
 

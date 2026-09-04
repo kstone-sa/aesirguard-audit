@@ -4,9 +4,6 @@
     "id": "1721721600.123:42",
     "time": "2024-07-23T08:00:00.123Z"
   },
-  "source": {
-    "host": "workstation-01"
-  },
   "event": {
     "type": "SYSCALL",
     "success": true
@@ -27,7 +24,6 @@
     "argv": ["sudo", "cat", "--", "/etc/shadow"],
     "cwd": "/home/mario",
     "tty": "pts0",
-    "architecture": "x86_64",
     "syscall": "execve",
     "return_value": "0"
   },
@@ -35,24 +31,17 @@
     {
       "name": "/usr/bin/sudo",
       "name_type": "NORMAL",
-      "inode": "120",
-      "device": "08:01",
-      "mode": "0104755",
       "owner": "root",
       "group": "root"
     },
     {
       "name": "/etc/shadow",
       "name_type": "NORMAL",
-      "inode": "123",
-      "device": "08:01",
-      "mode": "0100640",
       "owner": "root",
       "group": "shadow",
       "capabilities": {
-        "permitted": "0000000000002000",
-        "effective": "1",
-        "version": "2"
+        "permitted": ["CAP_NET_RAW"],
+        "effective": true
       }
     }
   ],

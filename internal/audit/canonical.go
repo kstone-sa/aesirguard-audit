@@ -1,17 +1,20 @@
 package audit
 
 import (
+	"encoding/json"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
+
+	mappingdata "github.com/marios-github/audit2json/data"
 )
 
 // CanonicalSchemaVersion identifies the emitted canonical contract.
 const CanonicalSchemaVersion = "0.2"
 
-// CanonicalOptions supplies source identity that is not present in every
-// audit record. An explicit host takes precedence over the record node field.
+// CanonicalOptions supplies optional source identity. Source metadata is
+// emitted only when explicitly configured by the caller.
 type CanonicalOptions struct {
 	Host string
 }
@@ -79,7 +82,6 @@ type CanonicalProcess struct {
 	Argv             []string `json:"argv,omitempty"`
 	CWD              string   `json:"cwd,omitempty"`
 	TTY              string   `json:"tty,omitempty"`
-	Architecture     string   `json:"architecture,omitempty"`
 	ArchitectureCode string   `json:"architecture_code,omitempty"`
 	Syscall          string   `json:"syscall,omitempty"`
 	SyscallNumber    string   `json:"syscall_number,omitempty"`
@@ -89,9 +91,6 @@ type CanonicalProcess struct {
 type CanonicalPath struct {
 	Name         string                     `json:"name,omitempty"`
 	NameType     string                     `json:"name_type,omitempty"`
-	Inode        string                     `json:"inode,omitempty"`
-	Device       string                     `json:"device,omitempty"`
-	Mode         string                     `json:"mode,omitempty"`
 	Owner        string                     `json:"owner,omitempty"`
 	OwnerID      string                     `json:"owner_id,omitempty"`
 	Group        string                     `json:"group,omitempty"`
@@ -100,12 +99,12 @@ type CanonicalPath struct {
 }
 
 type CanonicalFileCapabilities struct {
-	Permitted   string `json:"permitted,omitempty"`
-	Inheritable string `json:"inheritable,omitempty"`
-	Effective   string `json:"effective,omitempty"`
-	Version     string `json:"version,omitempty"`
-	RootID      string `json:"root_id,omitempty"`
+	Permitted   []string `json:"permitted,omitempty"`
+	Inheritable []string `json:"inheritable,omitempty"`
+	Effective   bool     `json:"effective,omitempty"`
 }
+
+var linuxCapabilityNames = mustLinuxCapabilityNames()
 
 type sourceIdentity struct {
 	name string
@@ -151,12 +150,8 @@ func BuildCanonicalEvent(assembled AssembledEvent, options CanonicalOptions) Can
 		})
 	}
 
-	host := options.Host
-	if host == "" {
-		host = firstRecordValue(assembled.Records, "node")
-	}
-	if host != "" {
-		event.Source = &CanonicalSource{Host: host}
+	if options.Host != "" {
+		event.Source = &CanonicalSource{Host: options.Host}
 	}
 
 	keys := uniqueRecordValues(assembled.Records, "key")
@@ -186,7 +181,9 @@ func BuildCanonicalEvent(assembled AssembledEvent, options CanonicalOptions) Can
 	if hasCanonicalProcess(process) {
 		event.Process = &process
 	}
-	event.Paths = buildCanonicalPaths(assembled.Records)
+	var pathIssues []CanonicalIssue
+	event.Paths, pathIssues = buildCanonicalPaths(assembled.Records)
+	event.Event.Issues = append(event.Event.Issues, pathIssues...)
 	return event
 }
 
@@ -219,15 +216,11 @@ func buildCanonicalProcess(records []Record) CanonicalProcess {
 		TTY:         firstRecordValue(records, "tty"),
 		ReturnValue: firstRecordValue(records, "exit"),
 	}
-	if name := interpretedValue(records, "ARCH"); name != "" {
-		process.Architecture = name
-	} else {
-		process.ArchitectureCode = firstRecordValue(records, "arch")
-	}
 	if name := interpretedValue(records, "SYSCALL"); name != "" {
 		process.Syscall = name
-	} else {
-		process.SyscallNumber = firstRecordValue(records, "syscall")
+	} else if number := firstRecordValue(records, "syscall"); number != "" {
+		process.SyscallNumber = number
+		process.ArchitectureCode = firstRecordValue(records, "arch")
 	}
 
 	argv := map[int]*execArg{}
@@ -255,8 +248,8 @@ func hasCanonicalProcess(process CanonicalProcess) bool {
 	return process.PID != "" || process.PPID != "" || process.User != "" ||
 		process.UserID != "" || process.RealUser != "" || process.RealUserID != "" ||
 		process.Name != "" || process.Executable != "" || len(process.Argv) > 0 ||
-		process.CWD != "" || process.TTY != "" || process.Architecture != "" ||
-		process.ArchitectureCode != "" || process.Syscall != "" ||
+		process.CWD != "" || process.TTY != "" || process.ArchitectureCode != "" ||
+		process.Syscall != "" ||
 		process.SyscallNumber != "" || process.ReturnValue != ""
 }
 
@@ -267,21 +260,21 @@ type canonicalPathEntry struct {
 	recordIndex int
 }
 
-func buildCanonicalPaths(records []Record) []CanonicalPath {
+func buildCanonicalPaths(records []Record) ([]CanonicalPath, []CanonicalIssue) {
 	entries := make([]canonicalPathEntry, 0)
+	issues := make([]CanonicalIssue, 0)
 	for index, record := range records {
 		if record.Type != "PATH" {
 			continue
 		}
 		owner := singleRecordIdentity(record, "OUID", "ouid")
 		group := singleRecordIdentity(record, "OGID", "ogid")
+		capabilities, capabilityIssues := fileCapabilities(record)
+		issues = append(issues, capabilityIssues...)
 		path := CanonicalPath{
 			Name:         recordValue(record, "name"),
 			NameType:     recordValue(record, "nametype"),
-			Inode:        recordValue(record, "inode"),
-			Device:       recordValue(record, "dev"),
-			Mode:         recordValue(record, "mode"),
-			Capabilities: fileCapabilities(record),
+			Capabilities: capabilities,
 		}
 		setPathOwner(&path, owner)
 		setPathGroup(&path, group)
@@ -305,30 +298,83 @@ func buildCanonicalPaths(records []Record) []CanonicalPath {
 	for _, entry := range entries {
 		paths = append(paths, entry.path)
 	}
-	return paths
+	return paths, issues
 }
 
-func fileCapabilities(record Record) *CanonicalFileCapabilities {
+func fileCapabilities(record Record) (*CanonicalFileCapabilities, []CanonicalIssue) {
+	permitted, permittedIssue := decodeCapabilityMask(recordValue(record, "cap_fp"), "paths.capabilities.permitted")
+	inheritable, inheritableIssue := decodeCapabilityMask(recordValue(record, "cap_fi"), "paths.capabilities.inheritable")
 	capabilities := CanonicalFileCapabilities{
-		Permitted:   meaningfulCapability(recordValue(record, "cap_fp")),
-		Inheritable: meaningfulCapability(recordValue(record, "cap_fi")),
-		Effective:   meaningfulCapability(recordValue(record, "cap_fe")),
-		Version:     meaningfulCapability(recordValue(record, "cap_fver")),
-		RootID:      meaningfulCapability(recordValue(record, "cap_frootid")),
+		Permitted:   permitted,
+		Inheritable: inheritable,
 	}
-	if capabilities == (CanonicalFileCapabilities{}) {
-		return nil
+	issues := append(permittedIssue, inheritableIssue...)
+	switch strings.ToLower(recordValue(record, "cap_fe")) {
+	case "", "none", "0":
+	case "1":
+		capabilities.Effective = true
+	default:
+		issues = append(issues, CanonicalIssue{
+			Code:       "unknown_capability_effective",
+			RecordType: record.Type,
+			Field:      "paths.capabilities.effective",
+			Value:      recordValue(record, "cap_fe"),
+		})
 	}
-	return &capabilities
+	if len(capabilities.Permitted) == 0 && len(capabilities.Inheritable) == 0 && !capabilities.Effective {
+		return nil, issues
+	}
+	return &capabilities, issues
 }
 
-func meaningfulCapability(value string) string {
-	switch strings.ToLower(value) {
-	case "", "none", "0", "0000000000000000":
-		return ""
-	default:
-		return value
+func decodeCapabilityMask(value, field string) ([]string, []CanonicalIssue) {
+	trimmed := strings.TrimPrefix(strings.ToLower(value), "0x")
+	if trimmed == "" || trimmed == "none" {
+		return nil, nil
 	}
+	mask, err := strconv.ParseUint(trimmed, 16, 64)
+	if err != nil {
+		return nil, []CanonicalIssue{{
+			Code:       "invalid_capability_mask",
+			RecordType: "PATH",
+			Field:      field,
+			Value:      value,
+		}}
+	}
+	if mask == 0 {
+		return nil, nil
+	}
+
+	names := make([]string, 0)
+	remaining := mask
+	for bit, name := range linuxCapabilityNames {
+		bitMask := uint64(1) << bit
+		if mask&bitMask == 0 {
+			continue
+		}
+		names = append(names, name)
+		remaining &^= bitMask
+	}
+	if remaining != 0 {
+		return names, []CanonicalIssue{{
+			Code:       "unknown_capability_bits",
+			RecordType: "PATH",
+			Field:      field,
+			Value:      value,
+		}}
+	}
+	return names, nil
+}
+
+func mustLinuxCapabilityNames() []string {
+	var names []string
+	if err := json.Unmarshal([]byte(mappingdata.LinuxCapabilityNamesJSON()), &names); err != nil {
+		panic("invalid embedded Linux capability mapping: " + err.Error())
+	}
+	if len(names) == 0 || len(names) > 64 {
+		panic("invalid embedded Linux capability mapping length")
+	}
+	return names
 }
 
 func recordIdentity(records []Record, nameKey, idKey string) sourceIdentity {
