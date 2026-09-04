@@ -36,45 +36,35 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 
 	enc := json.NewEncoder(stdout)
 	enc.SetEscapeHTML(false)
+	assembler := audit.NewAssembler(0)
+	emit := func(events []audit.Event) error {
+		for _, event := range events {
+			if err := enc.Encode(event); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
 
-	pending := make(map[string][]audit.Record)
 	scanner := bufio.NewScanner(input)
 	buf := make([]byte, 64*1024)
 	scanner.Buffer(buf, 1024*1024)
 
 	for scanner.Scan() {
-		line := scanner.Text()
-		record, err := audit.ParseRecord(line)
+		record, err := audit.ParseRecord(scanner.Text())
 		if err != nil {
 			fmt.Fprintln(stderr, "skip:", err)
 			continue
 		}
-
-		pending[record.ID] = append(pending[record.ID], record)
-		if record.Type != "EOE" {
-			continue
-		}
-
-		event := audit.BuildEvent(pending[record.ID])
-		if err := enc.Encode(event); err != nil {
+		if err := emit(assembler.Add(record)); err != nil {
 			return err
 		}
-		delete(pending, record.ID)
 	}
 	if err := scanner.Err(); err != nil {
 		return err
 	}
 
-	// File and stdin mode flush incomplete events at EOF. Live follow mode will
-	// use a timeout-based flush in a later delivery.
-	for id, records := range pending {
-		if len(records) == 0 {
-			continue
-		}
-		if err := enc.Encode(audit.BuildEvent(records)); err != nil {
-			return err
-		}
-		delete(pending, id)
-	}
-	return nil
+	// Batch file and stdin modes flush incomplete events at EOF. The future
+	// collector will call FlushExpired while waiting for more input.
+	return emit(assembler.FlushAll())
 }
