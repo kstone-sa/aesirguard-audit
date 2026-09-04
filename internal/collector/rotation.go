@@ -19,6 +19,8 @@ type SourcePosition struct {
 	Offset     int64
 }
 
+var errInputPathPending = errors.New("replacement input path is temporarily absent")
+
 // RotationOptions controls retained-file discovery and old-inode drain time.
 type RotationOptions struct {
 	FollowerOptions
@@ -131,6 +133,9 @@ func (follower *RotatingFollower) Next(ctx context.Context) (SourceLine, bool, e
 	}
 	if len(follower.queued) != 0 && !follower.currentAtPath {
 		if err := follower.refreshQueue(); err != nil {
+			if rotationPending(err) {
+				return SourceLine{}, false, nil
+			}
 			return SourceLine{}, false, err
 		}
 		if follower.currentAtPath {
@@ -141,6 +146,9 @@ func (follower *RotatingFollower) Next(ctx context.Context) (SourceLine, bool, e
 			return SourceLine{}, false, err
 		}
 		if err := follower.switchTo(follower.queued[0]); err != nil {
+			if rotationPending(err) {
+				return SourceLine{}, false, nil
+			}
 			return SourceLine{}, false, err
 		}
 		follower.queued = follower.queued[1:]
@@ -149,6 +157,9 @@ func (follower *RotatingFollower) Next(ctx context.Context) (SourceLine, bool, e
 	}
 	if !follower.currentAtPath {
 		if err := follower.refreshQueue(); err != nil {
+			if rotationPending(err) {
+				return SourceLine{}, false, nil
+			}
 			return SourceLine{}, false, err
 		}
 		return SourceLine{}, false, nil
@@ -173,6 +184,9 @@ func (follower *RotatingFollower) Next(ctx context.Context) (SourceLine, bool, e
 		return SourceLine{}, false, nil
 	}
 	if err := follower.refreshQueue(); err != nil {
+		if rotationPending(err) {
+			return SourceLine{}, false, nil
+		}
 		return SourceLine{}, false, err
 	}
 	stable, err := follower.stableForSwitch(follower.queued[0].identity)
@@ -181,6 +195,9 @@ func (follower *RotatingFollower) Next(ctx context.Context) (SourceLine, bool, e
 	}
 	candidate := follower.queued[0]
 	if err := follower.switchTo(candidate); err != nil {
+		if rotationPending(err) {
+			return SourceLine{}, false, nil
+		}
 		return SourceLine{}, false, err
 	}
 	follower.queued = follower.queued[1:]
@@ -212,10 +229,17 @@ func (follower *RotatingFollower) refreshQueue() error {
 	return nil
 }
 
+func rotationPending(err error) bool {
+	return errors.Is(err, errInputPathPending) || errors.Is(err, os.ErrNotExist)
+}
+
 func (follower *RotatingFollower) stableForSwitch(next FileIdentity) (bool, error) {
 	size, err := follower.current.descriptorSize()
 	if err != nil {
 		return false, err
+	}
+	if size < follower.current.CurrentOffset() {
+		return false, &SourceTruncatedError{Identity: follower.current.Identity(), Offset: follower.current.CurrentOffset(), Size: size}
 	}
 	now := time.Now()
 	if next != follower.pendingIdentity || size != follower.drainSize {
@@ -374,7 +398,7 @@ func discoverCandidates(inputPath string, excludes []string) ([]sourceCandidate,
 		currentFound = currentFound || candidate.current
 	}
 	if !currentFound {
-		return nil, errors.New("configured input path is not a regular file")
+		return nil, errInputPathPending
 	}
 	return candidates, nil
 }

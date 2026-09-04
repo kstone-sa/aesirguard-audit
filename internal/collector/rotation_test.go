@@ -179,6 +179,56 @@ func TestRotatingFollowerExtendsRecoveryQueueDuringDrain(t *testing.T) {
 	}
 }
 
+func TestRotatingFollowerWaitsForMissingPathDuringRecovery(t *testing.T) {
+	directory := t.TempDir()
+	path := filepath.Join(directory, "audit.log")
+	old := path + ".1"
+	if err := os.WriteFile(old, []byte("old\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("middle\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(old)
+	if err != nil {
+		t.Fatal(err)
+	}
+	identity, err := identityFromFileInfo(info)
+	if err != nil {
+		t.Fatal(err)
+	}
+	follower := mustOpenRotatingFollower(t, path, &Checkpoint{Device: identity.Device, Inode: identity.Inode})
+	defer follower.Close()
+	if line := mustNextRotatingLine(t, follower); line.Text != "old" {
+		t.Fatalf("old line = %#v", line)
+	}
+	if err := os.Rename(old, path+".2"); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(path, old); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok, err := follower.Next(context.Background()); err != nil || ok {
+		t.Fatalf("queued missing-path window = %v, %v", ok, err)
+	}
+	if err := os.WriteFile(path, []byte("current\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now()
+	if err := os.Chtimes(path+".2", now.Add(-2*time.Second), now.Add(-2*time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chtimes(old, now.Add(-time.Second), now.Add(-time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	for index, want := range []string{"middle", "current"} {
+		line := mustNextRotatingLine(t, follower)
+		if line.Text != want || line.Generation != uint64(index+1) {
+			t.Fatalf("recovered missing-path line %d = %#v", index, line)
+		}
+	}
+}
+
 func TestRotatingFollowerPreservesPartialLineAcrossRotation(t *testing.T) {
 	directory := t.TempDir()
 	path := filepath.Join(directory, "audit.log")
@@ -405,6 +455,32 @@ func TestRotatingFollowerReportsSameInodeTruncation(t *testing.T) {
 	var truncated *SourceTruncatedError
 	if !errors.As(err, &truncated) {
 		t.Fatalf("truncation error = %v", err)
+	}
+}
+
+func TestRotatingFollowerReportsTruncationAfterRename(t *testing.T) {
+	directory := t.TempDir()
+	path := filepath.Join(directory, "audit.log")
+	rotated := path + ".1"
+	if err := os.WriteFile(path, []byte("line\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	follower := mustOpenRotatingFollower(t, path, nil)
+	defer follower.Close()
+	mustNextRotatingLine(t, follower)
+	if err := os.Rename(path, rotated); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("new\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Truncate(rotated, 0); err != nil {
+		t.Fatal(err)
+	}
+	_, _, err := follower.Next(context.Background())
+	var truncated *SourceTruncatedError
+	if !errors.As(err, &truncated) {
+		t.Fatalf("renamed truncation error = %v", err)
 	}
 }
 
