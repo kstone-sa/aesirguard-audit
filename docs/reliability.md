@@ -15,7 +15,7 @@ These guarantees apply to audit2json and its selected sink. End-to-end indexing 
 
 ## Implementation status
 
-Milestone v0.5 implements durable opt-in checkpoints and restart recovery when the checkpointed device and inode still match the configured input path. It fails explicitly on a generation mismatch. Locating retained rotated generations, live rotation, truncation handling, and output reopen remain target behavior until v0.6 is complete.
+Milestone v0.6 implements durable opt-in checkpoints, recovery through retained uncompressed generations, live rename/create input rotation, explicit same-inode truncation errors, and automatic managed-output reopen.
 
 ## Delivery semantics
 
@@ -83,11 +83,12 @@ On startup:
 
 1. acquire the per-input singleton lock;
 2. read and validate the checkpoint;
-3. verify the current path has the checkpoint device and inode;
-4. seek to the safe offset;
-5. continue following that generation.
+3. locate its device and inode at the current path or among uncompressed basename-prefixed siblings;
+4. seek to the validated complete-line offset;
+5. drain retained generations in modification-time order;
+6. switch to and follow the current input path.
 
-Milestone v0.6 extends this sequence by locating the checkpoint inode among retained rotated files, draining newer generations in order, and switching to the current input path. In v0.5, an inode mismatch is an explicit fail-closed error.
+If the checkpoint inode cannot be found, recovery fails closed with an explicit source-gap error. Compressed generations are not decoded. Recovery assumes the rotation set preserves modification-time order; unusual schemes should retain standard `audit.log.*` or `audit.log-*` naming and timestamps.
 
 ## Rotation handling
 
@@ -104,7 +105,7 @@ For rename/create rotation:
 
 This permits a logical Audit event to span file generations.
 
-For truncation on the same inode, detect that file size is smaller than the current offset, report the condition, and restart from the beginning according to the configured recovery policy.
+For truncation on the same inode, the collector detects that file size is smaller than the current offset and fails with an explicit source-gap error. It does not silently restart at zero. A configurable best-effort continuation policy remains future work.
 
 ## Event completion and latency
 
@@ -145,10 +146,10 @@ The managed file sink:
 - makes completed lines visible promptly;
 - optionally syncs each accepted event;
 - syncs durable output before advancing a durability-dependent input checkpoint;
-- will support managed rename-based rotation or an explicit reopen signal;
+- automatically reopens after managed rename-based rotation;
 - never relies on unmanaged shell redirection for long-running rotation.
 
-Input-log rotation and output-file rotation are independent state machines. Checkpoint coupling is implemented in v0.5; managed output rotation remains planned for v0.6.
+Input-log rotation and output-file rotation are independent state machines. Checkpoint coupling and managed rename-based output reopen are implemented.
 
 ## Failure reporting
 

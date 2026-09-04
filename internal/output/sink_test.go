@@ -63,6 +63,39 @@ func TestFileSinkCommitSyncsWithoutPerEventSync(t *testing.T) {
 	}
 }
 
+func TestFileSinkReopensAfterRenameRotation(t *testing.T) {
+	directory := t.TempDir()
+	path := filepath.Join(directory, "audit.ndjson")
+	rotated := path + ".1"
+	sink, err := OpenFileSink(path, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := sink.Write(audit.CanonicalEvent{SchemaVersion: "0.3", Message: "before"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(path, rotated); err != nil {
+		t.Fatal(err)
+	}
+	if err := sink.Write(audit.CanonicalEvent{SchemaVersion: "0.3", Message: "after"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := sink.Close(); err != nil {
+		t.Fatal(err)
+	}
+	oldContents, err := os.ReadFile(rotated)
+	if err != nil {
+		t.Fatal(err)
+	}
+	newContents, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(oldContents), "before") || strings.Contains(string(oldContents), "after") || !strings.Contains(string(newContents), "after") {
+		t.Fatalf("rotated outputs: old=%s new=%s", oldContents, newContents)
+	}
+}
+
 type blockingWriter struct {
 	started chan struct{}
 	release chan struct{}

@@ -290,6 +290,56 @@ func TestRunFollowerCheckpointStopsBeforeUnresolvedEvent(t *testing.T) {
 	}
 }
 
+func TestRunFollowerContinuesAcrossRenameRotation(t *testing.T) {
+	directory := t.TempDir()
+	inputPath := filepath.Join(directory, "audit.log")
+	outputPath := filepath.Join(directory, "events.ndjson")
+	checkpointPath := filepath.Join(directory, "checkpoint")
+	lockPath := filepath.Join(directory, "lock")
+	if err := os.WriteFile(inputPath, []byte(`type=KERNEL msg=audit(1721721920.000:120): device=old`+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() {
+		done <- runContext(ctx, []string{
+			"--follow", "--poll-interval=5ms", "--rotation-drain-interval=10ms", "--checkpoint-interval=5ms",
+			"--output-file=" + outputPath, "--checkpoint-file=" + checkpointPath,
+			"--lock-file=" + lockPath, inputPath,
+		}, strings.NewReader(""), io.Discard, io.Discard)
+	}()
+	waitForOutputLines(t, outputPath, 1)
+	if err := os.Rename(inputPath, inputPath+".1"); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(inputPath, []byte(`type=KERNEL msg=audit(1721721921.000:121): device=new`+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	waitForOutputLines(t, outputPath, 2)
+	cancel()
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+	contents, err := os.ReadFile(outputPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(contents), "1721721920.000:120") || !strings.Contains(string(contents), "1721721921.000:121") {
+		t.Fatalf("rotated output = %s", contents)
+	}
+	checkpoint, err := collector.LoadCheckpoint(checkpointPath)
+	if err != nil || checkpoint == nil {
+		t.Fatalf("checkpoint = %#v, %v", checkpoint, err)
+	}
+	info, err := os.Stat(inputPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if checkpoint.Offset != info.Size() {
+		t.Fatalf("checkpoint offset = %d, want %d", checkpoint.Offset, info.Size())
+	}
+}
+
 func TestRunRejectsConflictingStatePaths(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "audit.log")
 	if err := os.WriteFile(path, nil, 0o600); err != nil {
@@ -325,6 +375,18 @@ func waitForOutput(t *testing.T, path string) {
 		time.Sleep(5 * time.Millisecond)
 	}
 	t.Fatalf("output was not written: %s", path)
+}
+
+func waitForOutputLines(t *testing.T, path string, count int) {
+	t.Helper()
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		if contents, err := os.ReadFile(path); err == nil && strings.Count(string(contents), "\n") >= count {
+			return
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	t.Fatalf("output did not reach %d lines", count)
 }
 
 func runFollowerUntilOutput(t *testing.T, inputPath, outputPath, checkpointPath string, lines int) {

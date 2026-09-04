@@ -1,0 +1,306 @@
+package collector
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
+	"time"
+)
+
+// SourcePosition is a durable complete-line boundary in one generation.
+type SourcePosition struct {
+	Identity   FileIdentity
+	Generation uint64
+	Offset     int64
+}
+
+// RotationOptions controls retained-file discovery and old-inode drain time.
+type RotationOptions struct {
+	FollowerOptions
+	DrainInterval time.Duration
+	ExcludePaths  []string
+}
+
+// SourceGapError means the checkpoint generation is no longer retained.
+type SourceGapError struct {
+	Identity FileIdentity
+}
+
+func (err *SourceGapError) Error() string {
+	return fmt.Sprintf("checkpoint source generation is not retained: device=%d inode=%d", err.Identity.Device, err.Identity.Inode)
+}
+
+// SourceTruncatedError reports copytruncate or another same-inode shrink.
+type SourceTruncatedError struct {
+	Identity FileIdentity
+	Offset   int64
+	Size     int64
+}
+
+func (err *SourceTruncatedError) Error() string {
+	return fmt.Sprintf("source generation truncated: device=%d inode=%d offset=%d size=%d", err.Identity.Device, err.Identity.Inode, err.Offset, err.Size)
+}
+
+type sourceCandidate struct {
+	path       string
+	identity   FileIdentity
+	modifiedAt time.Time
+	current    bool
+}
+
+// RotatingFollower drains retained and live rename/create generations in
+// source order while preserving partial physical lines.
+type RotatingFollower struct {
+	inputPath       string
+	options         RotationOptions
+	current         *FileFollower
+	currentAtPath   bool
+	queued          []sourceCandidate
+	complete        SourcePosition
+	rotationCount   uint64
+	pendingIdentity FileIdentity
+	drainStarted    time.Time
+	drainSize       int64
+}
+
+// OpenRotatingFollower opens the checkpoint generation, searching retained
+// siblings when the configured path already references a newer inode.
+func OpenRotatingFollower(inputPath string, options RotationOptions, checkpoint *Checkpoint) (*RotatingFollower, error) {
+	if options.DrainInterval <= 0 {
+		return nil, fmt.Errorf("rotation drain interval must be positive")
+	}
+	canonicalInput, err := CanonicalPath(inputPath)
+	if err != nil {
+		return nil, err
+	}
+	if checkpoint == nil {
+		follower, err := OpenFileFollowerAt(canonicalInput, options.FollowerOptions, 0, nil)
+		if err != nil {
+			return nil, err
+		}
+		return &RotatingFollower{
+			inputPath: canonicalInput, options: options, current: follower, currentAtPath: true,
+			complete: SourcePosition{Identity: follower.Identity(), Offset: 0},
+		}, nil
+	}
+
+	expected := FileIdentity{Device: checkpoint.Device, Inode: checkpoint.Inode}
+	candidates, err := discoverCandidates(canonicalInput, options.ExcludePaths)
+	if err != nil {
+		return nil, err
+	}
+	index := -1
+	for i, candidate := range candidates {
+		if candidate.identity == expected {
+			index = i
+			break
+		}
+	}
+	if index < 0 {
+		return nil, &SourceGapError{Identity: expected}
+	}
+	first := candidates[index]
+	followerOptions := options.FollowerOptions
+	followerOptions.Generation = 0
+	follower, err := OpenFileFollowerAt(first.path, followerOptions, checkpoint.Offset, &expected)
+	if err != nil {
+		return nil, err
+	}
+	return &RotatingFollower{
+		inputPath: canonicalInput, options: options, current: follower, currentAtPath: first.current,
+		queued: candidates[index+1:],
+		complete: SourcePosition{Identity: expected, Offset: checkpoint.Offset},
+	}, nil
+}
+
+// Next returns a source line, an idle tick, or an explicit source gap.
+func (follower *RotatingFollower) Next(ctx context.Context) (SourceLine, bool, error) {
+	line, ok, err := follower.current.NextSource(ctx)
+	if err != nil || ok {
+		if ok {
+			follower.complete = SourcePosition{Identity: line.Identity, Generation: line.Generation, Offset: line.End}
+		}
+		return line, ok, err
+	}
+	if len(follower.queued) != 0 && !follower.currentAtPath {
+		if err := follower.switchTo(follower.queued[0]); err != nil {
+			return SourceLine{}, false, err
+		}
+		follower.queued = follower.queued[1:]
+		return SourceLine{}, false, nil
+	}
+	if !follower.currentAtPath {
+		return SourceLine{}, false, fmt.Errorf("retained source chain ended before current input path")
+	}
+	pathInfo, err := os.Stat(follower.inputPath)
+	if err != nil {
+		return SourceLine{}, false, err
+	}
+	pathIdentity, err := identityFromFileInfo(pathInfo)
+	if err != nil {
+		return SourceLine{}, false, err
+	}
+	if pathIdentity == follower.current.Identity() {
+		follower.queued = nil
+		follower.pendingIdentity = FileIdentity{}
+		follower.drainStarted = time.Time{}
+		if pathInfo.Size() < follower.current.CurrentOffset() {
+			return SourceLine{}, false, &SourceTruncatedError{Identity: pathIdentity, Offset: follower.current.CurrentOffset(), Size: pathInfo.Size()}
+		}
+		return SourceLine{}, false, nil
+	}
+	candidates, err := discoverCandidates(follower.inputPath, follower.options.ExcludePaths)
+	if err != nil {
+		return SourceLine{}, false, err
+	}
+	currentIndex := -1
+	for i, candidate := range candidates {
+		if candidate.identity == follower.current.Identity() {
+			currentIndex = i
+			break
+		}
+	}
+	if currentIndex < 0 || currentIndex+1 >= len(candidates) {
+		return SourceLine{}, false, &SourceGapError{Identity: follower.current.Identity()}
+	}
+	follower.queued = candidates[currentIndex+1:]
+	size, err := follower.current.descriptorSize()
+	if err != nil {
+		return SourceLine{}, false, err
+	}
+	now := time.Now()
+	if follower.queued[0].identity != follower.pendingIdentity || size != follower.drainSize {
+		follower.pendingIdentity = follower.queued[0].identity
+		follower.drainSize = size
+		follower.drainStarted = now
+		return SourceLine{}, false, nil
+	}
+	if now.Sub(follower.drainStarted) < follower.options.DrainInterval {
+		return SourceLine{}, false, nil
+	}
+	candidate := follower.queued[0]
+	if err := follower.switchTo(candidate); err != nil {
+		return SourceLine{}, false, err
+	}
+	follower.queued = follower.queued[1:]
+	follower.pendingIdentity = FileIdentity{}
+	follower.drainStarted = time.Time{}
+	return SourceLine{}, false, nil
+}
+
+func (follower *RotatingFollower) switchTo(candidate sourceCandidate) error {
+	options := follower.options.FollowerOptions
+	options.Generation = follower.current.generation + 1
+	next, err := OpenFileFollowerAt(candidate.path, options, 0, &candidate.identity)
+	if err != nil {
+		return err
+	}
+	hadPartial := follower.current.HasPartial()
+	if err := follower.current.transferPartialTo(next); err != nil {
+		_ = next.Close()
+		return err
+	}
+	if err := follower.current.Close(); err != nil {
+		_ = next.Close()
+		return err
+	}
+	follower.current = next
+	follower.currentAtPath = candidate.current
+	follower.rotationCount++
+	if !hadPartial {
+		follower.complete = SourcePosition{Identity: candidate.identity, Generation: options.Generation, Offset: 0}
+	}
+	return nil
+}
+
+// CompletePosition returns the end of the last complete physical line.
+func (follower *RotatingFollower) CompletePosition() SourcePosition { return follower.complete }
+
+// RotationCount is incremented after every generation transition.
+func (follower *RotatingFollower) RotationCount() uint64 { return follower.rotationCount }
+
+// Close releases the active source descriptor.
+func (follower *RotatingFollower) Close() error { return follower.current.Close() }
+
+func discoverCandidates(inputPath string, excludes []string) ([]sourceCandidate, error) {
+	directory := filepath.Dir(inputPath)
+	base := filepath.Base(inputPath)
+	excluded := make(map[string]struct{}, len(excludes))
+	for _, path := range excludes {
+		if path == "" {
+			continue
+		}
+		canonical, err := CanonicalPath(path)
+		if err == nil {
+			excluded[canonical] = struct{}{}
+		}
+	}
+	entries, err := os.ReadDir(directory)
+	if err != nil {
+		return nil, err
+	}
+	candidates := make([]sourceCandidate, 0)
+	for _, entry := range entries {
+		name := entry.Name()
+		if name != base && !strings.HasPrefix(name, base+".") && !strings.HasPrefix(name, base+"-") {
+			continue
+		}
+		if isCompressedRotation(name) {
+			continue
+		}
+		path := filepath.Join(directory, name)
+		if _, skip := excluded[path]; skip {
+			continue
+		}
+		if entry.Type()&os.ModeSymlink != 0 {
+			continue
+		}
+		info, err := entry.Info()
+		if err != nil {
+			return nil, err
+		}
+		if !info.Mode().IsRegular() {
+			continue
+		}
+		identity, err := identityFromFileInfo(info)
+		if err != nil {
+			return nil, err
+		}
+		candidates = append(candidates, sourceCandidate{
+			path: path, identity: identity, modifiedAt: info.ModTime(), current: path == inputPath,
+		})
+	}
+	if len(candidates) == 0 {
+		return nil, os.ErrNotExist
+	}
+	sort.SliceStable(candidates, func(i, j int) bool {
+		if candidates[i].current != candidates[j].current {
+			return !candidates[i].current
+		}
+		if candidates[i].modifiedAt.Equal(candidates[j].modifiedAt) {
+			return candidates[i].path < candidates[j].path
+		}
+		return candidates[i].modifiedAt.Before(candidates[j].modifiedAt)
+	})
+	currentFound := false
+	for _, candidate := range candidates {
+		currentFound = currentFound || candidate.current
+	}
+	if !currentFound {
+		return nil, errors.New("configured input path is not a regular file")
+	}
+	return candidates, nil
+}
+
+func isCompressedRotation(name string) bool {
+	for _, suffix := range []string{".gz", ".xz", ".bz2", ".zst"} {
+		if strings.HasSuffix(name, suffix) {
+			return true
+		}
+	}
+	return false
+}

@@ -35,6 +35,7 @@ type SourcePosition struct {
 	Generation uint64
 	Start      int64
 	End        int64
+	Bytes      int
 	Valid      bool
 }
 
