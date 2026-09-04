@@ -7,7 +7,61 @@ import (
 )
 
 // HumanRendererVersion identifies the deterministic message template set.
-const HumanRendererVersion = "2"
+const HumanRendererVersion = "3"
+
+type actionWording struct {
+	success string
+	failure string
+	unknown string
+}
+
+var securityActionWording = map[string]actionWording{
+	"authenticate":             {"authenticated", "failed to authenticate", "attempted to authenticate"},
+	"check_account":            {"validated", "failed to validate", "attempted to validate"},
+	"login":                    {"logged in", "failed to log in", "attempted to log in"},
+	"logout":                   {"logged out", "failed to log out", "attempted to log out"},
+	"start_session":            {"started a session", "failed to start a session", "attempted to start a session"},
+	"end_session":              {"ended a session", "failed to end a session", "attempted to end a session"},
+	"acquire_credentials":      {"acquired credentials", "failed to acquire credentials", "attempted to acquire credentials"},
+	"dispose_credentials":      {"disposed of credentials", "failed to dispose of credentials", "attempted to dispose of credentials"},
+	"refresh_credentials":      {"refreshed credentials", "failed to refresh credentials", "attempted to refresh credentials"},
+	"change_credentials":       {"changed credentials", "failed to change credentials", "attempted to change credentials"},
+	"change_group_credentials": {"changed group credentials", "failed to change group credentials", "attempted to change group credentials"},
+	"modify_user":              {"modified a user", "failed to modify a user", "attempted to modify a user"},
+	"modify_group":             {"modified a group", "failed to modify a group", "attempted to modify a group"},
+	"create_user":              {"created a user", "failed to create a user", "attempted to create a user"},
+	"delete_user":              {"deleted a user", "failed to delete a user", "attempted to delete a user"},
+	"create_group":             {"created a group", "failed to create a group", "attempted to create a group"},
+	"delete_group":             {"deleted a group", "failed to delete a group", "attempted to delete a group"},
+	"lock_account":             {"locked an account", "failed to lock an account", "attempted to lock an account"},
+	"unlock_account":           {"unlocked an account", "failed to unlock an account", "attempted to unlock an account"},
+	"authentication_error":     {"reported an authentication error", "reported an authentication error", "reported an authentication error"},
+	"boot":                     {"booted the system", "failed to boot the system", "attempted to boot the system"},
+	"shutdown":                 {"shut down the system", "failed to shut down the system", "attempted to shut down the system"},
+	"change_runlevel":          {"changed the system runlevel", "failed to change the system runlevel", "attempted to change the system runlevel"},
+	"start_service":            {"started a service", "failed to start a service", "attempted to start a service"},
+	"stop_service":             {"stopped a service", "failed to stop a service", "attempted to stop a service"},
+	"update_software":          {"updated software", "failed to update software", "attempted to update software"},
+	"start_audit_daemon":       {"started the audit daemon", "failed to start the audit daemon", "attempted to start the audit daemon"},
+	"stop_audit_daemon":        {"stopped the audit daemon", "failed to stop the audit daemon", "attempted to stop the audit daemon"},
+	"abort_audit_daemon":       {"aborted the audit daemon", "the audit daemon aborted", "the audit daemon was aborted"},
+	"audit_daemon_error":       {"reported an audit daemon error", "reported an audit daemon error", "reported an audit daemon error"},
+	"configure_audit_daemon":   {"configured the audit daemon", "failed to configure the audit daemon", "attempted to configure the audit daemon"},
+	"rotate_audit_log":         {"rotated the audit log", "failed to rotate the audit log", "attempted to rotate the audit log"},
+	"resume_audit_logging":     {"resumed audit logging", "failed to resume audit logging", "attempted to resume audit logging"},
+	"change_audit_feature":     {"changed an audit feature", "failed to change an audit feature", "attempted to change an audit feature"},
+	"policy_error":             {"reported an access-control policy error", "reported an access-control policy error", "reported an access-control policy error"},
+	"terminate_by_policy":      {"was terminated by access-control policy", "could not be terminated by access-control policy", "was selected for termination by access-control policy"},
+	"change_policy_status":     {"changed access-control policy status", "failed to change access-control policy status", "attempted to change access-control policy status"},
+	"load_mac_policy":          {"loaded mandatory access-control policy", "failed to load mandatory access-control policy", "attempted to load mandatory access-control policy"},
+	"block_syscall":            {"blocked a system call", "failed to block a system call", "attempted to block a system call"},
+	"bpf_operation":            {"performed a BPF operation", "failed to perform a BPF operation", "attempted a BPF operation"},
+	"change_capabilities":      {"changed process capabilities", "failed to change process capabilities", "attempted to change process capabilities"},
+	"apply_file_capabilities":  {"applied file capabilities", "failed to apply file capabilities", "attempted to apply file capabilities"},
+	"kernel_module_operation":  {"performed a kernel module operation", "failed to perform a kernel module operation", "attempted a kernel module operation"},
+	"detect_anomaly":           {"reported a security anomaly", "reported a security anomaly", "reported a security anomaly"},
+	"check_integrity":          {"reported an integrity event", "reported an integrity failure", "reported an integrity event"},
+}
 
 // WithHumanMessage returns an event with an analyst-readable message when a
 // supported template can be rendered entirely from canonical fields.
@@ -59,8 +113,95 @@ func renderCanonicalMessage(event CanonicalEvent) (string, bool) {
 		return renderMappedAction(event, "queried kernel modules", "failed to query kernel modules", "attempted to query kernel modules", "at", true)
 	case "change_audit_configuration":
 		return renderMappedAction(event, "changed audit configuration", "failed to change audit configuration", "attempted to change audit configuration", "at", false)
+	case "enforce_access_control":
+		return renderAccessControlMessage(event)
 	default:
+		if wording, ok := securityActionWording[event.Event.Action]; ok {
+			return renderSecurityFamilyMessage(event, wording), true
+		}
 		return renderProcessMessage(event)
+	}
+}
+
+func renderSecurityFamilyMessage(event CanonicalEvent, wording actionWording) string {
+	phrase := wording.unknown
+	if event.Event.Success != nil && *event.Event.Success {
+		phrase = wording.success
+	} else if event.Event.Success != nil {
+		phrase = wording.failure
+	}
+	var builder strings.Builder
+	builder.WriteString(renderedActor(event))
+	builder.WriteByte(' ')
+	builder.WriteString(phrase)
+	appendRenderedTarget(&builder, event)
+	appendRenderedOrigin(&builder, event)
+	if event.Event.OriginalAction != "" && (event.Event.Category == "authentication" || event.Event.Category == "identity") {
+		builder.WriteString(" during ")
+		builder.WriteString(renderedArgument(event.Event.OriginalAction))
+	}
+	return builder.String()
+}
+
+func renderAccessControlMessage(event CanonicalEvent) (string, bool) {
+	decision := "triggered an access-control decision"
+	if event.Security != nil {
+		switch strings.ToLower(event.Security.Decision) {
+		case "denied", "deny":
+			decision = "was denied access by mandatory access-control policy"
+		case "allowed", "allow", "granted":
+			decision = "was allowed access by mandatory access-control policy"
+		}
+	}
+	var builder strings.Builder
+	builder.WriteString(renderedActor(event))
+	builder.WriteByte(' ')
+	builder.WriteString(decision)
+	if event.Security != nil && len(event.Security.Permissions) > 0 {
+		builder.WriteString(" for ")
+		builder.WriteString(strings.Join(event.Security.Permissions, ", "))
+	}
+	appendRenderedTarget(&builder, event)
+	return builder.String(), true
+}
+
+func appendRenderedTarget(builder *strings.Builder, event CanonicalEvent) {
+	if event.Target == nil {
+		if targets := renderedTargets(event.Paths); targets != "" {
+			builder.WriteString(" on ")
+			builder.WriteString(targets)
+		}
+		return
+	}
+	if event.Target.User != "" || event.Target.UserID != "" {
+		builder.WriteString(" for account ")
+		builder.WriteString(renderedIdentity(event.Target.User, event.Target.UserID))
+	}
+	if event.Target.Service != "" {
+		builder.WriteString(" ")
+		builder.WriteString(renderedArgument(event.Target.Service))
+	}
+	if event.Target.Name != "" {
+		builder.WriteString(" on ")
+		builder.WriteString(renderedArgument(event.Target.Name))
+	}
+}
+
+func appendRenderedOrigin(builder *strings.Builder, event CanonicalEvent) {
+	if event.Origin == nil {
+		return
+	}
+	remote := event.Origin.Address
+	if remote == "" {
+		remote = event.Origin.Host
+	}
+	if remote != "" {
+		builder.WriteString(" from ")
+		builder.WriteString(renderedArgument(remote))
+	}
+	if event.Origin.Terminal != "" {
+		builder.WriteString(" via ")
+		builder.WriteString(renderedArgument(event.Origin.Terminal))
 	}
 }
 

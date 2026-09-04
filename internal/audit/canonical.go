@@ -28,6 +28,9 @@ type CanonicalEvent struct {
 	Rule          *CanonicalRule     `json:"rule,omitempty"`
 	Actor         *CanonicalActor    `json:"actor,omitempty"`
 	Process       *CanonicalProcess  `json:"process,omitempty"`
+	Target        *CanonicalTarget   `json:"target,omitempty"`
+	Origin        *CanonicalOrigin   `json:"origin,omitempty"`
+	Security      *CanonicalSecurity `json:"security,omitempty"`
 	Paths         []CanonicalPath    `json:"paths,omitempty"`
 	Message       string             `json:"message,omitempty"`
 	Renderer      string             `json:"renderer_version,omitempty"`
@@ -70,12 +73,13 @@ type CanonicalSource struct {
 }
 
 type CanonicalEventMeta struct {
-	Type      string              `json:"type"`
-	Category  string              `json:"category,omitempty"`
-	Action    string              `json:"action,omitempty"`
-	Success   *bool               `json:"success,omitempty"`
-	Integrity *CanonicalIntegrity `json:"integrity,omitempty"`
-	Issues    []CanonicalIssue    `json:"issues,omitempty"`
+	Type           string              `json:"type"`
+	Category       string              `json:"category,omitempty"`
+	Action         string              `json:"action,omitempty"`
+	OriginalAction string              `json:"original_action,omitempty"`
+	Success        *bool               `json:"success,omitempty"`
+	Integrity      *CanonicalIntegrity `json:"integrity,omitempty"`
+	Issues         []CanonicalIssue    `json:"issues,omitempty"`
 }
 
 type CanonicalIntegrity struct {
@@ -97,6 +101,29 @@ type CanonicalRule struct {
 type CanonicalActor struct {
 	User   string `json:"user,omitempty"`
 	UserID string `json:"user_id,omitempty"`
+}
+
+type CanonicalTarget struct {
+	User    string `json:"user,omitempty"`
+	UserID  string `json:"user_id,omitempty"`
+	Service string `json:"service,omitempty"`
+	Name    string `json:"name,omitempty"`
+}
+
+type CanonicalOrigin struct {
+	Address  string `json:"address,omitempty"`
+	Host     string `json:"host,omitempty"`
+	Terminal string `json:"terminal,omitempty"`
+}
+
+type CanonicalSecurity struct {
+	Decision       string   `json:"decision,omitempty"`
+	Permissions    []string `json:"permissions,omitempty"`
+	SubjectContext string   `json:"subject_context,omitempty"`
+	TargetContext  string   `json:"target_context,omitempty"`
+	TargetClass    string   `json:"target_class,omitempty"`
+	Profile        string   `json:"profile,omitempty"`
+	Permissive     *bool    `json:"permissive,omitempty"`
 }
 
 type CanonicalProcess struct {
@@ -149,6 +176,9 @@ func BuildCanonicalEvent(assembled AssembledEvent, options CanonicalOptions) Can
 			Type: primaryRecordType(assembled.Records),
 		},
 	}
+	if recordType := preferredSecurityRecordType(assembled.Records); recordType != "" {
+		event.Event.Type = recordType
+	}
 
 	if event.Audit.Time == "" {
 		event.Event.Issues = append(event.Event.Issues, CanonicalIssue{
@@ -165,7 +195,7 @@ func BuildCanonicalEvent(assembled AssembledEvent, options CanonicalOptions) Can
 	}
 	if success, ok := canonicalSuccess(assembled.Records); ok {
 		event.Event.Success = &success
-	} else if raw := firstNonemptyRecordValue(assembled.Records, "success", "res"); raw != "" {
+	} else if raw := firstNonemptySemanticRecordValue(assembled.Records, "success", "res"); raw != "" {
 		event.Event.Issues = append(event.Event.Issues, CanonicalIssue{
 			Code:  "unknown_result",
 			Field: "event.success",
@@ -177,6 +207,16 @@ func BuildCanonicalEvent(assembled AssembledEvent, options CanonicalOptions) Can
 			Code:       "unsupported_record",
 			RecordType: recordType,
 		})
+	}
+	for _, record := range assembled.Records {
+		if record.EmbeddedParseError != "" {
+			event.Event.Issues = append(event.Event.Issues, CanonicalIssue{
+				Code:       "embedded_parse_failure",
+				RecordType: record.Type,
+				Field:      "msg",
+				Value:      record.EmbeddedParseError,
+			})
+		}
 	}
 
 	if options.Host != "" {
@@ -210,6 +250,10 @@ func BuildCanonicalEvent(assembled AssembledEvent, options CanonicalOptions) Can
 	if hasCanonicalProcess(process) {
 		event.Process = &process
 	}
+	event.Event.OriginalAction = meaningfulAuditValue(firstNonemptySemanticRecordValue(assembled.Records, "op", "operation"))
+	event.Target = buildCanonicalTarget(assembled.Records, event.Event.Type)
+	event.Origin = buildCanonicalOrigin(assembled.Records)
+	event.Security = buildCanonicalSecurity(assembled.Records, event.Event.Type)
 	var pathIssues []CanonicalIssue
 	event.Paths, pathIssues = buildCanonicalPaths(assembled.Records)
 	event.Event.Issues = append(event.Event.Issues, pathIssues...)
@@ -226,7 +270,7 @@ func canonicalAudit(id string) CanonicalAudit {
 }
 
 func canonicalSuccess(records []Record) (bool, bool) {
-	switch strings.ToLower(firstNonemptyRecordValue(records, "success", "res")) {
+	switch strings.ToLower(firstNonemptySemanticRecordValue(records, "success", "res")) {
 	case "yes", "success", "succeeded":
 		return true, true
 	case "no", "failed", "failure":
@@ -238,13 +282,13 @@ func canonicalSuccess(records []Record) (bool, bool) {
 
 func buildCanonicalProcess(records []Record) CanonicalProcess {
 	process := CanonicalProcess{
-		PID:         firstRecordValue(records, "pid"),
-		PPID:        firstRecordValue(records, "ppid"),
-		Name:        firstRecordValue(records, "comm"),
-		Executable:  firstRecordValue(records, "exe"),
-		CWD:         firstRecordValue(records, "cwd"),
-		TTY:         firstRecordValue(records, "tty"),
-		ReturnValue: firstRecordValue(records, "exit"),
+		PID:         firstSemanticRecordValue(records, "pid"),
+		PPID:        firstSemanticRecordValue(records, "ppid"),
+		Name:        firstSemanticRecordValue(records, "comm"),
+		Executable:  firstSemanticRecordValue(records, "exe"),
+		CWD:         firstSemanticRecordValue(records, "cwd"),
+		TTY:         firstSemanticRecordValue(records, "tty"),
+		ReturnValue: firstSemanticRecordValue(records, "exit"),
 	}
 	if name := interpretedValue(records, "SYSCALL"); name != "" {
 		process.Syscall = name
@@ -283,6 +327,75 @@ func buildCanonicalProcess(records []Record) CanonicalProcess {
 		}
 	}
 	return process
+}
+
+func buildCanonicalTarget(records []Record, primaryType string) *CanonicalTarget {
+	target := CanonicalTarget{}
+	account := meaningfulAuditValue(firstSemanticRecordValue(records, "acct"))
+	if account != "" {
+		if isDecimal(account) {
+			target.UserID = account
+		} else {
+			target.User = account
+		}
+	}
+	target.Service = meaningfulAuditValue(firstNonemptySemanticRecordValue(records, "unit", "service"))
+	if primaryType != "PATH" {
+		target.Name = meaningfulAuditValue(firstSemanticRecordValueExcludingType(records, "name", "PATH"))
+	}
+	if target.User == "" && target.UserID == "" && target.Service == "" && target.Name == "" {
+		return nil
+	}
+	return &target
+}
+
+func buildCanonicalOrigin(records []Record) *CanonicalOrigin {
+	origin := CanonicalOrigin{
+		Address:  meaningfulAuditValue(firstNonemptySemanticRecordValue(records, "addr", "ip")),
+		Host:     meaningfulAuditValue(firstNonemptySemanticRecordValue(records, "hostname", "host")),
+		Terminal: meaningfulAuditValue(firstSemanticRecordValue(records, "terminal")),
+	}
+	if origin.Address == "" && origin.Host == "" && origin.Terminal == "" {
+		return nil
+	}
+	return &origin
+}
+
+func buildCanonicalSecurity(records []Record, recordType string) *CanonicalSecurity {
+	family, mapped := securityEventFamilyForType(recordType)
+	if !mapped || (family.Category != "access_control" && family.Category != "security" && family.Category != "integrity") {
+		return nil
+	}
+	security := CanonicalSecurity{
+		Decision:       strings.ToLower(meaningfulAuditValue(firstNonemptySemanticRecordValue(records, "decision", "apparmor"))),
+		SubjectContext: meaningfulAuditValue(firstNonemptySemanticRecordValue(records, "scontext", "subj")),
+		TargetContext:  meaningfulAuditValue(firstSemanticRecordValue(records, "tcontext")),
+		TargetClass:    meaningfulAuditValue(firstSemanticRecordValue(records, "tclass")),
+		Profile:        meaningfulAuditValue(firstSemanticRecordValue(records, "profile")),
+	}
+	if permissions := meaningfulAuditValue(firstNonemptySemanticRecordValue(records, "permissions", "requested_mask")); permissions != "" {
+		security.Permissions = strings.Fields(strings.Trim(permissions, `"{} `))
+	}
+	if permissive := firstSemanticRecordValue(records, "permissive"); permissive != "" {
+		value := permissive == "1" || strings.EqualFold(permissive, "yes") || strings.EqualFold(permissive, "true")
+		if value || permissive == "0" || strings.EqualFold(permissive, "no") || strings.EqualFold(permissive, "false") {
+			security.Permissive = &value
+		}
+	}
+	if security.Decision == "" && len(security.Permissions) == 0 && security.SubjectContext == "" &&
+		security.TargetContext == "" && security.TargetClass == "" && security.Profile == "" && security.Permissive == nil {
+		return nil
+	}
+	return &security
+}
+
+func meaningfulAuditValue(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "", "?", "unset", "(none)", "unknown":
+		return ""
+	default:
+		return value
+	}
 }
 
 func hasCanonicalProcess(process CanonicalProcess) bool {
@@ -524,9 +637,39 @@ func firstRecordValue(records []Record, key string) string {
 	return ""
 }
 
+func firstSemanticRecordValue(records []Record, key string) string {
+	for _, record := range records {
+		if value := semanticRecordValue(record, key); value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
+func firstSemanticRecordValueExcludingType(records []Record, key, excludedType string) string {
+	for _, record := range records {
+		if record.Type == excludedType {
+			continue
+		}
+		if value := semanticRecordValue(record, key); value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
 func firstNonemptyRecordValue(records []Record, keys ...string) string {
 	for _, key := range keys {
 		if value := firstRecordValue(records, key); value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
+func firstNonemptySemanticRecordValue(records []Record, keys ...string) string {
+	for _, key := range keys {
+		if value := firstSemanticRecordValue(records, key); value != "" {
 			return value
 		}
 	}
@@ -565,7 +708,8 @@ func unsupportedRecordTypes(records []Record) []string {
 	result := make([]string, 0)
 	seen := map[string]struct{}{}
 	for _, record := range records {
-		if _, supported := known[record.Type]; supported {
+		_, mapped := securityEventFamilyForType(record.Type)
+		if _, supported := known[record.Type]; supported || mapped {
 			continue
 		}
 		if _, exists := seen[record.Type]; exists {

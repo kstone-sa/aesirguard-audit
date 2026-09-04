@@ -27,8 +27,8 @@ func FuzzAssemblerPreservesAcceptedRecords(f *testing.F) {
 		}
 
 		active := [4]bool{}
-		accepted := 0
-		emittedRecords := 0
+		accepted := make([]Record, 0, len(input))
+		seen := make(map[int]struct{}, len(input))
 		observedAt := time.Unix(1, 0)
 		for index, value := range input {
 			eventIndex := int(value % 4)
@@ -40,31 +40,47 @@ func FuzzAssemblerPreservesAcceptedRecords(f *testing.F) {
 				Type:        recordType,
 				ID:          fmt.Sprintf("1721723000.000:%d", eventIndex),
 				SourceBytes: 1,
+				Source:      SourcePosition{Start: int64(index), Valid: true},
 			}
 			events, err := assembler.AddCheckedAt(record, observedAt.Add(time.Duration(index)))
 			if err != nil {
 				t.Fatalf("record %d rejected despite sized limits: %v", index, err)
 			}
-			accepted++
+			accepted = append(accepted, record)
 			if recordType == "EOE" {
 				active[eventIndex] = false
 			} else {
 				active[eventIndex] = true
 			}
-			for _, event := range events {
-				emittedRecords += len(event.Records)
-			}
+			assertSyntheticRecords(t, events, accepted, seen)
 		}
-		for _, event := range assembler.FlushAll() {
-			emittedRecords += len(event.Records)
-		}
-		if emittedRecords != accepted {
-			t.Fatalf("emitted %d of %d accepted records", emittedRecords, accepted)
+		assertSyntheticRecords(t, assembler.FlushAll(), accepted, seen)
+		if len(seen) != len(accepted) {
+			t.Fatalf("emitted %d of %d accepted records", len(seen), len(accepted))
 		}
 		if assembler.Pending() != 0 || assembler.PendingBytes() != 0 {
 			t.Fatalf("state retained after flush: events=%d bytes=%d", assembler.Pending(), assembler.PendingBytes())
 		}
 	})
+}
+
+func assertSyntheticRecords(t *testing.T, events []AssembledEvent, accepted []Record, seen map[int]struct{}) {
+	t.Helper()
+	for _, event := range events {
+		for _, record := range event.Records {
+			marker := int(record.Source.Start)
+			if marker < 0 || marker >= len(accepted) {
+				t.Fatalf("emitted unknown record marker %d", marker)
+			}
+			if _, duplicate := seen[marker]; duplicate {
+				t.Fatalf("emitted record marker %d more than once", marker)
+			}
+			if event.ID != record.ID || !reflect.DeepEqual(record, accepted[marker]) {
+				t.Fatalf("record marker %d changed or moved: event=%q record=%#v want=%#v", marker, event.ID, record, accepted[marker])
+			}
+			seen[marker] = struct{}{}
+		}
+	}
 }
 
 func TestSyntheticInterleavingIsDeterministicAndLossless(t *testing.T) {

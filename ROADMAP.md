@@ -154,7 +154,7 @@ Configuration schema version 1 is strict and supports CLI overrides. Operational
 
 ## v0.8 - Performance and regression
 
-**Status: 8A implemented on the development branch; 8B pending empirical corpus**
+**Status: 8A and 8C implemented; 8B pending empirical corpus**
 
 ### v0.8A - Synthetic hardening
 
@@ -178,6 +178,16 @@ Pending:
 - convert confirmed distro differences and previously unseen record shapes into regression fixtures;
 - document the tested auditd, kernel, and distribution versions.
 
+### v0.8C - Security event coverage
+
+Implemented:
+
+- parse nested user-space Audit payloads and structured AVC decision prose;
+- classify authentication, account, session, system, service, audit-daemon, MAC, kernel-security, anomaly, and integrity families independently from CIS;
+- emit typed target, origin, and access-control evidence without copying arbitrary Audit fields;
+- render every mapped action with deterministic versioned templates;
+- keep potentially compound kernel records open until `EOE` or the configured assembler boundary while completing known standalone user-space records immediately.
+
 Deliverables:
 
 - events/sec and MB/sec benchmarks;
@@ -190,6 +200,14 @@ Deliverables:
 - slow-consumer and back-pressure tests.
 
 Optimize only after correctness and measurement.
+
+### Validation tracks and release gates
+
+- 8A: synthetic hardening is implemented, including exact record-conservation fuzz assertions.
+- 8B: empirical validation on the supported distribution matrix remains pending and may take additional time.
+- 8C: broader security-event normalization and rendering is implemented independently from the CIS rule profile.
+
+Development toward v0.9 and v1.0 may proceed while 8B remains open. Until 8B is complete, documentation and release notes must clearly distinguish synthetic coverage from empirically verified distribution support, and stable-release support claims must remain limited accordingly.
 
 ## v0.9 - Production hardening
 
@@ -213,3 +231,15 @@ Requirements:
 - bounded resource use under sustained load;
 - production packaging and operating guidance;
 - no backend-specific data model in the core.
+
+### Public release preparation
+
+Before changing repository visibility to public:
+
+- consolidate the README around installation, runtime modes, delivery semantics, limitations, and verified support;
+- keep `AGENTS.md` concise and development-focused;
+- remove obsolete examples, stale roadmap language, and redundant planning notes;
+- add or verify `CONTRIBUTING.md`, `SECURITY.md`, changelog/release notes, and reproducible release builds;
+- review the entire Git history, issues, pull requests, workflow logs, artifacts, fixtures, and documentation for credentials, internal names, private infrastructure, customer data, and unsanitized audit records;
+- sanitize or remove sensitive material before publication;
+- require explicit maintainer approval before any history rewrite or repository visibility change.

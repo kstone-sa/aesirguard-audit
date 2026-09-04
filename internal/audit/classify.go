@@ -22,9 +22,35 @@ type canonicalClassificationRule struct {
 	RequireFailure bool     `json:"require_failure"`
 }
 
+type securityEventFamilyDocument struct {
+	Version           string                          `json:"version"`
+	RecordTypes       map[string]securityEventFamily  `json:"record_types"`
+	RecordPrefixes    []securityEventFamilyPrefixRule `json:"record_prefixes"`
+	SingleRecordTypes []string                        `json:"single_record_types"`
+}
+
+type securityEventFamily struct {
+	Category string `json:"category"`
+	Action   string `json:"action"`
+}
+
+type securityEventFamilyPrefixRule struct {
+	Prefix   string `json:"prefix"`
+	Category string `json:"category"`
+	Action   string `json:"action"`
+}
+
 var cisAuditClassification = mustCISAuditClassification()
+var securityEventFamilies = mustSecurityEventFamilies()
 
 func classifyCanonicalEvent(event *CanonicalEvent) {
+	family, hasSecurityFamily := securityEventFamilyForType(event.Event.Type)
+	if hasSecurityFamily && event.Event.Type != "KERN_MODULE" {
+		event.Event.Category = family.Category
+		event.Event.Action = family.Action
+		return
+	}
+
 	if event.Process != nil && (event.Process.Syscall == "execve" || event.Process.Syscall == "execveat" || len(event.Process.Argv) > 0) {
 		event.Event.Category = "process"
 		event.Event.Action = "execute"
@@ -38,6 +64,35 @@ func classifyCanonicalEvent(event *CanonicalEvent) {
 			return
 		}
 	}
+	if hasSecurityFamily {
+		event.Event.Category = family.Category
+		event.Event.Action = family.Action
+	}
+}
+
+func securityEventFamilyForType(recordType string) (securityEventFamily, bool) {
+	if family, ok := securityEventFamilies.RecordTypes[recordType]; ok {
+		return family, true
+	}
+	for _, rule := range securityEventFamilies.RecordPrefixes {
+		if strings.HasPrefix(recordType, rule.Prefix) {
+			return securityEventFamily{Category: rule.Category, Action: rule.Action}, true
+		}
+	}
+	return securityEventFamily{}, false
+}
+
+func isKnownSingleRecordType(recordType string) bool {
+	return containsString(securityEventFamilies.SingleRecordTypes, recordType)
+}
+
+func preferredSecurityRecordType(records []Record) string {
+	for _, record := range records {
+		if _, ok := securityEventFamilyForType(record.Type); ok {
+			return record.Type
+		}
+	}
+	return ""
 }
 
 func classificationRuleMatches(event CanonicalEvent, rule canonicalClassificationRule) bool {
@@ -111,6 +166,27 @@ func mustCISAuditClassification() canonicalClassificationDocument {
 	for _, rule := range document.Rules {
 		if rule.Category == "" || rule.Action == "" {
 			panic("incomplete embedded CIS Audit family mapping")
+		}
+	}
+	return document
+}
+
+func mustSecurityEventFamilies() securityEventFamilyDocument {
+	var document securityEventFamilyDocument
+	if err := json.Unmarshal([]byte(mappingdata.SecurityEventFamiliesJSON()), &document); err != nil {
+		panic("invalid embedded security event family mapping: " + err.Error())
+	}
+	if document.Version == "" || len(document.RecordTypes) == 0 {
+		panic("empty embedded security event family mapping")
+	}
+	for recordType, family := range document.RecordTypes {
+		if recordType == "" || family.Category == "" || family.Action == "" {
+			panic("incomplete embedded security event family mapping")
+		}
+	}
+	for _, rule := range document.RecordPrefixes {
+		if rule.Prefix == "" || rule.Category == "" || rule.Action == "" {
+			panic("incomplete embedded security event prefix mapping")
 		}
 	}
 	return document
