@@ -6,7 +6,7 @@ The project is intended to become a persistent, low-latency collector that follo
 
 ## Current status
 
-The milestone v0.6 development branch contains the canonical converter, CIS-oriented semantic classifier, and a checkpointed rotation-aware persistent collector. It can:
+The milestone v0.7 development branch contains the canonical converter, CIS-oriented semantic classifier, checkpointed rotation-aware persistent collector, and its operational configuration and health surface. It can:
 
 - read stdin or one existing file;
 - preserve ordered and repeated Audit fields;
@@ -30,7 +30,9 @@ The milestone v0.6 development branch contains the canonical converter, CIS-orie
 - drain rename/create rotations before following the replacement inode;
 - preserve pending events and partial physical lines across generations;
 - detect same-inode truncation as an explicit source gap;
-- reopen a managed output file automatically after rename rotation.
+- reopen a managed output file automatically after rename rotation;
+- load strict versioned JSON configuration with command-line overrides;
+- emit structured operational diagnostics, counters, and heartbeats on stderr.
 
 Batch mode still exits at EOF. Follow mode waits at EOF, recovers through retained uncompressed generations, and follows rename/create rotation. Compressed historical logs are not decoded; if the checkpoint inode is no longer available as an uncompressed file, startup fails explicitly.
 
@@ -109,6 +111,15 @@ Follow a live Audit log and emit to stdout:
 ./audit2json --follow --render-message /var/log/audit/audit.log
 ```
 
+Run the same collector from a validated configuration:
+
+```bash
+./audit2json --config /etc/audit2json/config.json --check-config
+./audit2json --config /etc/audit2json/config.json
+```
+
+See `configs/audit2json.example.json`. Command-line values override the file, which keeps one deployment configuration reusable while allowing bootstrap or diagnostic overrides.
+
 Repeated scheduled invocations are safe: while one healthy process owns the per-input lock, another exits successfully without emitting data.
 The default lock is stored in a private per-user temporary directory and is derived from the absolute input path. Use `--lock-file` to place it in a service-managed runtime directory.
 
@@ -139,6 +150,8 @@ For live rename/create rotation, the old descriptor must remain at a stable EOF 
 - `docs/schema.md`: current schema and canonical-schema principles;
 - `docs/cis-coverage.md`: guaranteed CIS Linux audit-family coverage and test matrix;
 - `docs/reliability.md`: checkpoints, delivery semantics, rotation, and failure handling;
+- `docs/configuration.md`: versioned JSON fields, validation, and CLI overrides;
+- `docs/operations.md`: structured diagnostics, counters, lag, and heartbeat semantics;
 - `docs/development.md`: focused development modes and validation;
 - `ROADMAP.md`: implementation order and release gates.
 
@@ -148,6 +161,7 @@ For live rename/create rotation, the old descriptor must remain at a stable EOF 
 cmd/audit2json/      command-line program
 internal/audit/      current parser and event builder
 data/                embedded static mapping data
+configs/             example operational configuration
 docs/                architecture, schema, reliability, and development guidance
 testdata/            reviewable Linux Audit samples
 AGENTS.md             scoped instructions for humans and coding agents

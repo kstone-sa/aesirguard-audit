@@ -533,6 +533,29 @@ func mustOpenRotatingFollower(t *testing.T, path string, checkpoint *Checkpoint)
 	return follower
 }
 
+func TestRotatingFollowerReportsLagAndCaughtUp(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "audit.log")
+	if err := os.WriteFile(path, []byte("first\nsecond\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	follower := mustOpenRotatingFollower(t, path, nil)
+	defer follower.Close()
+	lag, err := follower.LagBytes()
+	if err != nil || lag != int64(len("first\nsecond\n")) || follower.CaughtUp() {
+		t.Fatalf("initial lag = %d, caught up = %v, error = %v", lag, follower.CaughtUp(), err)
+	}
+	mustNextRotatingLine(t, follower)
+	lag, err = follower.LagBytes()
+	if err != nil || lag != int64(len("second\n")) {
+		t.Fatalf("partial lag = %d, error = %v", lag, err)
+	}
+	mustNextRotatingLine(t, follower)
+	lag, err = follower.LagBytes()
+	if err != nil || lag != 0 || !follower.CaughtUp() {
+		t.Fatalf("final lag = %d, caught up = %v, error = %v", lag, follower.CaughtUp(), err)
+	}
+}
+
 func testRotationOptions() RotationOptions {
 	return RotationOptions{
 		FollowerOptions: FollowerOptions{PollInterval: time.Millisecond, MaxLineBytes: 1024},

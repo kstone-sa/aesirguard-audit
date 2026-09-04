@@ -1,0 +1,42 @@
+# Configuration
+
+Milestone v0.7 adds one strict, versioned JSON configuration file. Unknown fields, trailing JSON values, unsupported versions, invalid durations, path conflicts, and unsafe option combinations cause startup to fail.
+
+## Loading and validation
+
+```bash
+audit2json --config /etc/audit2json/config.json
+audit2json --config /etc/audit2json/config.json --check-config
+```
+
+`--check-config` performs both structural and semantic validation, writes a `configuration_valid` diagnostic to stderr, and exits without opening the input or sink. It requires `--config`.
+
+Command-line options override values loaded from the file. This includes explicit Boolean overrides such as `--render-message=false`. A positional input path overrides `input.path`.
+
+## Schema version 1
+
+See `configs/audit2json.example.json` for a complete example.
+
+| JSON field | CLI override | Meaning |
+|---|---|---|
+| `input.path` | positional path | Audit log path |
+| `input.follow` | `--follow` | persistent file-follow mode |
+| `input.source_host` | `--source-host` | optional canonical source host |
+| `input.lock_file` | `--lock-file` | singleton lock path |
+| `sink.file` | `--output-file` | managed append-only sink; empty selects stdout |
+| `sink.sync` | `--sync-output` | sync every managed-file event |
+| `checkpoint.file` | `--checkpoint-file` | durable checkpoint path |
+| `checkpoint.interval` | `--checkpoint-interval` | maximum checkpoint interval |
+| `collection.poll_interval` | `--poll-interval` | EOF poll interval |
+| `collection.event_timeout` | `--event-timeout` | unresolved event inactivity timeout |
+| `collection.rotation_drain_interval` | `--rotation-drain-interval` | stable EOF time before generation switch |
+| `collection.max_line_bytes` | `--max-line-bytes` | physical line limit |
+| `collection.max_pending_events` | `--max-pending-events` | unresolved event limit |
+| `collection.max_records_per_event` | `--max-records-per-event` | per-event record limit |
+| `collection.max_pending_bytes` | `--max-pending-bytes` | unresolved source-byte limit |
+| `mapping.render_message` | `--render-message` | optional analyst-readable renderer |
+| `operations.heartbeat_interval` | `--heartbeat-interval` | heartbeat period; `0s` disables it |
+
+Durations use Go duration syntax, for example `200ms`, `2s`, or `1m30s`. Zero-valued integer limits mean "use the built-in default"; negative values are invalid.
+
+Configuration reload is deliberately not implemented. A validated restart makes configuration changes explicit and preserves the existing checkpoint and singleton model.

@@ -27,6 +27,7 @@ const (
 	defaultMaxPendingBytes    = 64 * 1024 * 1024
 	defaultCheckpointInterval = time.Second
 	defaultRotationDrain      = 500 * time.Millisecond
+	defaultHeartbeatInterval  = 30 * time.Second
 )
 
 type commandOptions struct {
@@ -46,6 +47,9 @@ type commandOptions struct {
 	maxPendingBytes    int
 	checkpointInterval time.Duration
 	rotationDrain      time.Duration
+	heartbeatInterval  time.Duration
+	configPath         string
+	checkConfig        bool
 }
 
 type eventProcessor struct {
@@ -54,13 +58,15 @@ type eventProcessor struct {
 	stderr        io.Writer
 	canonical     audit.CanonicalOptions
 	renderMessage bool
+	diagnostics   *operationalDiagnostics
+	replayWindow  bool
 }
 
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	if err := runContext(ctx, os.Args[1:], os.Stdin, os.Stdout, os.Stderr); err != nil {
-		fmt.Fprintln(os.Stderr, "audit2json:", err)
+		writeFatalDiagnostic(os.Stderr, err)
 		os.Exit(1)
 	}
 }
@@ -74,6 +80,11 @@ func runContext(ctx context.Context, args []string, stdin io.Reader, stdout, std
 	if err != nil {
 		return err
 	}
+	diagnostics := newOperationalDiagnostics(stderr, options.heartbeatInterval)
+	if options.checkConfig {
+		diagnostics.log("info", "configuration_valid", map[string]any{"config": options.configPath})
+		return nil
+	}
 
 	if options.follow {
 		lockPath := options.lockPath
@@ -85,6 +96,7 @@ func runContext(ctx context.Context, args []string, stdin io.Reader, stdout, std
 			return fmt.Errorf("acquire lock: %w", err)
 		}
 		if !acquired {
+			diagnostics.log("info", "singleton_active", map[string]any{"input": options.inputPath, "lock": lockPath})
 			return nil
 		}
 		defer func() {
@@ -114,7 +126,10 @@ func runContext(ctx context.Context, args []string, stdin io.Reader, stdout, std
 		stderr:        stderr,
 		canonical:     audit.CanonicalOptions{Host: options.sourceHost},
 		renderMessage: options.renderMessage,
+		diagnostics: diagnostics,
 	}
+	diagnostics.log("info", "started", map[string]any{"follow": options.follow, "input": options.inputPath, "sink": sinkName(options)})
+	defer diagnostics.log("info", "stopped", map[string]any{"counters": &diagnostics.counters})
 
 	if options.follow {
 		return runFollower(ctx, options, processor)
@@ -123,24 +138,46 @@ func runContext(ctx context.Context, args []string, stdin io.Reader, stdout, std
 }
 
 func parseOptions(args []string, stderr io.Writer) (commandOptions, error) {
+	configPath, err := bootstrapConfigPath(args)
+	if err != nil {
+		return commandOptions{}, err
+	}
 	flags := flag.NewFlagSet("audit2json", flag.ContinueOnError)
 	flags.SetOutput(stderr)
-	options := commandOptions{}
-	flags.StringVar(&options.sourceHost, "source-host", "", "include this source host in canonical events")
-	flags.StringVar(&options.outputPath, "output-file", "", "append NDJSON to this managed output file instead of stdout")
-	flags.StringVar(&options.lockPath, "lock-file", "", "singleton lock path for follow mode")
-	flags.StringVar(&options.checkpointPath, "checkpoint-file", "", "durable recovery checkpoint for follow mode")
-	flags.BoolVar(&options.follow, "follow", false, "follow a growing audit log until interrupted")
-	flags.BoolVar(&options.renderMessage, "render-message", false, "include a deterministic analyst-readable message")
-	flags.BoolVar(&options.syncOutput, "sync-output", false, "sync the managed output file after every event")
-	flags.DurationVar(&options.pollInterval, "poll-interval", defaultPollInterval, "EOF polling interval in follow mode")
-	flags.DurationVar(&options.eventTimeout, "event-timeout", defaultEventTimeout, "maximum inactivity for an unterminated audit event")
-	flags.IntVar(&options.maxLineBytes, "max-line-bytes", defaultMaxLineBytes, "maximum physical audit line size")
-	flags.IntVar(&options.maxPendingEvents, "max-pending-events", defaultMaxPendingEvents, "maximum unresolved logical events")
-	flags.IntVar(&options.maxRecordsPerEvent, "max-records-per-event", defaultMaxRecordsPerEvent, "maximum records retained per unresolved event")
-	flags.IntVar(&options.maxPendingBytes, "max-pending-bytes", defaultMaxPendingBytes, "maximum source bytes retained by unresolved events")
-	flags.DurationVar(&options.checkpointInterval, "checkpoint-interval", defaultCheckpointInterval, "maximum interval between durable checkpoint updates")
-	flags.DurationVar(&options.rotationDrain, "rotation-drain-interval", defaultRotationDrain, "stable EOF time before switching input generations")
+	options := commandOptions{
+		pollInterval: defaultPollInterval, eventTimeout: defaultEventTimeout,
+		maxLineBytes: defaultMaxLineBytes, maxPendingEvents: defaultMaxPendingEvents,
+		maxRecordsPerEvent: defaultMaxRecordsPerEvent, maxPendingBytes: defaultMaxPendingBytes,
+		checkpointInterval: defaultCheckpointInterval, rotationDrain: defaultRotationDrain,
+		heartbeatInterval: defaultHeartbeatInterval, configPath: configPath,
+	}
+	if configPath != "" {
+		config, err := loadFileConfig(configPath)
+		if err != nil {
+			return options, fmt.Errorf("load configuration: %w", err)
+		}
+		if err := config.apply(&options); err != nil {
+			return options, fmt.Errorf("validate configuration: %w", err)
+		}
+	}
+	flags.StringVar(&options.configPath, "config", configPath, "load versioned JSON configuration")
+	flags.BoolVar(&options.checkConfig, "check-config", false, "validate configuration and exit")
+	flags.StringVar(&options.sourceHost, "source-host", options.sourceHost, "include this source host in canonical events")
+	flags.StringVar(&options.outputPath, "output-file", options.outputPath, "append NDJSON to this managed output file instead of stdout")
+	flags.StringVar(&options.lockPath, "lock-file", options.lockPath, "singleton lock path for follow mode")
+	flags.StringVar(&options.checkpointPath, "checkpoint-file", options.checkpointPath, "durable recovery checkpoint for follow mode")
+	flags.BoolVar(&options.follow, "follow", options.follow, "follow a growing audit log until interrupted")
+	flags.BoolVar(&options.renderMessage, "render-message", options.renderMessage, "include a deterministic analyst-readable message")
+	flags.BoolVar(&options.syncOutput, "sync-output", options.syncOutput, "sync the managed output file after every event")
+	flags.DurationVar(&options.pollInterval, "poll-interval", options.pollInterval, "EOF polling interval in follow mode")
+	flags.DurationVar(&options.eventTimeout, "event-timeout", options.eventTimeout, "maximum inactivity for an unterminated audit event")
+	flags.IntVar(&options.maxLineBytes, "max-line-bytes", options.maxLineBytes, "maximum physical audit line size")
+	flags.IntVar(&options.maxPendingEvents, "max-pending-events", options.maxPendingEvents, "maximum unresolved logical events")
+	flags.IntVar(&options.maxRecordsPerEvent, "max-records-per-event", options.maxRecordsPerEvent, "maximum records retained per unresolved event")
+	flags.IntVar(&options.maxPendingBytes, "max-pending-bytes", options.maxPendingBytes, "maximum source bytes retained by unresolved events")
+	flags.DurationVar(&options.checkpointInterval, "checkpoint-interval", options.checkpointInterval, "maximum interval between durable checkpoint updates")
+	flags.DurationVar(&options.rotationDrain, "rotation-drain-interval", options.rotationDrain, "stable EOF time before switching input generations")
+	flags.DurationVar(&options.heartbeatInterval, "heartbeat-interval", options.heartbeatInterval, "structured heartbeat interval (zero disables)")
 	if err := flags.Parse(args); err != nil {
 		return options, err
 	}
@@ -149,6 +186,9 @@ func parseOptions(args []string, stderr io.Writer) (commandOptions, error) {
 	}
 	if flags.NArg() == 1 {
 		options.inputPath = flags.Arg(0)
+	}
+	if options.checkConfig && options.configPath == "" {
+		return options, fmt.Errorf("check-config requires config")
 	}
 	if options.follow && options.inputPath == "" {
 		return options, fmt.Errorf("follow mode requires an audit log path")
@@ -162,7 +202,7 @@ func parseOptions(args []string, stderr io.Writer) (commandOptions, error) {
 	if options.syncOutput && options.outputPath == "" {
 		return options, fmt.Errorf("sync-output requires output-file")
 	}
-	if options.pollInterval <= 0 || options.eventTimeout <= 0 || options.checkpointInterval <= 0 || options.rotationDrain <= 0 {
+	if options.pollInterval <= 0 || options.eventTimeout <= 0 || options.checkpointInterval <= 0 || options.rotationDrain <= 0 || options.heartbeatInterval < 0 {
 		return options, fmt.Errorf("poll, event timeout, checkpoint, and rotation drain intervals must be positive")
 	}
 	if options.maxLineBytes <= 0 || options.maxPendingEvents <= 0 || options.maxRecordsPerEvent <= 0 || options.maxPendingBytes <= 0 {
@@ -203,6 +243,13 @@ func openSink(options commandOptions, stdout io.Writer) (eventoutput.Sink, error
 		return nil, fmt.Errorf("open output file: %w", err)
 	}
 	return sink, nil
+}
+
+func sinkName(options commandOptions) string {
+	if options.outputPath == "" {
+		return "stdout"
+	}
+	return "file"
 }
 
 func runBatch(options commandOptions, stdin io.Reader, processor *eventProcessor) error {
@@ -268,6 +315,10 @@ func runFollower(ctx context.Context, options commandOptions, processor *eventPr
 		return err
 	}
 	rotationCount := follower.RotationCount()
+	processor.replayWindow = checkpoint != nil
+	if checkpoint != nil {
+		processor.diagnostics.log("info", "recovery_started", map[string]any{"device": checkpoint.Device, "inode": checkpoint.Inode, "offset": checkpoint.Offset})
+	}
 
 	for {
 		line, ok, err := follower.Next(ctx)
@@ -278,6 +329,12 @@ func runFollower(ctx context.Context, options commandOptions, processor *eventPr
 			return checkpointWriter.persist(sourcePosition(follower.CompletePosition()), true)
 		}
 		if err != nil {
+			var gap *collector.SourceGapError
+			var truncated *collector.SourceTruncatedError
+			if errors.As(err, &gap) || errors.As(err, &truncated) {
+				processor.diagnostics.counters.Gaps++
+				processor.diagnostics.log("error", "source_gap", map[string]any{"error": err.Error()})
+			}
 			return err
 		}
 		if ok {
@@ -297,14 +354,26 @@ func runFollower(ctx context.Context, options commandOptions, processor *eventPr
 		}
 		if follower.RotationCount() != rotationCount {
 			rotationCount = follower.RotationCount()
-			fmt.Fprintf(processor.stderr, "input rotation: switched generation (%d)\n", rotationCount)
+			processor.diagnostics.counters.Rotations = rotationCount
+			processor.diagnostics.log("info", "input_rotation", map[string]any{"generation": rotationCount})
 		}
 		if err := processor.emit(processor.assembler.FlushExpired(time.Now())); err != nil {
 			return err
 		}
+		if processor.replayWindow && follower.CaughtUp() {
+			processor.replayWindow = false
+			processor.diagnostics.log("info", "recovery_caught_up", map[string]any{"replay_candidates": processor.diagnostics.counters.ReplayCandidates})
+		}
 		safe := processor.assembler.SafeSourcePosition(sourcePosition(follower.CompletePosition()))
 		if err := checkpointWriter.persist(safe, false); err != nil {
 			return err
+		}
+		if processor.diagnostics.heartbeatDue() {
+			lagBytes := int64(-1)
+			if lag, err := follower.LagBytes(); err == nil {
+				lagBytes = lag
+			}
+			processor.diagnostics.heartbeat(processor, lagBytes)
 		}
 	}
 }
@@ -393,9 +462,16 @@ func (processor *eventProcessor) addLine(line string) error {
 }
 
 func (processor *eventProcessor) addSourceLine(line string, source audit.SourcePosition) error {
+	processor.diagnostics.counters.InputLines++
+	lineBytes := len(line) + 1
+	if source.Valid && source.Bytes > 0 {
+		lineBytes = source.Bytes
+	}
+	processor.diagnostics.counters.InputBytes += uint64(lineBytes)
 	record, err := audit.ParseRecord(line)
 	if err != nil {
-		fmt.Fprintln(processor.stderr, "skip:", err)
+		processor.diagnostics.counters.ParseFailures++
+		processor.diagnostics.log("warn", "parse_failure", map[string]any{"error": err.Error()})
 		return nil
 	}
 	if source.Valid {
@@ -425,6 +501,10 @@ func (processor *eventProcessor) emit(events []audit.AssembledEvent) error {
 		}
 		if err := processor.sink.Write(output); err != nil {
 			return err
+		}
+		processor.diagnostics.counters.EmittedEvents++
+		if processor.replayWindow {
+			processor.diagnostics.counters.ReplayCandidates++
 		}
 	}
 	return nil

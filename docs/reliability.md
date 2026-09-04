@@ -15,7 +15,7 @@ These guarantees apply to audit2json and its selected sink. End-to-end indexing 
 
 ## Implementation status
 
-Milestone v0.6 implements durable opt-in checkpoints, recovery through retained uncompressed generations, live rename/create input rotation, explicit same-inode truncation errors, and automatic managed-output reopen.
+Milestone v0.7 adds validated operational configuration, structured diagnostics, counters, lag and pending-state gauges, and heartbeats to the durable checkpoint and rotation implementation.
 
 ## Delivery semantics
 
@@ -136,7 +136,7 @@ The external scheduler or service manager is responsible for launching and relau
 
 Sinks are synchronous and bounded. When stdout or file output blocks, the collector slows or stops reading. No unbounded in-memory output queue is introduced.
 
-The Audit files then become the recovery buffer. Operational telemetry must expose consumer lag and warn before retained rotated files can be deleted.
+The Audit files then become the recovery buffer. Operational telemetry exposes consumer lag so supervision can warn before retained rotated files can be deleted. The gauge may be omitted during a rename/create window where no stable filesystem estimate is available.
 
 ## File sink
 

@@ -117,7 +117,7 @@ The durable format, safe-offset invariant, sink/checkpoint ordering, configurabl
 
 ## v0.6 - Input and output rotation
 
-**Status: in progress**
+**Status: implemented**
 
 Deliverables:
 
@@ -137,6 +137,8 @@ The development branch implements retained uncompressed generation discovery, li
 
 ## v0.7 - Configuration and operations
 
+**Status: implemented on the development branch**
+
 Deliverables:
 
 - validated JSON configuration;
@@ -146,6 +148,8 @@ Deliverables:
 - structured operational diagnostics on stderr;
 - counters for input lag, pending events, parse failures, replay, gaps, and rotations;
 - health and heartbeat information for external supervision.
+
+Configuration schema version 1 is strict and supports CLI overrides. Operational records are JSON on stderr and include lifecycle, recovery, rotation, failure, process-lifetime counters, instantaneous lag and pending-state gauges, and a configurable heartbeat.
 
 ## v0.8 - Performance and regression
 

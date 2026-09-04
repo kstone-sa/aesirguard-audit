@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "input": {
+    "path": "/var/log/audit/audit.log",
+    "follow": true,
+    "source_host": "",
+    "lock_file": "/run/audit2json/audit.lock"
+  },
+  "sink": {
+    "file": "",
+    "sync": false
+  },
+  "checkpoint": {
+    "file": "/var/lib/audit2json/audit.checkpoint",
+    "interval": "1s"
+  },
+  "collection": {
+    "poll_interval": "200ms",
+    "event_timeout": "2s",
+    "rotation_drain_interval": "500ms",
+    "max_line_bytes": 1048576,
+    "max_pending_events": 4096,
+    "max_records_per_event": 256,
+    "max_pending_bytes": 67108864
+  },
+  "mapping": {
+    "render_message": true
+  },
+  "operations": {
+    "heartbeat_interval": "30s"
+  }
+}
