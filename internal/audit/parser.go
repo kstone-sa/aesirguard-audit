@@ -80,33 +80,35 @@ func normalizeKnownRecordSyntax(line string) string {
 	if boundary < 0 {
 		return line
 	}
-	prefix := line[:boundary+3]
-	payload := line[boundary+3:]
+	return line[:boundary+3] + normalizeAuditPayload(line[boundary+3:])
+}
+
+func normalizeAuditPayload(payload string) string {
 	if strings.HasPrefix(payload, "user ") {
-		return prefix + payload[len("user "):]
+		return normalizeAuditPayload(payload[len("user "):])
 	}
 	if !strings.HasPrefix(payload, "avc:") {
-		return line
+		return payload
 	}
 
 	remainder := strings.TrimSpace(strings.TrimPrefix(payload, "avc:"))
 	decisionEnd := strings.IndexByte(remainder, ' ')
 	if decisionEnd <= 0 {
-		return line
+		return payload
 	}
 	decision := remainder[:decisionEnd]
 	remainder = strings.TrimSpace(remainder[decisionEnd+1:])
 	if !strings.HasPrefix(remainder, "{") {
-		return line
+		return payload
 	}
 	permissionsEnd := strings.IndexByte(remainder, '}')
 	if permissionsEnd < 0 {
-		return line
+		return payload
 	}
 	permissions := strings.TrimSpace(remainder[1:permissionsEnd])
 	remainder = strings.TrimSpace(remainder[permissionsEnd+1:])
 	remainder = strings.TrimSpace(strings.TrimPrefix(remainder, "for"))
-	return prefix + "decision=" + strconv.Quote(decision) + " permissions=" + strconv.Quote(permissions) + " " + remainder
+	return "decision=" + strconv.Quote(decision) + " permissions=" + strconv.Quote(permissions) + " " + remainder
 }
 
 func parseEmbeddedMessages(messages []string) (map[string]string, map[string][]string, string) {
@@ -116,7 +118,7 @@ func parseEmbeddedMessages(messages []string) (map[string]string, map[string][]s
 		if auditIDFromMessage(message) != "" || !strings.Contains(message, "=") {
 			continue
 		}
-		_, parsedFirst, parsedValues, err := parseFields(message)
+		_, parsedFirst, parsedValues, err := parseFields(normalizeAuditPayload(message))
 		if err != nil {
 			return first, values, err.Error()
 		}

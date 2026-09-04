@@ -44,15 +44,16 @@ var cisAuditClassification = mustCISAuditClassification()
 var securityEventFamilies = mustSecurityEventFamilies()
 
 func classifyCanonicalEvent(event *CanonicalEvent) {
-	if event.Process != nil && (event.Process.Syscall == "execve" || event.Process.Syscall == "execveat" || len(event.Process.Argv) > 0) {
-		event.Event.Category = "process"
-		event.Event.Action = "execute"
-		return
-	}
 	family, hasSecurityFamily := securityEventFamilyForType(event.Event.Type)
 	if hasSecurityFamily && event.Event.Type != "KERN_MODULE" {
 		event.Event.Category = family.Category
 		event.Event.Action = family.Action
+		return
+	}
+
+	if event.Process != nil && (event.Process.Syscall == "execve" || event.Process.Syscall == "execveat" || len(event.Process.Argv) > 0) {
+		event.Event.Category = "process"
+		event.Event.Action = "execute"
 		return
 	}
 
