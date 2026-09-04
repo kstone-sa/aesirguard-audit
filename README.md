@@ -6,7 +6,7 @@ The project is intended to become a persistent, low-latency collector that follo
 
 ## Current status
 
-The milestone v0.5 development branch contains the canonical converter, CIS-oriented semantic classifier, persistent collector, and opt-in crash recovery. It can:
+The milestone v0.6 development branch contains the canonical converter, CIS-oriented semantic classifier, and a checkpointed rotation-aware persistent collector. It can:
 
 - read stdin or one existing file;
 - preserve ordered and repeated Audit fields;
@@ -26,8 +26,13 @@ The milestone v0.5 development branch contains the canonical converter, CIS-orie
 - enforce a non-blocking singleton lock per followed input.
 - persist a versioned checkpoint at complete-line and accepted-output boundaries;
 - resume the same file generation with at-least-once delivery.
+- locate a checkpoint generation among retained `audit.log.*` or `audit.log-*` files;
+- drain rename/create rotations before following the replacement inode;
+- preserve pending events and partial physical lines across generations;
+- detect same-inode truncation as an explicit source gap;
+- reopen a managed output file automatically after rename rotation.
 
-Batch mode still exits at EOF. Follow mode waits at EOF and can recover from a configured checkpoint, but it does not yet locate a rotated checkpoint generation or switch to a new inode. Rotation handling belongs to milestone v0.6.
+Batch mode still exits at EOF. Follow mode waits at EOF, recovers through retained uncompressed generations, and follows rename/create rotation. Compressed historical logs are not decoded; if the checkpoint inode is no longer available as an uncompressed file, startup fails explicitly.
 
 See `ROADMAP.md` for delivery order.
 
@@ -124,7 +129,9 @@ Enable crash recovery with an explicit durable checkpoint path:
   /var/log/audit/audit.log
 ```
 
-Checkpoint updates sync a managed output file before advancing input progress. With stdout, a successful write confirms only that the local pipe accepted the bytes; replay after a crash is therefore expected and delivery remains at-least-once. If the checkpoint inode no longer matches the configured input path, v0.5 fails explicitly instead of skipping to the current file.
+Checkpoint updates sync a managed output file before advancing input progress. With stdout, a successful write confirms only that the local pipe accepted the bytes; replay after a crash is therefore expected and delivery remains at-least-once. If the checkpoint inode is not the current input, audit2json searches uncompressed sibling files with the configured basename prefix and drains them in modification-time order. Equal timestamps use conventional numeric suffix order (`.2` before `.1`); non-numeric ties fail closed as ambiguous. If it cannot locate the inode, it fails explicitly instead of skipping to the current file.
+
+For live rename/create rotation, the old descriptor must remain at a stable EOF for `--rotation-drain-interval` (default `500ms`) before the collector switches. Same-inode shrink, including copytruncate, is detected and reported as a gap; automatic continuation is intentionally not claimed lossless.
 
 ## Documentation map
 

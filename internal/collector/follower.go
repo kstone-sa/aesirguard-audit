@@ -29,11 +29,14 @@ type FileIdentity struct {
 
 // SourceLine is one newline-terminated physical record and its byte range.
 type SourceLine struct {
-	Text       string
-	Identity   FileIdentity
-	Generation uint64
-	Start      int64
-	End        int64
+	Text            string
+	Identity        FileIdentity
+	Generation      uint64
+	StartIdentity   FileIdentity
+	StartGeneration uint64
+	Start           int64
+	End             int64
+	SourceBytes     int
 }
 
 // FileFollower reads complete lines from a growing file. It deliberately stays
@@ -50,6 +53,9 @@ type FileFollower struct {
 	readOffset   int64
 	lineStart    int64
 	completeEnd  int64
+	origin       FileIdentity
+	originGen    uint64
+	originOffset int64
 }
 
 // OpenFileFollower opens path at offset zero and prepares to wait at EOF.
@@ -122,6 +128,9 @@ func OpenFileFollowerAt(path string, options FollowerOptions, offset int64, expe
 		readOffset:   offset,
 		lineStart:    offset,
 		completeEnd:  offset,
+		origin:       identity,
+		originGen:    options.Generation,
+		originOffset: offset,
 	}, nil
 }
 
@@ -152,14 +161,20 @@ func (follower *FileFollower) NextSource(ctx context.Context) (line SourceLine, 
 			complete := bytes.TrimSuffix(follower.partial, []byte{'\n'})
 			complete = bytes.TrimSuffix(complete, []byte{'\r'})
 			line = SourceLine{
-				Text:       string(complete),
-				Identity:   follower.identity,
-				Generation: follower.generation,
-				Start:      follower.lineStart,
-				End:        follower.readOffset,
+				Text:            string(complete),
+				Identity:        follower.identity,
+				Generation:      follower.generation,
+				StartIdentity:   follower.origin,
+				StartGeneration: follower.originGen,
+				Start:           follower.originOffset,
+				End:             follower.readOffset,
+				SourceBytes:     len(follower.partial),
 			}
 			follower.completeEnd = follower.readOffset
 			follower.lineStart = follower.readOffset
+			follower.origin = follower.identity
+			follower.originGen = follower.generation
+			follower.originOffset = follower.readOffset
 			follower.partial = follower.partial[:0]
 			return line, true, nil
 		case errors.Is(readErr, bufio.ErrBufferFull):
@@ -186,6 +201,35 @@ func (follower *FileFollower) Identity() FileIdentity { return follower.identity
 
 // CompleteOffset is the end of the last newline-terminated record.
 func (follower *FileFollower) CompleteOffset() int64 { return follower.completeEnd }
+
+// CurrentOffset includes any unterminated physical line already read.
+func (follower *FileFollower) CurrentOffset() int64 { return follower.readOffset }
+
+// HasPartial reports whether the current generation ends with an unterminated line.
+func (follower *FileFollower) HasPartial() bool { return len(follower.partial) != 0 }
+
+func (follower *FileFollower) transferPartialTo(next *FileFollower) error {
+	if len(follower.partial) == 0 {
+		return nil
+	}
+	if len(follower.partial) > next.maxLineBytes {
+		return fmt.Errorf("physical line in %s exceeds %d bytes", follower.path, next.maxLineBytes)
+	}
+	next.partial = append(next.partial, follower.partial...)
+	next.origin = follower.origin
+	next.originGen = follower.originGen
+	next.originOffset = follower.originOffset
+	follower.partial = follower.partial[:0]
+	return nil
+}
+
+func (follower *FileFollower) descriptorSize() (int64, error) {
+	info, err := follower.file.Stat()
+	if err != nil {
+		return 0, err
+	}
+	return info.Size(), nil
+}
 
 func identityFromFileInfo(info os.FileInfo) (FileIdentity, error) {
 	stat, ok := info.Sys().(*syscall.Stat_t)

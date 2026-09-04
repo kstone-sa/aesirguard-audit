@@ -97,7 +97,7 @@ These deliverables are implemented for one open file generation.
 
 ## v0.5 - Checkpoint and crash recovery
 
-**Status: in progress**
+**Status: implemented**
 
 Deliverables:
 
@@ -113,9 +113,11 @@ Deliverables:
 
 Delivery semantics are at-least-once. Exact end-to-end indexing cannot be promised by an unacknowledged stdout sink.
 
-The development branch implements the durable format, safe-offset invariant, sink/checkpoint ordering, configurable interval, same-generation resume, and fail-closed corruption or identity mismatch handling. Retained rotated-generation recovery is delivered by v0.6.
+The durable format, safe-offset invariant, sink/checkpoint ordering, configurable interval, and same-generation resume are implemented.
 
 ## v0.6 - Input and output rotation
+
+**Status: in progress**
 
 Deliverables:
 
@@ -130,6 +132,8 @@ Deliverables:
 - stress tests for rapid rotation and partial multi-record events.
 
 Rename-based rotation is required for the strongest lossless guarantee. Copytruncate support is best effort.
+
+The development branch implements retained uncompressed generation discovery, live rename/create drain and switch, cross-generation pending state, explicit fail-closed truncation detection, managed output reopen, and focused rotation tests. Automatic continuation after copytruncate is not presented as lossless and remains disabled.
 
 ## v0.7 - Configuration and operations
 

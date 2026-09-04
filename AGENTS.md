@@ -20,7 +20,7 @@ Inspect additional files only when an observed dependency requires them.
 
 ## Status guardrail
 
-The milestone v0.5 branch adds durable opt-in checkpointing and same-generation restart recovery to the v0.4 persistent collector. Input rotation, rotated-generation discovery, truncation handling, and output reopen remain planned for v0.6. Never describe a planned capability as implemented.
+The milestone v0.6 branch adds retained-generation recovery, live rename/create input rotation, explicit same-inode truncation errors, and automatic managed-output reopen to the checkpointed persistent collector. Broader operational configuration and telemetry remain planned. Never describe a planned capability as implemented.
 
 ## Design rules
 

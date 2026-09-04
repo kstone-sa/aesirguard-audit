@@ -26,6 +26,7 @@ const (
 	defaultMaxRecordsPerEvent = 256
 	defaultMaxPendingBytes    = 64 * 1024 * 1024
 	defaultCheckpointInterval = time.Second
+	defaultRotationDrain      = 500 * time.Millisecond
 )
 
 type commandOptions struct {
@@ -44,6 +45,7 @@ type commandOptions struct {
 	maxRecordsPerEvent int
 	maxPendingBytes    int
 	checkpointInterval time.Duration
+	rotationDrain      time.Duration
 }
 
 type eventProcessor struct {
@@ -138,6 +140,7 @@ func parseOptions(args []string, stderr io.Writer) (commandOptions, error) {
 	flags.IntVar(&options.maxRecordsPerEvent, "max-records-per-event", defaultMaxRecordsPerEvent, "maximum records retained per unresolved event")
 	flags.IntVar(&options.maxPendingBytes, "max-pending-bytes", defaultMaxPendingBytes, "maximum source bytes retained by unresolved events")
 	flags.DurationVar(&options.checkpointInterval, "checkpoint-interval", defaultCheckpointInterval, "maximum interval between durable checkpoint updates")
+	flags.DurationVar(&options.rotationDrain, "rotation-drain-interval", defaultRotationDrain, "stable EOF time before switching input generations")
 	if err := flags.Parse(args); err != nil {
 		return options, err
 	}
@@ -159,8 +162,8 @@ func parseOptions(args []string, stderr io.Writer) (commandOptions, error) {
 	if options.syncOutput && options.outputPath == "" {
 		return options, fmt.Errorf("sync-output requires output-file")
 	}
-	if options.pollInterval <= 0 || options.eventTimeout <= 0 || options.checkpointInterval <= 0 {
-		return options, fmt.Errorf("poll interval, event timeout, and checkpoint interval must be positive")
+	if options.pollInterval <= 0 || options.eventTimeout <= 0 || options.checkpointInterval <= 0 || options.rotationDrain <= 0 {
+		return options, fmt.Errorf("poll, event timeout, checkpoint, and rotation drain intervals must be positive")
 	}
 	if options.maxLineBytes <= 0 || options.maxPendingEvents <= 0 || options.maxRecordsPerEvent <= 0 || options.maxPendingBytes <= 0 {
 		return options, fmt.Errorf("collection limits must be positive")
@@ -237,61 +240,70 @@ func runFollower(ctx context.Context, options commandOptions, processor *eventPr
 	if err != nil {
 		return err
 	}
-	var expected *collector.FileIdentity
-	var startOffset int64
+	var startPosition audit.SourcePosition
 	if checkpoint != nil {
-		expected = &collector.FileIdentity{Device: checkpoint.Device, Inode: checkpoint.Inode}
-		startOffset = checkpoint.Offset
+		startPosition = audit.SourcePosition{
+			Device: checkpoint.Device, Inode: checkpoint.Inode,
+			Start: checkpoint.Offset, End: checkpoint.Offset, Valid: true,
+		}
 	}
-	follower, err := collector.OpenFileFollowerAt(options.inputPath, collector.FollowerOptions{
-		PollInterval: options.pollInterval,
-		MaxLineBytes: options.maxLineBytes,
-	}, startOffset, expected)
+	follower, err := collector.OpenRotatingFollower(options.inputPath, collector.RotationOptions{
+		FollowerOptions: collector.FollowerOptions{PollInterval: options.pollInterval, MaxLineBytes: options.maxLineBytes},
+		DrainInterval:   options.rotationDrain,
+		ExcludePaths:    []string{options.outputPath, options.checkpointPath, options.lockPath},
+	}, checkpoint)
 	if err != nil {
 		return err
 	}
 	defer follower.Close()
-	checkpointWriter := newCheckpointWriter(options, inputPath, follower.Identity(), startOffset, checkpoint != nil, processor.sink)
-	if err := checkpointWriter.persist(startOffset, true); err != nil {
+	if checkpoint == nil {
+		position := follower.CompletePosition()
+		startPosition = audit.SourcePosition{
+			Device: position.Identity.Device, Inode: position.Identity.Inode,
+			Generation: position.Generation, Start: position.Offset, End: position.Offset, Valid: true,
+		}
+	}
+	checkpointWriter := newCheckpointWriter(options, inputPath, startPosition, checkpoint != nil, processor.sink)
+	if err := checkpointWriter.persist(startPosition, true); err != nil {
 		return err
 	}
+	rotationCount := follower.RotationCount()
 
 	for {
-		line, ok, err := follower.NextSource(ctx)
+		line, ok, err := follower.Next(ctx)
 		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 			if err := processor.flushAll(audit.CompletionShutdown); err != nil {
 				return err
 			}
-			return checkpointWriter.persist(follower.CompleteOffset(), true)
+			return checkpointWriter.persist(sourcePosition(follower.CompletePosition()), true)
 		}
 		if err != nil {
 			return err
 		}
 		if ok {
 			source := audit.SourcePosition{
-				Device: line.Identity.Device, Inode: line.Identity.Inode,
-				Generation: line.Generation, Start: line.Start, End: line.End, Valid: true,
+				Device: line.StartIdentity.Device, Inode: line.StartIdentity.Inode,
+				Generation: line.StartGeneration, Start: line.Start, End: line.Start,
+				Bytes: line.SourceBytes, Valid: true,
 			}
 			if err := processor.addSourceLine(line.Text, source); err != nil {
 				return err
 			}
-			safe := processor.assembler.SafeSourcePosition(audit.SourcePosition{
-				Device: line.Identity.Device, Inode: line.Identity.Inode,
-				Generation: line.Generation, Start: line.End, End: line.End, Valid: true,
-			})
-			if err := checkpointWriter.persist(safe.End, false); err != nil {
+			safe := processor.assembler.SafeSourcePosition(sourcePosition(follower.CompletePosition()))
+			if err := checkpointWriter.persist(safe, false); err != nil {
 				return err
 			}
 			continue
 		}
+		if follower.RotationCount() != rotationCount {
+			rotationCount = follower.RotationCount()
+			fmt.Fprintf(processor.stderr, "input rotation: switched generation (%d)\n", rotationCount)
+		}
 		if err := processor.emit(processor.assembler.FlushExpired(time.Now())); err != nil {
 			return err
 		}
-		safe := processor.assembler.SafeSourcePosition(audit.SourcePosition{
-			Device: follower.Identity().Device, Inode: follower.Identity().Inode,
-			Start: follower.CompleteOffset(), End: follower.CompleteOffset(), Valid: true,
-		})
-		if err := checkpointWriter.persist(safe.End, false); err != nil {
+		safe := processor.assembler.SafeSourcePosition(sourcePosition(follower.CompletePosition()))
+		if err := checkpointWriter.persist(safe, false); err != nil {
 			return err
 		}
 	}
@@ -314,30 +326,29 @@ func loadConfiguredCheckpoint(path, inputPath string) (*collector.Checkpoint, er
 type checkpointWriter struct {
 	path        string
 	inputPath   string
-	identity    collector.FileIdentity
 	interval    time.Duration
 	sink        eventoutput.Sink
-	lastOffset  int64
+	last        audit.SourcePosition
 	lastAttempt time.Time
 	initialized bool
 }
 
-func newCheckpointWriter(options commandOptions, inputPath string, identity collector.FileIdentity, offset int64, initialized bool, sink eventoutput.Sink) *checkpointWriter {
+func newCheckpointWriter(options commandOptions, inputPath string, position audit.SourcePosition, initialized bool, sink eventoutput.Sink) *checkpointWriter {
 	return &checkpointWriter{
-		path: options.checkpointPath, inputPath: inputPath, identity: identity,
-		interval: options.checkpointInterval, sink: sink, lastOffset: offset,
+		path: options.checkpointPath, inputPath: inputPath,
+		interval: options.checkpointInterval, sink: sink, last: position,
 		lastAttempt: time.Now(), initialized: initialized,
 	}
 }
 
-func (writer *checkpointWriter) persist(offset int64, force bool) error {
+func (writer *checkpointWriter) persist(position audit.SourcePosition, force bool) error {
 	if writer.path == "" {
 		return nil
 	}
-	if offset < writer.lastOffset {
-		return fmt.Errorf("checkpoint offset regressed from %d to %d", writer.lastOffset, offset)
+	if sourcePositionBefore(position, writer.last) {
+		return fmt.Errorf("checkpoint position regressed")
 	}
-	if writer.initialized && offset == writer.lastOffset {
+	if writer.initialized && sameSourcePosition(position, writer.last) {
 		return nil
 	}
 	if !force && time.Since(writer.lastAttempt) < writer.interval {
@@ -348,15 +359,33 @@ func (writer *checkpointWriter) persist(offset int64, force bool) error {
 		return fmt.Errorf("commit output before checkpoint: %w", err)
 	}
 	checkpoint := collector.Checkpoint{
-		InputPath: writer.inputPath, Device: writer.identity.Device,
-		Inode: writer.identity.Inode, Offset: offset,
+		InputPath: writer.inputPath, Device: position.Device,
+		Inode: position.Inode, Offset: position.End,
 	}
 	if err := collector.SaveCheckpoint(writer.path, checkpoint); err != nil {
 		return fmt.Errorf("save checkpoint: %w", err)
 	}
-	writer.lastOffset = offset
+	writer.last = position
 	writer.initialized = true
 	return nil
+}
+
+func sourcePosition(position collector.SourcePosition) audit.SourcePosition {
+	return audit.SourcePosition{
+		Device: position.Identity.Device, Inode: position.Identity.Inode,
+		Generation: position.Generation, Start: position.Offset, End: position.Offset, Valid: true,
+	}
+}
+
+func sourcePositionBefore(left, right audit.SourcePosition) bool {
+	if left.Generation != right.Generation {
+		return left.Generation < right.Generation
+	}
+	return left.End < right.End
+}
+
+func sameSourcePosition(left, right audit.SourcePosition) bool {
+	return left.Device == right.Device && left.Inode == right.Inode && left.End == right.End
 }
 
 func (processor *eventProcessor) addLine(line string) error {
@@ -371,7 +400,11 @@ func (processor *eventProcessor) addSourceLine(line string, source audit.SourceP
 	}
 	if source.Valid {
 		record.Source = source
-		record.SourceBytes = int(source.End - source.Start)
+		if source.Bytes > 0 {
+			record.SourceBytes = source.Bytes
+		} else {
+			record.SourceBytes = int(source.End - source.Start)
+		}
 	}
 	events, err := processor.assembler.AddChecked(record)
 	if err != nil {

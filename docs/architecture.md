@@ -4,7 +4,7 @@
 
 audit2json converts Linux Audit streams into canonical newline-delimited JSON. The core understands Linux Audit semantics but does not understand Splunk CIM, Sentinel ASIM, Elastic ECS, or any other backend schema.
 
-The milestone v0.5 branch adds versioned durable checkpoints and restart recovery for one file generation. Input rotation, retained-generation discovery, truncation handling, and output reopen remain target behavior for v0.6 and must not be treated as implemented.
+The milestone v0.6 branch adds retained-generation recovery, live rename/create input rotation, explicit same-inode truncation errors, and automatic managed-output reopen to the versioned checkpoint model.
 
 ## Target data flow
 
@@ -37,7 +37,7 @@ Each stage has one responsibility and can be tested independently.
 
 Owns file descriptors, polling, partial lines, EOF waiting, checkpoints, and input rotation. It does not parse Audit fields.
 
-Without a checkpoint, the follower opens at offset zero. With `--checkpoint-file`, it verifies device and inode, seeks to the safe complete-line offset, preserves partial lines, and waits at EOF. It deliberately remains attached to that inode. Detecting and switching file generations is implemented separately in v0.6.
+Without a checkpoint, the follower opens at offset zero. With `--checkpoint-file`, it locates the device and inode at the current path or among retained uncompressed siblings, validates a complete-line offset, and drains later generations in modification-time order. During live rename/create rotation it remains attached to the old inode until EOF is stable for the configured drain interval, then switches to the replacement. The assembler is not reset, and a physical partial line can span the transition.
 
 A file descriptor remains attached to its inode after rename. On rotation, the collector drains the old descriptor before opening the new file and preserves the assembler across the transition.
 
@@ -75,7 +75,7 @@ Security conclusions such as privilege escalation or credential theft belong to 
 
 The stdout sink writes one event per line and blocks naturally when the consumer applies back-pressure.
 
-The file sink appends NDJSON directly without a userspace queue. Optional per-event sync provides a local durability boundary. Output-file rotation remains separate from input-log rotation and is not implemented in v0.4.
+The file sink appends NDJSON directly without a userspace queue. Optional per-event sync provides a local durability boundary. Before each write or checkpoint commit, the sink compares its descriptor with the configured path and reopens after rename-based output rotation.
 
 Diagnostics never share the event stream and are written to stderr.
 
