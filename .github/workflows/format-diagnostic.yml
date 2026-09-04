@@ -1,0 +1,21 @@
+name: Format diagnostic
+
+on:
+  push:
+    branches:
+      - milestone/v0.3-cis-renderer
+
+permissions:
+  contents: read
+
+jobs:
+  diff:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Show gofmt diff
+        run: gofmt -d .
