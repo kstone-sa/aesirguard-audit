@@ -23,10 +23,10 @@ type canonicalClassificationRule struct {
 }
 
 type securityEventFamilyDocument struct {
-	Version        string                           `json:"version"`
-	RecordTypes    map[string]securityEventFamily  `json:"record_types"`
-	RecordPrefixes []securityEventFamilyPrefixRule `json:"record_prefixes"`
-	SingleRecordTypes []string                     `json:"single_record_types"`
+	Version           string                          `json:"version"`
+	RecordTypes       map[string]securityEventFamily  `json:"record_types"`
+	RecordPrefixes    []securityEventFamilyPrefixRule `json:"record_prefixes"`
+	SingleRecordTypes []string                        `json:"single_record_types"`
 }
 
 type securityEventFamily struct {

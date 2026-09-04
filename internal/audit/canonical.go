@@ -73,13 +73,13 @@ type CanonicalSource struct {
 }
 
 type CanonicalEventMeta struct {
-	Type      string              `json:"type"`
-	Category  string              `json:"category,omitempty"`
-	Action    string              `json:"action,omitempty"`
-	OriginalAction string         `json:"original_action,omitempty"`
-	Success   *bool               `json:"success,omitempty"`
-	Integrity *CanonicalIntegrity `json:"integrity,omitempty"`
-	Issues    []CanonicalIssue    `json:"issues,omitempty"`
+	Type           string              `json:"type"`
+	Category       string              `json:"category,omitempty"`
+	Action         string              `json:"action,omitempty"`
+	OriginalAction string              `json:"original_action,omitempty"`
+	Success        *bool               `json:"success,omitempty"`
+	Integrity      *CanonicalIntegrity `json:"integrity,omitempty"`
+	Issues         []CanonicalIssue    `json:"issues,omitempty"`
 }
 
 type CanonicalIntegrity struct {
