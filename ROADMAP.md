@@ -35,6 +35,10 @@ Known gaps:
 
 ## v0.2 - Parser correctness and canonical schema
 
+**Status: in progress**
+
+Parser correctness and deterministic event assembly are implemented in the first development slice. The canonical schema, normalization-ready metadata, and real multi-distribution corpus remain pending.
+
 Goal: make record parsing and event assembly safe enough to support persistent collection.
 
 Deliverables:
