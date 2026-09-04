@@ -35,6 +35,13 @@ jobs:
               -ldflags="-s -w -X main.version=${GITHUB_REF_NAME} -X main.commit=${GITHUB_SHA} -X main.buildDate=${build_date}" \
               -o "dist/${name}/audit2json" ./cmd/audit2json
             cp LICENSE README.md "dist/${name}/"
+            cp -R packaging "dist/${name}/"
+            mkdir -p "dist/${name}/configs" "dist/${name}/docs"
+            cp configs/audit2json.example.json "dist/${name}/configs/"
+            cp docs/compatibility.md docs/configuration.md docs/operations.md \
+              docs/release.md docs/reliability.md docs/runbook.md "dist/${name}/docs/"
+            test -f "dist/${name}/packaging/systemd/audit2json.service"
+            test -f "dist/${name}/configs/audit2json.example.json"
             tar -C dist -czf "dist/${name}.tar.gz" "${name}"
             rm -rf "dist/${name}"
           done

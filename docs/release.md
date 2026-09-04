@@ -9,7 +9,7 @@
 
 ## Publish
 
-Pushing a tag matching `v*` runs the release workflow. It retests the source, builds static Linux amd64 and arm64 archives with embedded version metadata, generates SHA-256 checksums, and creates the GitHub release.
+Pushing a tag matching `v*` runs the release workflow. It retests the source, builds static Linux amd64 and arm64 archives with embedded version metadata, includes the example configuration, systemd assets, and operational documentation, generates SHA-256 checksums, and creates the GitHub release.
 
 Verify each archive against `SHA256SUMS`, run `audit2json --version`, and test `--check-config` before promoting it to production.
 
