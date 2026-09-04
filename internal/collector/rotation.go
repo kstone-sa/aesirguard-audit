@@ -217,7 +217,15 @@ func (follower *RotatingFollower) switchTo(candidate sourceCandidate) error {
 	options.Generation = follower.current.generation + 1
 	next, err := OpenFileFollowerAt(candidate.path, options, 0, &candidate.identity)
 	if err != nil {
-		return err
+		resolved, resolveErr := follower.findCandidate(candidate.identity)
+		if resolveErr != nil {
+			return errors.Join(err, resolveErr)
+		}
+		candidate = resolved
+		next, err = OpenFileFollowerAt(candidate.path, options, 0, &candidate.identity)
+		if err != nil {
+			return err
+		}
 	}
 	hadPartial := follower.current.HasPartial()
 	if err := follower.current.transferPartialTo(next); err != nil {
@@ -235,6 +243,19 @@ func (follower *RotatingFollower) switchTo(candidate sourceCandidate) error {
 		follower.complete = SourcePosition{Identity: candidate.identity, Generation: options.Generation, Offset: 0}
 	}
 	return nil
+}
+
+func (follower *RotatingFollower) findCandidate(identity FileIdentity) (sourceCandidate, error) {
+	candidates, err := discoverCandidates(follower.inputPath, follower.options.ExcludePaths)
+	if err != nil {
+		return sourceCandidate{}, err
+	}
+	for _, candidate := range candidates {
+		if candidate.identity == identity {
+			return candidate, nil
+		}
+	}
+	return sourceCandidate{}, &SourceGapError{Identity: identity}
 }
 
 // CompletePosition returns the end of the last complete physical line.
