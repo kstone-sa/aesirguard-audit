@@ -56,6 +56,9 @@ func OpenFileFollower(path string, options FollowerOptions) (*FileFollower, erro
 // caller to expire pending logical events without a separate goroutine.
 func (follower *FileFollower) Next(ctx context.Context) (line string, ok bool, err error) {
 	for {
+		if err := ctx.Err(); err != nil {
+			return "", false, err
+		}
 		fragment, readErr := follower.reader.ReadSlice('\n')
 		if len(fragment) > 0 {
 			if len(follower.partial)+len(fragment) > follower.maxLineBytes {

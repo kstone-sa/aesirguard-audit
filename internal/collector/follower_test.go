@@ -62,6 +62,29 @@ func TestFileFollowerHonorsCancellationAtEOF(t *testing.T) {
 	}
 }
 
+func TestFileFollowerHonorsCancellationWithBacklog(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "audit.log")
+	if err := os.WriteFile(path, []byte("first\nsecond\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	follower, err := OpenFileFollower(path, FollowerOptions{PollInterval: time.Hour, MaxLineBytes: 1024})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer follower.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	line, ok, err := follower.Next(ctx)
+	if err != nil || !ok || line != "first" {
+		t.Fatalf("first read = %q, %v, %v", line, ok, err)
+	}
+	cancel()
+	_, _, err = follower.Next(ctx)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("cancellation error with backlog = %v", err)
+	}
+}
+
 func TestFileFollowerRejectsOversizedPartialLine(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "audit.log")
 	if err := os.WriteFile(path, []byte("12345"), 0o600); err != nil {
@@ -107,5 +130,18 @@ func TestDefaultLockPathIsStablePerInput(t *testing.T) {
 	}
 	if first == DefaultLockPath("/var/log/audit/other.log") {
 		t.Fatal("different inputs share a default lock path")
+	}
+}
+
+func TestFileLockRejectsUntrustedParentDirectory(t *testing.T) {
+	directory := filepath.Join(t.TempDir(), "untrusted")
+	if err := os.Mkdir(directory, 0o777); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(directory, 0o777); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := AcquireFileLock(filepath.Join(directory, "audit.lock")); err == nil {
+		t.Fatal("expected insecure lock directory rejection")
 	}
 }
