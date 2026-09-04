@@ -1,167 +1,166 @@
-Project Goals
+# Roadmap
 
-Breve descrizione del progetto e dei principi:
-Native Go
-Zero external runtime dependencies
-No Python
-No CGO
-Designed for Splunk Universal Forwarder
-High performance
-Low memory footprint
-Reliable under heavy auditd workloads
-Easy to maintain
+## Project principles
 
-v0.1 — Parser Foundation ✅
+- Native Go and standard library only.
+- No Python, CGO, libaudit, libauparse, or external runtime.
+- SIEM-agnostic canonical NDJSON.
+- Low latency, bounded memory, and natural back-pressure.
+- Lossless processing while retained source data is available.
+- At-least-once recovery with minimal, bounded duplication.
+- Correctness before optimization.
 
-Status: Completed
+Milestones may be developed separately, but persistent collection is not production-ready until following, checkpoint recovery, and rotation handling work together.
 
-Features:
-Audit record parser
-Event grouping
-Key/value parser
-EXECVE reconstruction
-PROCTITLE decoding
-PATH deduplication
-Compact JSON output
+## v0.1 - Parser foundation
 
-v0.2 — Mapping Engine
+**Status: implemented as a prototype**
 
-Goal
-Separate Linux-specific knowledge from the parser.
+Implemented:
+
+- basic Audit record parsing;
+- grouping by audit ID;
+- basic EXECVE reconstruction;
+- PROCTITLE decoding;
+- PATH name collection;
+- compact NDJSON output.
+
+Known gaps:
+
+- incomplete Audit grammar coverage;
+- incomplete event-boundary handling;
+- destructive loss of fields needed for later normalization;
+- synthetic happy-path test coverage only;
+- nondeterministic flush order for incomplete events.
+
+## v0.2 - Parser correctness and canonical schema
+
+Goal: make record parsing and event assembly safe enough to support persistent collection.
 
 Deliverables:
-External JSON mapping files
-Mapping loader
-In-memory cache
-Result mapping
-Architecture mapping
-Syscall mapping
-Permission mapping
-Optional mapping configuration
 
-Future mappings:
-errno
-socket families
-capabilities
-audit message types
+- preserve the audit ID when records contain nested or repeated fields;
+- robust quoted, escaped, hexadecimal, and malformed-value handling;
+- explicit event time, serial, source identity, and completion state;
+- stable field types;
+- deterministic ordering;
+- EOE, PROCTITLE, single-record, watermark, and timeout boundaries;
+- interleaved and out-of-order record handling;
+- loss-aware fallback for unsupported fields and records;
+- golden tests using real Linux Audit samples.
 
-v0.3 — Collector
+## v0.3 - Normalization and optional rendering
 
-Goal
-Read audit.log continuously.
+Goal: translate Linux Audit semantics without introducing backend-specific schemas.
 
-Requirements:
-tail mode
-configurable polling
-startup from checkpoint
-graceful shutdown
-back-pressure support
-EOF waiting
-configurable input path
+Deliverables:
 
-No parsing logic.
+- architecture and syscall mappings;
+- result and errno normalization;
+- permissions, capabilities, signals, socket families, and message-type mappings;
+- record-family classifiers for process, authentication, file, policy, and network activity;
+- stable canonical event codes;
+- optional deterministic human-readable messages;
+- raw and normalized values kept distinct where interpretation may vary;
+- mapping version metadata.
 
-Only collection.
+Splunk CIM, Sentinel ASIM, Elastic ECS, detections, and risk classifications remain backend responsibilities.
 
-v0.4 — Checkpoint Engine
+## v0.4 - Persistent collector and sinks
 
-Requirements:
-JSON checkpoint file
-inode
-device
-offset
-timestamp
-safe writes
-crash recovery
-configurable checkpoint interval
+Goal: run continuously with low latency.
 
-No duplicated events after restart.
+Deliverables:
 
-v0.5 — Log Rotation Support
-Questa è una milestone importante e vorrei darle parecchio spazio.
+- direct file-follow mode;
+- configurable polling;
+- EOF waiting;
+- partial-line preservation;
+- bounded event state;
+- graceful shutdown;
+- synchronous stdout sink with natural back-pressure;
+- append-only file sink;
+- non-blocking per-input singleton lock;
+- clean success exit when another healthy instance owns the lock.
 
-Requirements:
-inode tracking
-rename detection
-copytruncate detection
-rotation during partial event
-continue reading old inode until EOF
-seamlessly switch to new file
-zero data loss
-no duplicated events
+## v0.5 - Checkpoint and crash recovery
 
-Support:
-logrotate
-auditd rotation
-frequent rotations
-very small log sizes
+Deliverables:
 
-Stress tests:
-rotation every minute
-rotation every second
-rotation during EXECVE
-rotation during multi-line events
+- versioned checkpoint format;
+- device, inode, and safe input offset;
+- atomic same-directory temporary write, fsync, and rename;
+- checkpoint only after complete-line processing and successful sink write;
+- safe offset that does not pass the oldest unresolved event;
+- configurable checkpoint interval;
+- restart from the durable checkpoint;
+- bounded replay window and optional recent-event identity cache;
+- corrupted-checkpoint detection and explicit recovery policy.
 
-v0.6 — Configuration
-JSON configuration.
+Delivery semantics are at-least-once. Exact end-to-end indexing cannot be promised by an unacknowledged stdout sink.
 
-Examples:
-{
-  "input": {
-    "path": "/var/log/audit/audit.log"
-  },
-  "checkpoint": {
-    "enabled": true,
-    "interval": 5
-  },
-  "mapping": {
-    "syscalls": true
-  }
-}
+## v0.6 - Input and output rotation
 
-Future support:
-multiple inputs
-include files
-environment overrides
-v0.7 — Performance
+Deliverables:
 
-Benchmarks:
-events/sec
-MB/sec
-allocations
-memory
-CPU
+- device and inode tracking;
+- rename/create detection;
+- drain the old descriptor before switching;
+- preserve pending events across file generations;
+- locate the checkpoint inode among retained rotated files after restart;
+- detect truncation;
+- explicit gap reporting when the checkpoint generation is no longer available;
+- managed rotation or reopen support for the file sink;
+- stress tests for rapid rotation and partial multi-record events.
 
-Optimizations only after correctness.
-Never optimize prematurely.
+Rename-based rotation is required for the strongest lossless guarantee. Copytruncate support is best effort.
 
-v0.8 — Testing
-Regression suite
-Golden JSON tests
-Real audit.log corpus
-Fuzz testing
-Malformed records
-Large EXECVE
-Very large PATH lists
-Rotation tests
-Checkpoint tests
+## v0.7 - Configuration and operations
 
-v0.9 — Production Hardening
-Logging
-Metrics
-Graceful shutdown
-Signal handling
-Error recovery
-Corrupted input
-Corrupted checkpoint
-Configuration validation
+Deliverables:
 
-v1.0
-Stable release.
+- validated JSON configuration;
+- command-line overrides for bootstrap and diagnostics;
+- input, sink, checkpoint, polling, timeout, and mapping settings;
+- signal handling;
+- structured operational diagnostics on stderr;
+- counters for input lag, pending events, parse failures, replay, gaps, and rotations;
+- health and heartbeat information for external supervision.
+
+## v0.8 - Performance and regression
+
+Deliverables:
+
+- events/sec and MB/sec benchmarks;
+- allocation, memory, and CPU profiles;
+- fuzz tests;
+- real multi-distribution corpus;
+- malformed and oversized records;
+- large and fragmented EXECVE events;
+- checkpoint and rotation fault injection;
+- slow-consumer and back-pressure tests.
+
+Optimize only after correctness and measurement.
+
+## v0.9 - Production hardening
+
+Deliverables:
+
+- configuration migration;
+- checkpoint migration and crash testing;
+- permissions and secure file creation;
+- packaging documentation;
+- operational runbooks;
+- compatibility matrix;
+- release and rollback procedure.
+
+## v1.0 - Stable release
 
 Requirements:
-Fully documented
-100% regression tests passing
-Stable JSON format
-Performance benchmarked
-Production ready
+
+- documented stable canonical schema;
+- all regression and fault-injection tests passing;
+- checkpoint and rotation guarantees verified;
+- bounded resource use under sustained load;
+- production packaging and operating guidance;
+- no backend-specific data model in the core.
