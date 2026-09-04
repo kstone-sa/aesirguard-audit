@@ -88,7 +88,7 @@ On startup:
 5. drain retained generations in modification-time order;
 6. switch to and follow the current input path.
 
-If the checkpoint inode cannot be found, recovery fails closed with an explicit source-gap error. Compressed generations are not decoded. Recovery assumes the rotation set preserves modification-time order; unusual schemes should retain standard `audit.log.*` or `audit.log-*` naming and timestamps.
+If the checkpoint inode cannot be found, recovery fails closed with an explicit source-gap error. Compressed generations are not decoded. Recovery assumes the rotation set preserves modification-time order. Equal timestamps are ordered only for conventional numeric suffixes, with larger numbers treated as older; non-numeric ties fail closed as ambiguous.
 
 ## Rotation handling
 

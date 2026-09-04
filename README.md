@@ -129,7 +129,7 @@ Enable crash recovery with an explicit durable checkpoint path:
   /var/log/audit/audit.log
 ```
 
-Checkpoint updates sync a managed output file before advancing input progress. With stdout, a successful write confirms only that the local pipe accepted the bytes; replay after a crash is therefore expected and delivery remains at-least-once. If the checkpoint inode is not the current input, audit2json searches uncompressed sibling files with the configured basename prefix and drains them in modification-time order. If it cannot locate the inode, it fails explicitly instead of skipping to the current file.
+Checkpoint updates sync a managed output file before advancing input progress. With stdout, a successful write confirms only that the local pipe accepted the bytes; replay after a crash is therefore expected and delivery remains at-least-once. If the checkpoint inode is not the current input, audit2json searches uncompressed sibling files with the configured basename prefix and drains them in modification-time order. Equal timestamps use conventional numeric suffix order (`.2` before `.1`); non-numeric ties fail closed as ambiguous. If it cannot locate the inode, it fails explicitly instead of skipping to the current file.
 
 For live rename/create rotation, the old descriptor must remain at a stable EOF for `--rotation-drain-interval` (default `500ms`) before the collector switches. Same-inode shrink, including copytruncate, is detected and reported as a gap; automatic continuation is intentionally not claimed lossless.
 
