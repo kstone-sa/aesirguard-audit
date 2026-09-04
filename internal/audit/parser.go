@@ -18,11 +18,12 @@ type Field struct {
 
 // Record is one raw auditd record parsed into key/value fields.
 type Record struct {
-	Type      string
-	ID        string
-	Fields    map[string]string
-	Values    map[string][]string
-	AllFields []Field
+	Type        string
+	ID          string
+	Fields      map[string]string
+	Values      map[string][]string
+	AllFields   []Field
+	SourceBytes int
 }
 
 // ParseRecord parses one auditd line without depending on libauparse.
@@ -33,10 +34,11 @@ func ParseRecord(line string) (Record, error) {
 	}
 
 	r := Record{
-		Fields:    fields,
-		Values:    values,
-		AllFields: allFields,
-		Type:      firstValue(values, "type"),
+		Fields:      fields,
+		Values:      values,
+		AllFields:   allFields,
+		Type:        firstValue(values, "type"),
+		SourceBytes: len(line),
 	}
 	for _, msg := range values["msg"] {
 		if id := auditIDFromMessage(msg); id != "" {

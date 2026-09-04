@@ -29,6 +29,9 @@ func TestParseRecord(t *testing.T) {
 	if record.Fields["exe"] != "/usr/bin/sudo" {
 		t.Fatalf("exe = %q", record.Fields["exe"])
 	}
+	if record.SourceBytes != len(line) {
+		t.Fatalf("source bytes = %d, want %d", record.SourceBytes, len(line))
+	}
 }
 
 func TestParseRecordPreservesRepeatedMessages(t *testing.T) {
@@ -190,6 +193,56 @@ func TestAssemblerFlushAllIsDeterministic(t *testing.T) {
 		if !strings.HasSuffix(events[index].ID, ":"+serial) {
 			t.Fatalf("event %d = %q", index, events[index].ID)
 		}
+	}
+}
+
+func TestBoundedAssemblerRejectsExcessPendingEvents(t *testing.T) {
+	assembler, err := NewBoundedAssembler(time.Second, AssemblerLimits{
+		MaxPendingEvents:   1,
+		MaxRecordsPerEvent: 2,
+		MaxPendingBytes:    1024,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	first := mustParseRecord(t, `type=SYSCALL msg=audit(1721721630.000:70): syscall=1`)
+	second := mustParseRecord(t, `type=SYSCALL msg=audit(1721721631.000:71): syscall=2`)
+	if _, err := assembler.AddChecked(first); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := assembler.AddChecked(second); err == nil {
+		t.Fatal("expected pending-event limit error")
+	}
+	if assembler.Pending() != 1 || assembler.PendingBytes() != first.SourceBytes {
+		t.Fatalf("pending state = %d events, %d bytes", assembler.Pending(), assembler.PendingBytes())
+	}
+}
+
+func TestBoundedAssemblerReleasesBytesOnCompletion(t *testing.T) {
+	assembler, err := NewBoundedAssembler(time.Second, AssemblerLimits{
+		MaxPendingEvents:   1,
+		MaxRecordsPerEvent: 2,
+		MaxPendingBytes:    1024,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	record := mustParseRecord(t, `type=KERNEL msg=audit(1721721630.000:70): device=test`)
+	events, err := assembler.AddChecked(record)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(events) != 1 || assembler.PendingBytes() != 0 {
+		t.Fatalf("completion state = %#v, %d pending bytes", events, assembler.PendingBytes())
+	}
+}
+
+func TestAssemblerUsesShutdownCompletion(t *testing.T) {
+	assembler := NewAssembler(0)
+	assembler.Add(mustParseRecord(t, `type=SYSCALL msg=audit(1721721630.000:70): syscall=1`))
+	events := assembler.FlushAllWith(CompletionShutdown)
+	if len(events) != 1 || events[0].Complete || events[0].Completion != CompletionShutdown {
+		t.Fatalf("shutdown events = %#v", events)
 	}
 }
 
