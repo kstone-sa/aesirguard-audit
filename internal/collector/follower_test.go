@@ -142,6 +142,17 @@ func TestFileFollowerRejectsWrongGeneration(t *testing.T) {
 	}
 }
 
+func TestFileFollowerRejectsOffsetInsideLine(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "audit.log")
+	if err := os.WriteFile(path, []byte("first\nsecond\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if follower, err := OpenFileFollowerAt(path, FollowerOptions{PollInterval: time.Millisecond, MaxLineBytes: 1024}, 3, nil); err == nil {
+		follower.Close()
+		t.Fatal("expected incomplete-line checkpoint rejection")
+	}
+}
+
 func TestFileLockIsNonBlockingAndReleasedByClose(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "audit.lock")
 	first, acquired, err := AcquireFileLock(path)

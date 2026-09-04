@@ -43,12 +43,21 @@ func LoadCheckpoint(path string) (*Checkpoint, error) {
 	}
 	file := os.NewFile(uintptr(fd), path)
 	defer file.Close()
+	if err := validateLockDirectory(filepath.Dir(path)); err != nil {
+		return nil, fmt.Errorf("checkpoint directory: %w", err)
+	}
+	if err := validateLockFile(file); err != nil {
+		return nil, fmt.Errorf("checkpoint file: %w", err)
+	}
 	info, err := file.Stat()
 	if err != nil {
 		return nil, err
 	}
 	if !info.Mode().IsRegular() {
 		return nil, fmt.Errorf("checkpoint %s is not a regular file", path)
+	}
+	if info.Mode().Perm()&0o022 != 0 {
+		return nil, fmt.Errorf("checkpoint %s is group- or world-writable", path)
 	}
 	decoder := json.NewDecoder(file)
 	decoder.DisallowUnknownFields()

@@ -49,6 +49,20 @@ func TestCheckpointRejectsCorruptionAndUnsupportedVersion(t *testing.T) {
 	}
 }
 
+func TestCheckpointRejectsWritableState(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "checkpoint")
+	contents := `{"version":1,"input_path":"/audit.log","device":1,"inode":2,"offset":0,"updated_at":"2026-01-01T00:00:00Z"}` + "\n"
+	if err := os.WriteFile(path, []byte(contents), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(path, 0o666); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := LoadCheckpoint(path); err == nil {
+		t.Fatal("expected writable checkpoint rejection")
+	}
+}
+
 func TestCheckpointValidateRequiresTimestampAfterSaveOnly(t *testing.T) {
 	checkpoint := Checkpoint{Version: CheckpointVersion, InputPath: "/audit.log", Device: 1, Inode: 2, UpdatedAt: time.Time{}}
 	if err := checkpoint.Validate(); err == nil {
