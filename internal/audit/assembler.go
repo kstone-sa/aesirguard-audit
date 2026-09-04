@@ -50,7 +50,6 @@ type Completion string
 
 const (
 	CompletionEOE          Completion = "eoe"
-	CompletionProctitle    Completion = "proctitle"
 	CompletionSingleRecord Completion = "single_record"
 	CompletionWatermark    Completion = "watermark"
 	CompletionTimeout      Completion = "timeout"
@@ -117,8 +116,7 @@ func (assembler *Assembler) addAt(record Record, observedAt time.Time) ([]Assemb
 	ready := make([]readyEvent, 0, 2)
 	pending, exists := assembler.pending[record.ID]
 
-	// An EOE without cached records contains no event data. This also consumes
-	// EOE records that arrive after a PROCTITLE-triggered completion.
+	// An EOE without cached records contains no event data.
 	if record.Type != "EOE" || exists {
 		if err := assembler.checkLimits(record, pending, exists); err != nil {
 			return nil, err
@@ -264,15 +262,13 @@ func (assembler *Assembler) expired(now time.Time) []readyEvent {
 }
 
 func isTerminalRecord(recordType string) bool {
-	return recordType == "EOE" || recordType == "PROCTITLE" || recordType == "KERNEL"
+	return recordType == "EOE" || recordType == "KERNEL"
 }
 
 func terminalCompletion(recordType string) Completion {
 	switch recordType {
 	case "EOE":
 		return CompletionEOE
-	case "PROCTITLE":
-		return CompletionProctitle
 	default:
 		return CompletionSingleRecord
 	}

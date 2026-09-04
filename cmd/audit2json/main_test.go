@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/marios-github/audit2json/internal/audit"
-	"github.com/marios-github/audit2json/internal/collector"
+	"github.com/kstone-sa/audit2json/internal/audit"
+	"github.com/kstone-sa/audit2json/internal/collector"
 )
 
 func TestRunFlushesIncompleteEventsInInputOrder(t *testing.T) {
@@ -69,6 +69,22 @@ func TestRunOptionallyRendersMessage(t *testing.T) {
 	}
 	if event.Message != "mario attempted to execute /usr/bin/sudo as root with arguments: id" || event.Renderer != audit.HumanRendererVersion {
 		t.Fatalf("rendered event = %#v", event)
+	}
+}
+
+func TestRunPreservesMalformedLineAsFallbackEvent(t *testing.T) {
+	const input = `type=SYSCALL msg=audit(1721721702.000:82): broken`
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	if err := run(nil, strings.NewReader(input), &stdout, &stderr); err != nil {
+		t.Fatal(err)
+	}
+	var event audit.CanonicalEvent
+	if err := json.NewDecoder(&stdout).Decode(&event); err != nil {
+		t.Fatal(err)
+	}
+	if event.Audit.ID != "1721721702.000:82" || event.Audit.Raw != input || event.Event.Action != "parse_failure" {
+		t.Fatalf("fallback event = %#v", event)
 	}
 }
 
@@ -351,6 +367,159 @@ func TestRunRejectsConflictingStatePaths(t *testing.T) {
 	if err := run([]string{"--follow", "--lock-file=" + path, path}, strings.NewReader(""), io.Discard, io.Discard); err == nil {
 		t.Fatal("expected input/lock conflict")
 	}
+}
+
+func TestParseOptionsLoadsConfigAndAppliesCLIOverrides(t *testing.T) {
+	directory := t.TempDir()
+	configPath := filepath.Join(directory, "audit2json.json")
+	config := `{
+  "version": 1,
+  "input": {"path": "/var/log/audit/audit.log", "follow": true, "source_host": "configured"},
+  "sink": {"file": "/var/log/audit2json/events.ndjson", "sync": true},
+  "checkpoint": {"file": "/var/lib/audit2json/checkpoint", "interval": "3s"},
+  "collection": {"poll_interval": "250ms", "event_timeout": "4s", "rotation_drain_interval": "750ms"},
+  "mapping": {"render_message": true},
+  "operations": {"heartbeat_interval": "15s"}
+}`
+	if err := os.WriteFile(configPath, []byte(config), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	options, err := parseOptions([]string{"--config", configPath, "--source-host=override", "--poll-interval=10ms"}, io.Discard)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if options.inputPath != "/var/log/audit/audit.log" || !options.follow || options.sourceHost != "override" {
+		t.Fatalf("input options = %#v", options)
+	}
+	if options.outputPath != "/var/log/audit2json/events.ndjson" || !options.syncOutput || !options.renderMessage {
+		t.Fatalf("sink and mapping options = %#v", options)
+	}
+	if options.pollInterval != 10*time.Millisecond || options.eventTimeout != 4*time.Second || options.checkpointInterval != 3*time.Second || options.heartbeatInterval != 15*time.Second {
+		t.Fatalf("duration options = %#v", options)
+	}
+}
+
+func TestParseOptionsAcceptsSingleDashConfig(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "audit2json.json")
+	if err := os.WriteFile(configPath, []byte(`{"version":1,"input":{"source_host":"configured"}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	options, err := parseOptions([]string{"-config", configPath}, io.Discard)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if options.sourceHost != "configured" {
+		t.Fatalf("options = %#v", options)
+	}
+}
+
+func TestParseOptionsRejectsDuplicateConfig(t *testing.T) {
+	if _, err := parseOptions([]string{"--config=first.json", "-config", "second.json"}, io.Discard); err == nil || !strings.Contains(err.Error(), "more than once") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestRunHelpUsesStdoutWithoutDiagnostics(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	if err := run([]string{"--help"}, strings.NewReader(""), &stdout, &stderr); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(stdout.String(), "usage: audit2json") || stderr.Len() != 0 {
+		t.Fatalf("stdout = %q, stderr = %q", stdout.String(), stderr.String())
+	}
+}
+
+func TestParseOptionsRejectsUnknownConfigField(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "audit2json.json")
+	if err := os.WriteFile(configPath, []byte(`{"version":1,"surprise":true}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := parseOptions([]string{"--config=" + configPath, "--check-config"}, io.Discard); err == nil || !strings.Contains(err.Error(), "unknown field") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestRunCheckConfigEmitsStructuredDiagnostic(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "audit2json.json")
+	if err := os.WriteFile(configPath, []byte(`{"version":1}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var stderr bytes.Buffer
+	if err := run([]string{"--config=" + configPath, "--check-config"}, strings.NewReader(""), io.Discard, &stderr); err != nil {
+		t.Fatal(err)
+	}
+	var diagnostic map[string]any
+	if err := json.Unmarshal(bytes.TrimSpace(stderr.Bytes()), &diagnostic); err != nil {
+		t.Fatalf("diagnostic = %q: %v", stderr.String(), err)
+	}
+	if diagnostic["event"] != "configuration_valid" || diagnostic["level"] != "info" {
+		t.Fatalf("diagnostic = %#v", diagnostic)
+	}
+}
+
+func TestOperationalHeartbeatContainsCountersAndGauges(t *testing.T) {
+	var output bytes.Buffer
+	diagnostics := newOperationalDiagnostics(&output, time.Nanosecond)
+	diagnostics.nextHeartbeat = time.Time{}
+	diagnostics.counters.InputLines = 2
+	assembler, err := audit.NewBoundedAssembler(time.Second, audit.AssemblerLimits{
+		MaxPendingEvents: 2, MaxRecordsPerEvent: 2, MaxPendingBytes: 1024,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	processor := &eventProcessor{assembler: assembler}
+	if !diagnostics.heartbeatDue() {
+		t.Fatal("heartbeat should be due")
+	}
+	if err := diagnostics.heartbeat(processor, 42); err != nil {
+		t.Fatal(err)
+	}
+	var heartbeat struct {
+		Event         string            `json:"event"`
+		InputLagBytes int64             `json:"input_lag_bytes"`
+		Counters      operationCounters `json:"counters"`
+	}
+	if err := json.Unmarshal(bytes.TrimSpace(output.Bytes()), &heartbeat); err != nil {
+		t.Fatal(err)
+	}
+	if heartbeat.Event != "heartbeat" || heartbeat.InputLagBytes != 42 || heartbeat.Counters.InputLines != 2 {
+		t.Fatalf("heartbeat = %#v", heartbeat)
+	}
+}
+
+func TestRunFollowerEmitsHeartbeatWhileBacklogIsActive(t *testing.T) {
+	directory := t.TempDir()
+	inputPath := filepath.Join(directory, "audit.log")
+	if err := os.WriteFile(inputPath, []byte(`type=KERNEL msg=audit(1721722000.000:200): device=test`+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	diagnostics := &heartbeatCancelWriter{cancel: cancel}
+	err := runContext(ctx, []string{
+		"--follow", "--poll-interval=5ms", "--heartbeat-interval=1ns",
+		"--lock-file=" + filepath.Join(directory, "lock"), inputPath,
+	}, strings.NewReader(""), io.Discard, diagnostics)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !diagnostics.seen {
+		t.Fatal("heartbeat was not emitted while input remained readable")
+	}
+}
+
+type heartbeatCancelWriter struct {
+	cancel context.CancelFunc
+	seen   bool
+}
+
+func (writer *heartbeatCancelWriter) Write(data []byte) (int, error) {
+	if bytes.Contains(data, []byte(`"event":"heartbeat"`)) {
+		writer.seen = true
+		writer.cancel()
+	}
+	return len(data), nil
 }
 
 func waitForFile(t *testing.T, path string) {

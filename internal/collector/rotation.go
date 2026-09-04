@@ -326,6 +326,52 @@ func (follower *RotatingFollower) CompletePosition() SourcePosition { return fol
 // RotationCount is incremented after every generation transition.
 func (follower *RotatingFollower) RotationCount() uint64 { return follower.rotationCount }
 
+// CaughtUp reports whether the active descriptor is the configured path and
+// has reached its current size.
+func (follower *RotatingFollower) CaughtUp() bool {
+	if !follower.currentAtPath || len(follower.queued) != 0 {
+		return false
+	}
+	size, err := follower.current.descriptorSize()
+	return err == nil && size == follower.current.CurrentOffset()
+}
+
+// LagBytes estimates unread source bytes across the active and retained
+// generations visible at the instant of the call.
+func (follower *RotatingFollower) LagBytes() (int64, error) {
+	size, err := follower.current.descriptorSize()
+	if err != nil {
+		return 0, err
+	}
+	lag := size - follower.current.CurrentOffset()
+	if lag < 0 {
+		return 0, &SourceTruncatedError{Identity: follower.current.Identity(), Offset: follower.current.CurrentOffset(), Size: size}
+	}
+	candidates, err := discoverCandidates(follower.inputPath, follower.options.ExcludePaths)
+	if err != nil {
+		return 0, err
+	}
+	found := false
+	for _, candidate := range candidates {
+		if candidate.identity == follower.current.Identity() {
+			found = true
+			continue
+		}
+		if !found {
+			continue
+		}
+		info, err := os.Stat(candidate.path)
+		if err != nil {
+			return 0, err
+		}
+		lag += info.Size()
+	}
+	if !found {
+		return 0, &SourceGapError{Identity: follower.current.Identity()}
+	}
+	return lag, nil
+}
+
 // Close releases the active source descriptor.
 func (follower *RotatingFollower) Close() error { return follower.current.Close() }
 
@@ -350,7 +396,8 @@ func discoverCandidates(inputPath string, excludes []string) ([]sourceCandidate,
 	identities := make(map[FileIdentity]int)
 	for _, entry := range entries {
 		name := entry.Name()
-		if name != base && !strings.HasPrefix(name, base+".") && !strings.HasPrefix(name, base+"-") {
+		number, numbered := rotationNumber(base, name)
+		if name != base && !numbered {
 			continue
 		}
 		if isCompressedRotation(name) {
@@ -374,7 +421,6 @@ func discoverCandidates(inputPath string, excludes []string) ([]sourceCandidate,
 		if err != nil {
 			return nil, err
 		}
-		number, numbered := rotationNumber(base, name)
 		candidate := sourceCandidate{path: path, identity: identity, modifiedAt: info.ModTime(), current: path == inputPath, number: number, numbered: numbered}
 		if index, exists := identities[identity]; exists {
 			if candidate.current {

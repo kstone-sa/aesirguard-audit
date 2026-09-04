@@ -6,7 +6,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/marios-github/audit2json/internal/audit"
+	"github.com/kstone-sa/audit2json/internal/audit"
 )
 
 // Sink synchronously accepts canonical events.

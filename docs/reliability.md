@@ -15,7 +15,7 @@ These guarantees apply to audit2json and its selected sink. End-to-end indexing 
 
 ## Implementation status
 
-Milestone v0.6 implements durable opt-in checkpoints, recovery through retained uncompressed generations, live rename/create input rotation, explicit same-inode truncation errors, and automatic managed-output reopen.
+Milestone v0.7 adds validated operational configuration, structured diagnostics, counters, lag and pending-state gauges, and heartbeats to the durable checkpoint and rotation implementation.
 
 ## Delivery semantics
 
@@ -36,6 +36,8 @@ No source record is intentionally dropped when all of the following hold:
 - the configured sink remains writable;
 - rotation uses semantics that preserve written bytes;
 - the operating system can read and persist the required state.
+
+A malformed physical line is emitted as a canonical `parse_failure` event containing the original line in `audit.raw`. This exceptional fallback allows the checkpoint to advance without silently discarding input; normal events do not carry raw records.
 
 If a source generation is no longer present, audit2json reports a gap. It must not silently resume from the current file and imply continuity.
 
@@ -83,12 +85,12 @@ On startup:
 
 1. acquire the per-input singleton lock;
 2. read and validate the checkpoint;
-3. locate its device and inode at the current path or among uncompressed basename-prefixed siblings;
+3. locate its device and inode at the current path or among uncompressed numeric rotations such as `audit.log.1`;
 4. seek to the validated complete-line offset;
 5. drain retained generations in modification-time order;
 6. switch to and follow the current input path.
 
-If the checkpoint inode cannot be found, recovery fails closed with an explicit source-gap error. Compressed generations are not decoded. Recovery assumes the rotation set preserves modification-time order. Equal timestamps are ordered only for conventional numeric suffixes, with larger numbers treated as older; non-numeric ties fail closed as ambiguous.
+If the checkpoint inode cannot be found, recovery fails closed with an explicit source-gap error. Compressed and non-numeric basename-prefixed files are not treated as input generations. Numeric rotations with larger suffixes are treated as older when timestamps are equal.
 
 ## Rotation handling
 
@@ -128,6 +130,8 @@ Each input instance uses a non-blocking advisory lock derived from its input and
 - A concurrent invocation that finds a healthy owner exits successfully without event output.
 - Kernel lock ownership is authoritative.
 - PID and start-time metadata are diagnostic.
+
+Follow mode without a checkpoint is allowed but emits a structured `checkpoint_disabled` warning. A restart then begins again at offset zero of the retained input, so durable recovery requires `--checkpoint-file`.
 - Crashes and forced termination release the lock automatically.
 
 The external scheduler or service manager is responsible for launching and relaunching the process. A singleton lock does not detect a live but hung owner. Heartbeat-based health monitoring belongs to operational supervision and must not kill a process based only on an old PID file.
@@ -136,7 +140,7 @@ The external scheduler or service manager is responsible for launching and relau
 
 Sinks are synchronous and bounded. When stdout or file output blocks, the collector slows or stops reading. No unbounded in-memory output queue is introduced.
 
-The Audit files then become the recovery buffer. Operational telemetry must expose consumer lag and warn before retained rotated files can be deleted.
+The Audit files then become the recovery buffer. Operational telemetry exposes consumer lag so supervision can warn before retained rotated files can be deleted. The gauge may be omitted during a rename/create window where no stable filesystem estimate is available.
 
 ## File sink
 

@@ -153,6 +153,21 @@ func TestFileFollowerRejectsOffsetInsideLine(t *testing.T) {
 	}
 }
 
+func TestFileFollowerReportsTypedTruncationBeforeCheckpoint(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "audit.log")
+	if err := os.WriteFile(path, []byte("line\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	follower, err := OpenFileFollowerAt(path, FollowerOptions{PollInterval: time.Millisecond, MaxLineBytes: 1024}, 20, nil)
+	if follower != nil {
+		follower.Close()
+	}
+	var truncated *SourceTruncatedError
+	if !errors.As(err, &truncated) || truncated.Offset != 20 || truncated.Size != 5 {
+		t.Fatalf("truncation error = %#v, %v", truncated, err)
+	}
+}
+
 func TestFileLockIsNonBlockingAndReleasedByClose(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "audit.lock")
 	first, acquired, err := AcquireFileLock(path)

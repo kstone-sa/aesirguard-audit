@@ -48,7 +48,7 @@ Deliverables:
 - explicit event time, serial, source identity, and completion state;
 - stable field types;
 - deterministic ordering;
-- EOE, PROCTITLE, single-record, watermark, and timeout boundaries;
+- EOE, known single-record, watermark, and timeout boundaries;
 - interleaved and out-of-order record handling;
 - explicit issues for unsupported record families without copying arbitrary fields;
 - optional deterministic human-readable process messages;
@@ -56,21 +56,22 @@ Deliverables:
 
 ## v0.3 - Extended normalization and CIS event families
 
-**Status: implemented**
+**Status: implemented for the scoped CIS semantic families**
 
 Goal: translate Linux Audit semantics without introducing backend-specific schemas. Initial guaranteed coverage targets CIS Server Level 1 and Level 2 Audit event families across Debian 12/13, Ubuntu 22.04/24.04, RHEL 8/9, and Oracle Linux 8/9.
 
 Deliverables:
 
-- architecture and syscall mappings;
-- result and errno normalization;
-- permissions, capabilities, signals, socket families, and message-type mappings;
+- ENRICHED syscall names with architecture-dependent RAW fallback fields;
+- result normalization;
+- semantic file-capability decoding;
 - record-family classifiers for process, authentication, file, policy, and network activity;
 - stable canonical event codes;
 - deterministic human-readable templates for every supported CIS Audit family;
-- a versioned CIS coverage matrix and multi-distribution corpus;
+- a versioned CIS coverage matrix and representative multi-distribution fixtures;
 - raw and normalized values kept distinct where interpretation may vary;
-- mapping version metadata.
+
+Broader architecture tables, errno, permission, signal, socket-family, and message-type normalization are deferred until driven by the real corpus in v0.8. The schema version identifies the current contract; separate mapping-version metadata is not yet emitted.
 
 Splunk CIM, Sentinel ASIM, Elastic ECS, detections, and risk classifications remain backend responsibilities.
 
@@ -117,7 +118,7 @@ The durable format, safe-offset invariant, sink/checkpoint ordering, configurabl
 
 ## v0.6 - Input and output rotation
 
-**Status: in progress**
+**Status: implemented**
 
 Deliverables:
 
@@ -137,6 +138,8 @@ The development branch implements retained uncompressed generation discovery, li
 
 ## v0.7 - Configuration and operations
 
+**Status: implemented on the development branch**
+
 Deliverables:
 
 - validated JSON configuration;
@@ -146,6 +149,8 @@ Deliverables:
 - structured operational diagnostics on stderr;
 - counters for input lag, pending events, parse failures, replay, gaps, and rotations;
 - health and heartbeat information for external supervision.
+
+Configuration schema version 1 is strict and supports CLI overrides. Operational records are JSON on stderr and include lifecycle, recovery, rotation, failure, process-lifetime counters, instantaneous lag and pending-state gauges, and a configurable heartbeat.
 
 ## v0.8 - Performance and regression
 

@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/marios-github/audit2json/internal/audit"
+	"github.com/kstone-sa/audit2json/internal/audit"
 )
 
 func TestWriterSinkEmitsOneLineWithoutEscapingHTML(t *testing.T) {

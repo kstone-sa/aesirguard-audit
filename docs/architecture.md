@@ -4,7 +4,7 @@
 
 audit2json converts Linux Audit streams into canonical newline-delimited JSON. The core understands Linux Audit semantics but does not understand Splunk CIM, Sentinel ASIM, Elastic ECS, or any other backend schema.
 
-The milestone v0.6 branch adds retained-generation recovery, live rename/create input rotation, explicit same-inode truncation errors, and automatic managed-output reopen to the versioned checkpoint model.
+The milestone v0.7 branch adds strict operational configuration and a structured health surface to the versioned checkpoint and rotation model.
 
 ## Target data flow
 
@@ -52,10 +52,11 @@ Groups records by audit ID. Linux Audit records may be interleaved and may arriv
 Completion may be established by:
 
 - an EOE record;
-- a terminal record such as PROCTITLE;
 - a known single-record message type;
 - an event-time watermark;
 - an inactivity timeout.
+
+`PROCTITLE` is context, not a reliable terminal marker: later `PATH`, `SYSCALL`, or other records may share the same Audit ID. It supplies an `argv` fallback when `EXECVE` is absent.
 
 The assembler must use bounded state and report incomplete events explicitly.
 
@@ -78,6 +79,10 @@ The stdout sink writes one event per line and blocks naturally when the consumer
 The file sink appends NDJSON directly without a userspace queue. Optional per-event sync provides a local durability boundary. Before each write or checkpoint commit, the sink compares its descriptor with the configured path and reopens after rename-based output rotation.
 
 Diagnostics never share the event stream and are written to stderr.
+
+### Operations
+
+The command loads versioned JSON configuration before applying CLI overrides. The main collection loop owns operational counters and emits structured lifecycle, recovery, failure, rotation, and heartbeat records on stderr. This keeps telemetry ordered with collector state and makes a blocked loop externally visible as a missed heartbeat.
 
 ## Process model
 

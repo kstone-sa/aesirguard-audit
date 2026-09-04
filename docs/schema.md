@@ -12,7 +12,7 @@ The v0.3 schema is versioned but not yet frozen. Additive refinement is expected
 
 The parser retains source records while assembling an event, but the canonical output is not a JSON copy of auditd. It emits fields with defined security or forensic meaning.
 
-Unsupported record families are reported through `event.issues`; arbitrary source fields are not copied into the event. This keeps delivery lossless at event level without treating every auditd implementation detail as indexed security data.
+Unsupported record families are reported through `event.issues`; arbitrary source fields are not copied into normal events. A malformed physical line is the sole exception: it is emitted as a `parse_failure` event with the original line in `audit.raw`, preventing silent loss while keeping raw auditd noise out of valid events.
 
 ## Top-level contract
 
@@ -33,7 +33,7 @@ A local rule key is never used as a portable event type.
 
 ## Audit envelope and source
 
-`audit.id` preserves the original `timestamp:serial` identifier used to correlate the physical records. `audit.time` is its UTC RFC 3339 representation.
+`audit.id` preserves the original `timestamp:serial` identifier used to correlate the physical records. `audit.time` is its UTC RFC 3339 representation. `audit.raw` appears only on malformed-line fallback events.
 
 An invalid ID remains in `audit.id`; `audit.time` is omitted and `event.issues` reports `invalid_audit_id`.
 
@@ -50,7 +50,7 @@ An invalid ID remains in `audit.id`; `audit.time` is omitted and `event.issues` 
 | `event.integrity` | object | Present only for incomplete events |
 | `event.issues` | array | Present only for invalid or unsupported input |
 
-Normal EOE, PROCTITLE, and known single-record completions add no assembly metadata. Timeout, watermark, or EOF flushes produce:
+Normal EOE and known single-record completions add no assembly metadata. Timeout, watermark, shutdown, or EOF flushes produce:
 
 ```json
 "integrity": {

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	mappingdata "github.com/marios-github/audit2json/data"
+	mappingdata "github.com/kstone-sa/audit2json/data"
 )
 
 // CanonicalSchemaVersion identifies the emitted canonical contract.
@@ -34,8 +34,35 @@ type CanonicalEvent struct {
 }
 
 type CanonicalAudit struct {
-	ID   string `json:"id"`
+	ID   string `json:"id,omitempty"`
 	Time string `json:"time,omitempty"`
+	Raw  string `json:"raw,omitempty"`
+}
+
+// BuildParseFailureEvent preserves one malformed physical input line in the
+// event stream so a durable checkpoint can advance without silent data loss.
+func BuildParseFailureEvent(line string, parseErr error, options CanonicalOptions) CanonicalEvent {
+	event := CanonicalEvent{
+		SchemaVersion: CanonicalSchemaVersion,
+		Audit:         CanonicalAudit{Raw: line},
+		Event: CanonicalEventMeta{
+			Type:     "PARSE_ERROR",
+			Category: "conversion",
+			Action:   "parse_failure",
+			Issues: []CanonicalIssue{{
+				Code:  "parse_failure",
+				Value: parseErr.Error(),
+			}},
+		},
+	}
+	if id := auditIDFromMessage(line); id != "" {
+		event.Audit = canonicalAudit(id)
+		event.Audit.Raw = line
+	}
+	if options.Host != "" {
+		event.Source = &CanonicalSource{Host: options.Host}
+	}
+	return event
 }
 
 type CanonicalSource struct {
@@ -241,6 +268,17 @@ func buildCanonicalProcess(records []Record) CanonicalProcess {
 		for _, index := range indexes {
 			if value, ok := argv[index].value(); ok {
 				process.Argv = append(process.Argv, value)
+			}
+		}
+	}
+	if len(process.Argv) == 0 {
+		for _, record := range records {
+			if record.Type != "PROCTITLE" {
+				continue
+			}
+			if decoded, ok := decodeProctitleArgs(recordValue(record, "proctitle")); ok {
+				process.Argv = decoded
+				break
 			}
 		}
 	}
