@@ -20,7 +20,7 @@ Inspect additional files only when an observed dependency requires them.
 
 ## Status guardrail
 
-Milestones v0.7, v0.8A, v0.8C, and v0.9 are implemented. Milestone v0.9 adds secure filesystem boundaries, versioned release builds, compatibility documentation, packaging guidance, and upgrade/rollback procedures. Empirical validation against real audit output from every supported distribution is v0.8B and remains incomplete. Never describe synthetic fixtures as verified distro coverage.
+The v1.0 implementation is feature-complete but not released. Empirical validation against real audit output from every supported distribution is milestone v0.8B and remains incomplete. Never describe synthetic fixtures as verified distro coverage, and do not create a stable tag or change repository visibility without explicit maintainer approval.
 
 ## Design rules
 

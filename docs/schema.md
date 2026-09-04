@@ -2,11 +2,13 @@
 
 ## Status
 
-Canonical schema v0.3 is implemented on the milestone branch and is the only event output. There is no legacy schema mode.
+Canonical schema v1.0 is the stable event contract and the only event output. There is no legacy schema mode.
 
 Output is newline-delimited JSON: one logical Linux Audit event per line. Empty optional objects, fields, and arrays are omitted. Fields documented as arrays never change to scalars.
 
-The v0.3 schema is versioned but not yet frozen. Additive refinement is expected before v1.0.
+Within schema major version 1, field types and documented semantics are stable. Compatible revisions may add optional fields; consumers must ignore fields they do not use. Removing a field, changing its type or meaning, or making an optional field required needs a new schema major version and migration documentation.
+
+The machine-readable contract is `schema/audit2json-v1.schema.json`. The Go model and the published schema version are checked together by the test suite.
 
 ## Security-oriented boundary
 
@@ -18,7 +20,7 @@ Unsupported record families are reported through `event.issues`; arbitrary sourc
 
 | Field | Type | Meaning |
 |---|---|---|
-| `schema_version` | string | Canonical schema version; currently `0.3` |
+| `schema_version` | string | Canonical schema version; currently `1.0` |
 | `audit` | object | Original Audit ID and event time |
 | `source` | object | Optional explicitly configured source host |
 | `event` | object | Event type, outcome, integrity anomalies, and conversion issues |
@@ -133,7 +135,7 @@ Some user-space Audit records embed a second key/value payload inside `msg`. The
 
 ## Example and validation
 
-`testdata/execve.v0.3.json` is the intentionally verbose golden event. It exercises:
+`testdata/execve.v1.json` is the intentionally verbose golden event. It exercises:
 
 - ENRICHED login, real, and effective identities that differ;
 - a named syscall and correlated PID/PPID;

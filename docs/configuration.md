@@ -1,6 +1,6 @@
 # Configuration
 
-Milestone v0.7 adds one strict, versioned JSON configuration file. Unknown fields, trailing JSON values, unsupported versions, invalid durations, path conflicts, and unsafe option combinations cause startup to fail.
+audit2json uses one strict, versioned JSON configuration file. Unknown fields, trailing JSON values, unsupported versions, invalid durations, path conflicts, and unsafe option combinations cause startup to fail.
 
 ## Loading and validation
 

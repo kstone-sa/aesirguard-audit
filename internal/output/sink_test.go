@@ -16,7 +16,7 @@ import (
 func TestWriterSinkEmitsOneLineWithoutEscapingHTML(t *testing.T) {
 	var buffer bytes.Buffer
 	sink := NewWriterSink(&buffer)
-	if err := sink.Write(audit.CanonicalEvent{SchemaVersion: "0.3", Message: "a < b"}); err != nil {
+	if err := sink.Write(audit.CanonicalEvent{SchemaVersion: "1.0", Message: "a < b"}); err != nil {
 		t.Fatal(err)
 	}
 	if got := buffer.String(); !strings.HasSuffix(got, "\n") || strings.Contains(got, `\u003c`) {
@@ -31,7 +31,7 @@ func TestFileSinkAppendsAcrossReopen(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := sink.Write(audit.CanonicalEvent{SchemaVersion: "0.3", Audit: audit.CanonicalAudit{ID: id}}); err != nil {
+		if err := sink.Write(audit.CanonicalEvent{SchemaVersion: "1.0", Audit: audit.CanonicalAudit{ID: id}}); err != nil {
 			t.Fatal(err)
 		}
 		if err := sink.Close(); err != nil {
@@ -53,7 +53,7 @@ func TestFileSinkCommitSyncsWithoutPerEventSync(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := sink.Write(audit.CanonicalEvent{SchemaVersion: "0.3"}); err != nil {
+	if err := sink.Write(audit.CanonicalEvent{SchemaVersion: "1.0"}); err != nil {
 		t.Fatal(err)
 	}
 	if err := sink.Commit(); err != nil {
@@ -134,13 +134,13 @@ func TestFileSinkReopensAfterRenameRotation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := sink.Write(audit.CanonicalEvent{SchemaVersion: "0.3", Message: "before"}); err != nil {
+	if err := sink.Write(audit.CanonicalEvent{SchemaVersion: "1.0", Message: "before"}); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.Rename(path, rotated); err != nil {
 		t.Fatal(err)
 	}
-	if err := sink.Write(audit.CanonicalEvent{SchemaVersion: "0.3", Message: "after"}); err != nil {
+	if err := sink.Write(audit.CanonicalEvent{SchemaVersion: "1.0", Message: "after"}); err != nil {
 		t.Fatal(err)
 	}
 	if err := sink.Close(); err != nil {
@@ -168,7 +168,7 @@ func TestFileSinkRejectsSymlinkToRotatedInode(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer sink.Close()
-	if err := sink.Write(audit.CanonicalEvent{SchemaVersion: "0.3", Message: "before"}); err != nil {
+	if err := sink.Write(audit.CanonicalEvent{SchemaVersion: "1.0", Message: "before"}); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.Rename(path, rotated); err != nil {
@@ -177,7 +177,7 @@ func TestFileSinkRejectsSymlinkToRotatedInode(t *testing.T) {
 	if err := os.Symlink(rotated, path); err != nil {
 		t.Fatal(err)
 	}
-	if err := sink.Write(audit.CanonicalEvent{SchemaVersion: "0.3", Message: "after"}); err == nil || !strings.Contains(err.Error(), "symbolic link") {
+	if err := sink.Write(audit.CanonicalEvent{SchemaVersion: "1.0", Message: "after"}); err == nil || !strings.Contains(err.Error(), "symbolic link") {
 		t.Fatalf("error = %v", err)
 	}
 }
@@ -199,7 +199,7 @@ func TestWriterSinkAppliesBackPressureSynchronously(t *testing.T) {
 	sink := NewWriterSink(writer)
 	done := make(chan error, 1)
 	go func() {
-		done <- sink.Write(audit.CanonicalEvent{SchemaVersion: "0.3"})
+		done <- sink.Write(audit.CanonicalEvent{SchemaVersion: "1.0"})
 	}()
 
 	select {

@@ -30,7 +30,7 @@ func TestBuildCanonicalEventGolden(t *testing.T) {
 	}
 
 	got := WithHumanMessage(BuildCanonicalEvent(events[0], CanonicalOptions{}))
-	wantJSON, err := os.ReadFile("../../testdata/execve.v0.3.json")
+	wantJSON, err := os.ReadFile("../../testdata/execve.v1.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -41,6 +41,26 @@ func TestBuildCanonicalEventGolden(t *testing.T) {
 	if !reflect.DeepEqual(got, want) {
 		gotJSON, _ := json.MarshalIndent(got, "", "  ")
 		t.Fatalf("canonical event mismatch\n got: %s\nwant: %s", gotJSON, wantJSON)
+	}
+}
+
+func TestPublishedSchemaMatchesCanonicalVersion(t *testing.T) {
+	contents, err := os.ReadFile("../../schema/audit2json-v1.schema.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var document struct {
+		Properties struct {
+			SchemaVersion struct {
+				Const string `json:"const"`
+			} `json:"schema_version"`
+		} `json:"properties"`
+	}
+	if err := json.Unmarshal(contents, &document); err != nil {
+		t.Fatal(err)
+	}
+	if document.Properties.SchemaVersion.Const != CanonicalSchemaVersion {
+		t.Fatalf("published schema version = %q, canonical version = %q", document.Properties.SchemaVersion.Const, CanonicalSchemaVersion)
 	}
 }
 

@@ -30,13 +30,23 @@ jobs:
         run: go test -race ./...
       - name: Run vet
         run: go vet ./...
-      - name: Build release targets
+      - name: Build and inspect release packages
         run: |
-          for arch in amd64 arm64; do
-            CGO_ENABLED=0 GOOS=linux GOARCH="${arch}" go build -trimpath \
-              -ldflags="-s -w -X main.version=ci -X main.commit=${GITHUB_SHA} -X main.buildDate=ci" \
-              -o "${RUNNER_TEMP}/audit2json-${arch}" ./cmd/audit2json
-          done
+          set -euo pipefail
+          dist="${RUNNER_TEMP}/audit2json-dist"
+          source_date_epoch="$(git show -s --format=%ct "${GITHUB_SHA}")"
+          ./scripts/package-release.sh ci "${GITHUB_SHA}" "${source_date_epoch}" "$dist"
+          test "$(find "$dist" -maxdepth 1 -name '*_standalone.tar.gz' | wc -l)" -eq 2
+          test "$(find "$dist" -maxdepth 1 -name '*_systemd.tar.gz' | wc -l)" -eq 2
+          tar -tzf "$dist/audit2json_ci_linux_amd64_standalone.tar.gz" | grep -q '/audit2json$'
+          if tar -tzf "$dist/audit2json_ci_linux_amd64_standalone.tar.gz" | grep -q '/packaging/'; then
+            exit 1
+          fi
+          tar -tzf "$dist/audit2json_ci_linux_amd64_systemd.tar.gz" | \
+            grep -q '/packaging/systemd/audit2json.service$'
+          tar -xzf "$dist/audit2json_ci_linux_amd64_standalone.tar.gz" -C "$RUNNER_TEMP"
+          "$RUNNER_TEMP/audit2json_ci_linux_amd64_standalone/audit2json" --version
+          (cd "$dist" && sha256sum -c SHA256SUMS)
 
   synthetic:
     runs-on: ubuntu-latest
