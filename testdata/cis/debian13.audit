@@ -1,0 +1,3 @@
+type=SYSCALL msg=audit(1721722001.000:101): arch=c000003e syscall=452 success=yes exit=0 auid=1000 uid=1000 euid=1000 pid=1001 ppid=900 comm="chmod" exe="/usr/bin/chmod" key="perm_mod" ARCH=x86_64 SYSCALL=fchmodat2 AUID="mario" UID="mario" EUID="mario"
+type=PATH msg=audit(1721722001.000:101): item=0 name="/srv/data" nametype=NORMAL ouid=1000 ogid=1000 OUID="mario" OGID="mario"
+type=EOE msg=audit(1721722001.000:101):

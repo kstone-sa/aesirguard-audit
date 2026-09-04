@@ -6,17 +6,18 @@ The project is intended to become a persistent, low-latency collector that follo
 
 ## Current status
 
-The repository currently contains the v0.2 batch converter. It can:
+The milestone v0.3 development branch contains the batch converter and CIS-oriented semantic classifier. It can:
 
 - read stdin or one existing file;
 - preserve ordered and repeated Audit fields;
 - group interleaved records by audit ID with explicit completion metadata;
 - reconstruct EXECVE arguments and structured PATH records;
-- emit one security-oriented canonical v0.2 schema;
+- emit one security-oriented canonical v0.3 schema;
 - prefer names supplied by Audit ENRICHED records and fall back to explicit ID fields;
 - collapse identical login, real, and effective identities;
 - decode non-empty file capability masks to Linux capability names;
-- optionally add a deterministic analyst-readable process message.
+- classify the Linux Audit activity families covered by the selected CIS Linux server baselines;
+- optionally add deterministic analyst-readable messages for those families.
 
 The current implementation still exits at EOF. Broader event-family mappings and rendering, persistent following, checkpoints, rotation, singleton execution, and managed file output are planned and are not implemented yet.
 
@@ -34,6 +35,8 @@ See `ROADMAP.md` for delivery order.
 - lossless processing while the retained source files remain readable;
 - deterministic behavior and explicit failure reporting;
 - compact output suitable for licensed-volume ingestion.
+
+Guaranteed CIS semantic rendering assumes `auditd` is configured with `log_format=ENRICHED`. RAW records remain accepted with explicit numeric fallbacks, but classification may be less specific when only architecture-dependent syscall numbers are available.
 
 ## Target runtime model
 
@@ -59,7 +62,7 @@ go build -o audit2json ./cmd/audit2json
 
 ## Run the current converter
 
-Read a sample file using canonical v0.2 output:
+Read a sample file using canonical v0.3 output:
 
 ```bash
 ./audit2json testdata/execve.audit
@@ -91,6 +94,7 @@ This redirection is batch behavior, not the planned managed file sink.
 
 - `docs/architecture.md`: component boundaries and target data flow;
 - `docs/schema.md`: current schema and canonical-schema principles;
+- `docs/cis-coverage.md`: guaranteed CIS Linux audit-family coverage and test matrix;
 - `docs/reliability.md`: checkpoints, delivery semantics, rotation, and failure handling;
 - `docs/development.md`: focused development modes and validation;
 - `ROADMAP.md`: implementation order and release gates.

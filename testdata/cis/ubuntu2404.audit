@@ -1,0 +1,2 @@
+type=SYSCALL msg=audit(1721722003.000:103): arch=c000003e syscall=170 success=yes exit=0 auid=1000 uid=1000 euid=1000 pid=1003 ppid=900 comm="hostname" exe="/usr/bin/hostname" key="system-locale" ARCH=x86_64 SYSCALL=sethostname AUID="mario" UID="mario" EUID="mario"
+type=EOE msg=audit(1721722003.000:103):

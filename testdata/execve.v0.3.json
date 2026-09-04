@@ -1,11 +1,13 @@
 {
-  "schema_version": "0.2",
+  "schema_version": "0.3",
   "audit": {
     "id": "1721721600.123:42",
     "time": "2024-07-23T08:00:00.123Z"
   },
   "event": {
     "type": "SYSCALL",
+    "category": "process",
+    "action": "execute",
     "success": true
   },
   "rule": {
@@ -46,5 +48,6 @@
     }
   ],
   "message": "mario executed /usr/bin/sudo as root with arguments: cat -- /etc/shadow",
-  "renderer_version": "1"
+  "renderer_version": "2"
 }
+

@@ -2,11 +2,11 @@
 
 ## Status
 
-Canonical schema v0.2 is implemented and is the only event output. There is no legacy schema mode.
+Canonical schema v0.3 is implemented on the milestone branch and is the only event output. There is no legacy schema mode.
 
 Output is newline-delimited JSON: one logical Linux Audit event per line. Empty optional objects, fields, and arrays are omitted. Fields documented as arrays never change to scalars.
 
-The v0.2 schema is versioned but not yet frozen. Additive refinement is expected before v1.0.
+The v0.3 schema is versioned but not yet frozen. Additive refinement is expected before v1.0.
 
 ## Security-oriented boundary
 
@@ -18,7 +18,7 @@ Unsupported record families are reported through `event.issues`; arbitrary sourc
 
 | Field | Type | Meaning |
 |---|---|---|
-| `schema_version` | string | Canonical schema version; currently `0.2` |
+| `schema_version` | string | Canonical schema version; currently `0.3` |
 | `audit` | object | Original Audit ID and event time |
 | `source` | object | Optional explicitly configured source host |
 | `event` | object | Event type, outcome, integrity anomalies, and conversion issues |
@@ -44,6 +44,8 @@ An invalid ID remains in `audit.id`; `audit.time` is omitted and `event.issues` 
 | Field | Type | Meaning |
 |---|---|---|
 | `event.type` | string | Deterministic primary Linux Audit record type |
+| `event.category` | string | SIEM-agnostic semantic category such as `process`, `file`, or `configuration` |
+| `event.action` | string | Stable semantic action used by renderers and backend adapters |
 | `event.success` | boolean | Normalized source result when recognized |
 | `event.integrity` | object | Present only for incomplete events |
 | `event.issues` | array | Present only for invalid or unsupported input |
@@ -61,9 +63,9 @@ Unknown result values and unsupported record families are reported explicitly wi
 
 ## Identity handling
 
-Audit `log_format=ENRICHED` is strongly recommended. ENRICHED names are preferred because they represent the account resolution performed when auditd wrote the event.
+Audit `log_format=ENRICHED` is required for the guaranteed CIS renderer coverage. ENRICHED names are preferred because they represent the account resolution performed when auditd wrote the event.
 
-When an interpreted name is unavailable, the raw numeric identifier is emitted in a separate `*_id` field. A numeric value is never placed in a name field.
+RAW input remains accepted. When an interpreted name is unavailable, the raw numeric identifier is emitted in a separate `*_id` field. A numeric value is never placed in a name field. Classification may be less specific when RAW input exposes only architecture-dependent syscall numbers.
 
 `actor.user` or `actor.user_id` represents the login identity derived from AUID. Process identities are collapsed:
 
@@ -111,11 +113,13 @@ The renderer:
 - quotes ambiguous arguments;
 - omits itself for unsupported event families.
 
-Renderer version `1` currently supports process execution messages backed by a named `execve`/`execveat` syscall or reconstructed `argv`. Merely having an executable path is not treated as evidence of a new process execution. Additional event-family templates belong to the extended-normalization milestone.
+Renderer version `2` covers the Linux Audit activity families selected by the supported CIS Server L1+L2 baselines. Process execution messages require a named `execve`/`execveat` syscall or reconstructed `argv`; merely having an executable path is not treated as execution evidence.
+
+Classification uses reconstructed execution evidence, normalized syscall and outcome, normalized rule keys, and conservatively matched paths. Rule keys are locally configurable and therefore are not the sole contract. A security-relevant path is accepted without a recognized key only when the syscall itself proves a mutation. See `cis-coverage.md` for the supported baseline and family matrix.
 
 ## Example and validation
 
-`testdata/execve.v0.2.json` is the intentionally verbose golden event. It exercises:
+`testdata/execve.v0.3.json` is the intentionally verbose golden event. It exercises:
 
 - ENRICHED login, real, and effective identities that differ;
 - a named syscall and correlated PID/PPID;

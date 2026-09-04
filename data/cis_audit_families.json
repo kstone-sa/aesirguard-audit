@@ -1,0 +1,115 @@
+{
+  "version": "1",
+  "rules": [
+    {
+      "category": "system",
+      "action": "load_kernel_module",
+      "syscalls": ["init_module", "finit_module"]
+    },
+    {
+      "category": "system",
+      "action": "unload_kernel_module",
+      "syscalls": ["delete_module"]
+    },
+    {
+      "category": "system",
+      "action": "query_kernel_module",
+      "syscalls": ["create_module", "query_module"]
+    },
+    {
+      "category": "system",
+      "action": "change_time",
+      "keys": ["time_change"],
+      "syscalls": ["adjtimex", "clock_adjtime", "clock_settime", "settimeofday", "stime"],
+      "paths": ["/etc/localtime"]
+    },
+    {
+      "category": "file",
+      "action": "change_permissions",
+      "keys": ["perm_mod"],
+      "syscalls": ["chmod", "fchmod", "fchmodat", "fchmodat2", "chown", "fchown", "fchownat", "lchown", "setxattr", "lsetxattr", "fsetxattr", "removexattr", "lremovexattr", "fremovexattr"]
+    },
+    {
+      "category": "system",
+      "action": "mount_filesystem",
+      "keys": ["mounts"],
+      "syscalls": ["mount"]
+    },
+    {
+      "category": "file",
+      "action": "rename",
+      "syscalls": ["rename", "renameat", "renameat2"]
+    },
+    {
+      "category": "file",
+      "action": "delete",
+      "syscalls": ["unlink", "unlinkat"]
+    },
+    {
+      "category": "file",
+      "action": "delete",
+      "keys": ["delete"]
+    },
+    {
+      "category": "file",
+      "action": "access",
+      "keys": ["access"],
+      "syscalls": ["creat", "ftruncate", "open", "openat", "openat2", "truncate"],
+      "require_failure": true
+    },
+    {
+      "category": "configuration",
+      "action": "change_privilege_scope",
+      "keys": ["scope"],
+      "paths": ["/etc/sudoers", "/etc/sudoers.d"],
+      "path_prefixes": ["/etc/sudoers.d/"]
+    },
+    {
+      "category": "file",
+      "action": "write_sudo_log",
+      "keys": ["sudo_log_file", "sudo_log"]
+    },
+    {
+      "category": "configuration",
+      "action": "change_network_configuration",
+      "keys": ["system_locale", "system_network"],
+      "syscalls": ["sethostname", "setdomainname"],
+      "paths": ["/etc/hostname", "/etc/hosts", "/etc/issue", "/etc/issue.net", "/etc/network", "/etc/networks", "/etc/netplan", "/etc/sysconfig/network", "/etc/NetworkManager"],
+      "path_prefixes": ["/etc/network/", "/etc/netplan/", "/etc/sysconfig/network-scripts/", "/etc/NetworkManager/"]
+    },
+    {
+      "category": "configuration",
+      "action": "change_identity_configuration",
+      "keys": ["identity"],
+      "paths": ["/etc/group", "/etc/gshadow", "/etc/nsswitch.conf", "/etc/pam.conf", "/etc/passwd", "/etc/security/opasswd", "/etc/shadow", "/etc/pam.d"],
+      "path_prefixes": ["/etc/pam.d/"]
+    },
+    {
+      "category": "session",
+      "action": "update_session_record",
+      "keys": ["session"],
+      "paths": ["/run/utmp", "/var/run/utmp", "/var/log/btmp", "/var/log/wtmp"]
+    },
+    {
+      "category": "authentication",
+      "action": "update_login_record",
+      "keys": ["logins"],
+      "paths": ["/var/log/faillog", "/var/log/lastlog", "/var/run/faillock", "/run/faillock"],
+      "path_prefixes": ["/var/run/faillock/", "/run/faillock/"]
+    },
+    {
+      "category": "configuration",
+      "action": "change_mac_policy",
+      "keys": ["mac_policy"],
+      "paths": ["/etc/apparmor", "/etc/apparmor.d", "/etc/selinux", "/usr/share/selinux"],
+      "path_prefixes": ["/etc/apparmor/", "/etc/apparmor.d/", "/etc/selinux/", "/usr/share/selinux/"]
+    },
+    {
+      "category": "configuration",
+      "action": "change_audit_configuration",
+      "keys": ["audit_config"],
+      "paths": ["/etc/audit", "/etc/audit/audit.rules", "/etc/audit/rules.d"],
+      "path_prefixes": ["/etc/audit/", "/etc/audit/rules.d/"]
+    }
+  ]
+}
