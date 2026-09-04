@@ -154,6 +154,40 @@ Configuration schema version 1 is strict and supports CLI overrides. Operational
 
 ## v0.8 - Performance and regression
 
+**Status: 8A and 8C implemented; 8B pending empirical corpus**
+
+### v0.8A - Synthetic hardening
+
+Implemented:
+
+- bounded fuzz campaigns for the record parser and assembler state transitions;
+- generated interleaved and out-of-order multi-record events with conservation and determinism assertions;
+- large fragmented EXECVE reconstruction;
+- sink failure and checkpoint commit-order fault injection;
+- slow-consumer back-pressure tests;
+- rapid rotation, missing generation, truncation, partial-line, and many-generation recovery stress tests;
+- an allocation-aware end-to-end parsing, assembly, normalization, rendering, and JSON benchmark;
+- race-detector validation.
+
+### v0.8B - Empirical distribution validation
+
+Pending:
+
+- capture and sanitize real RAW and ENRICHED Audit output;
+- validate CIS Server Level 1 and Level 2 families on Debian 12/13, Ubuntu 22.04/24.04, RHEL 8/9, and Oracle Linux 8/9;
+- convert confirmed distro differences and previously unseen record shapes into regression fixtures;
+- document the tested auditd, kernel, and distribution versions.
+
+### v0.8C - Security event coverage
+
+Implemented:
+
+- parse nested user-space Audit payloads and structured AVC decision prose;
+- classify authentication, account, session, system, service, audit-daemon, MAC, kernel-security, anomaly, and integrity families independently from CIS;
+- emit typed target, origin, and access-control evidence without copying arbitrary Audit fields;
+- render every mapped action with deterministic versioned templates;
+- keep potentially compound kernel records open until `EOE` or the configured assembler boundary while completing known standalone user-space records immediately.
+
 Deliverables:
 
 - events/sec and MB/sec benchmarks;
@@ -169,11 +203,11 @@ Optimize only after correctness and measurement.
 
 ### Validation tracks and release gates
 
-- **8A:** synthetic hardening is implemented in PR #8, pending integration and review follow-up.
-- **8B:** empirical RAW/ENRICHED validation remains pending on Debian 12/13, Ubuntu 22.04/24.04, RHEL 8/9, and Oracle Linux 8/9. Tests may be run locally by the operator with guided instructions; sharing raw logs is not required. Record versions, commands, expected results, and sanitized outcomes.
-- **8C:** expanded security-family normalization and renderer version 3 are implemented in PR #9, including regressions for nested USER_AVC payloads and security classification precedence.
+- 8A: synthetic hardening is implemented, including exact record-conservation fuzz assertions.
+- 8B: empirical validation on the supported distribution matrix remains pending and may take additional time.
+- 8C: broader security-event normalization and rendering is implemented independently from the CIS rule profile.
 
-8B may take time. Independent v0.9 hardening and v1.0 documentation/publication preparation may proceed while it remains open. Synthetic tests do not establish distro compatibility. A stable release must have empirical evidence for every platform it claims to support; any reduction in the initial supported-platform scope requires an explicit decision.
+Development toward v0.9 and v1.0 may proceed while 8B remains open. Until 8B is complete, documentation and release notes must clearly distinguish synthetic coverage from empirically verified distribution support, and stable-release support claims must remain limited accordingly.
 
 ## v0.9 - Production hardening
 
@@ -200,17 +234,12 @@ Requirements:
 
 ### Public release preparation
 
-Planned acceptance checklist:
+Before changing repository visibility to public:
 
-- consolidate README, installation, quickstart, schema, coverage, reliability, and operations documentation;
-- distinguish implemented behavior, known limitations, and future work; archive historical milestone detail without deleting useful provenance;
-- keep AGENTS.md concise and route development context to focused documents;
-- remove obsolete examples, duplicate documentation, and temporary artifacts after reviewing exact targets;
-- add contribution guidance, a security reporting policy, changelog, and release notes;
-- verify Apache-2.0 licensing and third-party attribution;
-- prepare reproducible release builds, checksums, installation and rollback instructions;
-- review the entire Git history and all branches/tags for secrets and confidential information, not only the current tree;
-- inspect issues, PR discussions, workflow logs/artifacts, fixtures, and release assets for private or client-identifying content before publication;
-- sanitize examples and document the resulting compatibility matrix and delivery limitations.
-
-History rewriting, destructive cleanup, and changing repository visibility require explicit approval. The repository remains private until the owner approves publication after the checklist is complete.
+- consolidate the README around installation, runtime modes, delivery semantics, limitations, and verified support;
+- keep `AGENTS.md` concise and development-focused;
+- remove obsolete examples, stale roadmap language, and redundant planning notes;
+- add or verify `CONTRIBUTING.md`, `SECURITY.md`, changelog/release notes, and reproducible release builds;
+- review the entire Git history, issues, pull requests, workflow logs, artifacts, fixtures, and documentation for credentials, internal names, private infrastructure, customer data, and unsanitized audit records;
+- sanitize or remove sensitive material before publication;
+- require explicit maintainer approval before any history rewrite or repository visibility change.

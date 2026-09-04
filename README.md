@@ -4,15 +4,20 @@ audit2json converts Linux Audit records into compact, canonical newline-delimite
 
 The project is intended to become a persistent, low-latency collector that follows the audit log, assembles multi-record audit events, normalizes Linux-specific values, and writes events to stdout or an append-only file. Its output schema is independent from Splunk CIM, Microsoft Sentinel ASIM, Elastic ECS, and other backend models.
 
+## AI-assisted development
+
+This project was designed and developed by Kstone SA with assistance from OpenAI Codex. AI-assisted changes were reviewed, tested, and accepted by the maintainer, who retains responsibility for the project’s architecture, security, quality, and licensing compliance.
+
 ## Current status
 
-The milestone v0.7 development branch contains the canonical converter, CIS-oriented semantic classifier, checkpointed rotation-aware persistent collector, and its operational configuration and health surface. It can:
+Milestone v0.7 contains the canonical converter, CIS-oriented semantic classifier, checkpointed rotation-aware persistent collector, and its operational configuration and health surface. Milestone v0.8A adds synthetic correctness, fault, stress, fuzz, and benchmark coverage. The project can:
 
 - read stdin or one existing file;
 - preserve ordered and repeated Audit fields;
 - group interleaved records by audit ID with explicit completion metadata;
 - reconstruct EXECVE arguments and structured PATH records;
 - emit one security-oriented canonical v0.3 schema;
+- normalize authentication, account, session, service, audit-daemon, mandatory access-control, anomaly, integrity, and selected kernel-security records;
 - prefer names supplied by Audit ENRICHED records and fall back to explicit ID fields;
 - collapse identical login, real, and effective identities;
 - decode non-empty file capability masks to Linux capability names;
@@ -33,10 +38,13 @@ The milestone v0.7 development branch contains the canonical converter, CIS-orie
 - reopen a managed output file automatically after rename rotation;
 - load strict versioned JSON configuration with command-line overrides;
 - emit structured operational diagnostics, counters, and heartbeats on stderr.
+- verify generated interleaving, large fragmented EXECVE, sink/checkpoint failure windows, and recovery across many retained generations;
+- run bounded fuzz campaigns and a reproducible end-to-end pipeline benchmark in CI.
 
 Batch mode still exits at EOF. Follow mode waits at EOF, recovers through retained uncompressed generations, and follows rename/create rotation. Compressed historical logs are not decoded; if the checkpoint inode is no longer available as an uncompressed file, startup fails explicitly.
 
-See `ROADMAP.md` for delivery order.
+See `ROADMAP.md` for delivery order and `docs/performance.md` for the synthetic validation and benchmark model.
+See `docs/security-event-coverage.md` for security-relevant Audit families beyond the CIS rule profile.
 
 ## Design goals
 
@@ -52,6 +60,8 @@ See `ROADMAP.md` for delivery order.
 - compact output suitable for licensed-volume ingestion.
 
 Guaranteed CIS semantic rendering assumes `auditd` is configured with `log_format=ENRICHED`. RAW records remain accepted with explicit numeric fallbacks, but classification may be less specific when only architecture-dependent syscall numbers are available.
+
+The existing distro-labelled fixtures are synthetic representatives. Empirical validation with captured and sanitized Audit output from Debian, Ubuntu, RHEL, and Oracle Linux is milestone v0.8B and has not yet been completed.
 
 ## Target runtime model
 
@@ -149,6 +159,7 @@ For live rename/create rotation, the old descriptor must remain at a stable EOF 
 - `docs/architecture.md`: component boundaries and target data flow;
 - `docs/schema.md`: current schema and canonical-schema principles;
 - `docs/cis-coverage.md`: guaranteed CIS Linux audit-family coverage and test matrix;
+- `docs/security-event-coverage.md`: additional normalized security-event families and renderer coverage;
 - `docs/reliability.md`: checkpoints, delivery semantics, rotation, and failure handling;
 - `docs/configuration.md`: versioned JSON fields, validation, and CLI overrides;
 - `docs/operations.md`: structured diagnostics, counters, lag, and heartbeat semantics;
