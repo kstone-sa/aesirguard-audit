@@ -246,6 +246,24 @@ func TestAssemblerUsesShutdownCompletion(t *testing.T) {
 	}
 }
 
+func TestAssemblerSafePositionStopsAtOldestUnresolvedLine(t *testing.T) {
+	assembler := NewAssembler(time.Hour)
+	first := mustParseRecord(t, `type=SYSCALL msg=audit(1721721630.000:70): syscall=1`)
+	first.Source = SourcePosition{Device: 1, Inode: 2, Start: 100, End: 150, Valid: true}
+	if _, err := assembler.AddChecked(first); err != nil {
+		t.Fatal(err)
+	}
+	safe := assembler.SafeSourcePosition(SourcePosition{Device: 1, Inode: 2, Start: 300, End: 300, Valid: true})
+	if !safe.Valid || safe.End != 100 {
+		t.Fatalf("safe position = %#v", safe)
+	}
+	assembler.FlushAll()
+	safe = assembler.SafeSourcePosition(SourcePosition{Device: 1, Inode: 2, Start: 300, End: 300, Valid: true})
+	if safe.End != 300 {
+		t.Fatalf("safe position after flush = %#v", safe)
+	}
+}
+
 func FuzzParseRecordDoesNotPanic(f *testing.F) {
 	f.Add(`type=SYSCALL msg=audit(1721721600.123:42): syscall=59 exe="/usr/bin/true"`)
 	f.Add(`type=USER_AUTH msg=audit(1721721601.456:43): msg='op=PAM:authentication res=failed'`)

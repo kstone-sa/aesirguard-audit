@@ -76,7 +76,7 @@ Splunk CIM, Sentinel ASIM, Elastic ECS, detections, and risk classifications rem
 
 ## v0.4 - Persistent collector and sinks
 
-**Status: in progress**
+**Status: implemented**
 
 Goal: run continuously with low latency.
 
@@ -93,9 +93,11 @@ Deliverables:
 - non-blocking per-input singleton lock;
 - clean success exit when another healthy instance owns the lock.
 
-The development branch implements these deliverables for one open file generation. Checkpoint recovery and input rotation are intentionally deferred to v0.5 and v0.6.
+These deliverables are implemented for one open file generation.
 
 ## v0.5 - Checkpoint and crash recovery
+
+**Status: in progress**
 
 Deliverables:
 
@@ -110,6 +112,8 @@ Deliverables:
 - corrupted-checkpoint detection and explicit recovery policy.
 
 Delivery semantics are at-least-once. Exact end-to-end indexing cannot be promised by an unacknowledged stdout sink.
+
+The development branch implements the durable format, safe-offset invariant, sink/checkpoint ordering, configurable interval, same-generation resume, and fail-closed corruption or identity mismatch handling. Retained rotated-generation recovery is delivered by v0.6.
 
 ## v0.6 - Input and output rotation
 

@@ -46,6 +46,23 @@ func TestFileSinkAppendsAcrossReopen(t *testing.T) {
 	}
 }
 
+func TestFileSinkCommitSyncsWithoutPerEventSync(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "audit.ndjson")
+	sink, err := OpenFileSink(path, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := sink.Write(audit.CanonicalEvent{SchemaVersion: "0.3"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := sink.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	if err := sink.Close(); err != nil {
+		t.Fatal(err)
+	}
+}
+
 type blockingWriter struct {
 	started chan struct{}
 	release chan struct{}

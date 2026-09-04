@@ -101,6 +101,58 @@ func TestFileFollowerRejectsOversizedPartialLine(t *testing.T) {
 	}
 }
 
+func TestFileFollowerReturnsOffsetsAndResumes(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "audit.log")
+	if err := os.WriteFile(path, []byte("first\nsecond\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	initial, err := OpenFileFollower(path, FollowerOptions{PollInterval: time.Millisecond, MaxLineBytes: 1024})
+	if err != nil {
+		t.Fatal(err)
+	}
+	line, ok, err := initial.NextSource(context.Background())
+	if err != nil || !ok || line.Text != "first" || line.Start != 0 || line.End != 6 {
+		t.Fatalf("source line = %#v, %v, %v", line, ok, err)
+	}
+	identity := initial.Identity()
+	if err := initial.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	resumed, err := OpenFileFollowerAt(path, FollowerOptions{PollInterval: time.Millisecond, MaxLineBytes: 1024}, line.End, &identity)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resumed.Close()
+	line, ok, err = resumed.NextSource(context.Background())
+	if err != nil || !ok || line.Text != "second" || line.Start != 6 || line.End != 13 {
+		t.Fatalf("resumed line = %#v, %v, %v", line, ok, err)
+	}
+}
+
+func TestFileFollowerRejectsWrongGeneration(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "audit.log")
+	if err := os.WriteFile(path, []byte("line\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	wrong := FileIdentity{Device: 1, Inode: 1}
+	if follower, err := OpenFileFollowerAt(path, FollowerOptions{PollInterval: time.Millisecond, MaxLineBytes: 1024}, 0, &wrong); err == nil {
+		follower.Close()
+		t.Fatal("expected generation mismatch")
+	}
+}
+
+func TestFileFollowerRejectsOffsetInsideLine(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "audit.log")
+	if err := os.WriteFile(path, []byte("first\nsecond\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if follower, err := OpenFileFollowerAt(path, FollowerOptions{PollInterval: time.Millisecond, MaxLineBytes: 1024}, 3, nil); err == nil {
+		follower.Close()
+		t.Fatal("expected incomplete-line checkpoint rejection")
+	}
+}
+
 func TestFileLockIsNonBlockingAndReleasedByClose(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "audit.lock")
 	first, acquired, err := AcquireFileLock(path)

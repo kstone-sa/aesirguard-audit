@@ -4,7 +4,7 @@
 
 audit2json converts Linux Audit streams into canonical newline-delimited JSON. The core understands Linux Audit semantics but does not understand Splunk CIM, Sentinel ASIM, Elastic ECS, or any other backend schema.
 
-The milestone v0.4 branch adds a persistent follower for one open file generation, bounded event state, synchronous stdout and file sinks, graceful shutdown, and singleton locking. Checkpoint recovery and input rotation remain target behavior and must not be treated as implemented.
+The milestone v0.5 branch adds versioned durable checkpoints and restart recovery for one file generation. Input rotation, retained-generation discovery, truncation handling, and output reopen remain target behavior for v0.6 and must not be treated as implemented.
 
 ## Target data flow
 
@@ -37,7 +37,7 @@ Each stage has one responsibility and can be tested independently.
 
 Owns file descriptors, polling, partial lines, EOF waiting, checkpoints, and input rotation. It does not parse Audit fields.
 
-The v0.4 follower opens at offset zero, preserves partial lines, and waits at EOF. It deliberately remains attached to that inode. Detecting and switching file generations is implemented separately in v0.6.
+Without a checkpoint, the follower opens at offset zero. With `--checkpoint-file`, it verifies device and inode, seeks to the safe complete-line offset, preserves partial lines, and waits at EOF. It deliberately remains attached to that inode. Detecting and switching file generations is implemented separately in v0.6.
 
 A file descriptor remains attached to its inode after rename. On rotation, the collector drains the old descriptor before opening the new file and preserves the assembler across the transition.
 

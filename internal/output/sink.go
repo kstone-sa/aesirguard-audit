@@ -12,6 +12,7 @@ import (
 // Sink synchronously accepts canonical events.
 type Sink interface {
 	Write(audit.CanonicalEvent) error
+	Commit() error
 	Close() error
 }
 
@@ -51,6 +52,15 @@ func (sink *NDJSONSink) Write(event audit.CanonicalEvent) error {
 		return sink.file.Sync()
 	}
 	return nil
+}
+
+// Commit establishes the sink durability boundary used by checkpoints. A
+// stdout write has no stronger local operation; managed files are synced.
+func (sink *NDJSONSink) Commit() error {
+	if sink.file == nil {
+		return nil
+	}
+	return sink.file.Sync()
 }
 
 // Close releases a managed file. Caller-owned writers are not closed.
