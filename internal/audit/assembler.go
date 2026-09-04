@@ -29,9 +29,9 @@ type pendingEvent struct {
 // AssemblerLimits bounds unresolved event state. Every value must be positive
 // when limits are enabled.
 type AssemblerLimits struct {
-	MaxPendingEvents  int
+	MaxPendingEvents   int
 	MaxRecordsPerEvent int
-	MaxPendingBytes   int
+	MaxPendingBytes    int
 }
 
 // AssemblerLimitError reports a record that could not be retained without
