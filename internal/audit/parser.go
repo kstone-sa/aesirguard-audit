@@ -124,6 +124,7 @@ func parseEmbeddedMessages(messages []string) (map[string]string, map[string][]s
 			if _, exists := first[key]; !exists {
 				first[key] = value
 			}
+		}
 		for key, entries := range parsedValues {
 			values[key] = append(values[key], entries...)
 		}
