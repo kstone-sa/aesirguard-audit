@@ -13,7 +13,7 @@ audit2json --config /etc/audit2json/config.json --check-config
 
 Command-line options override values loaded from the file. This includes explicit Boolean overrides such as `--render-message=false`. A positional input path overrides `input.path`.
 
-The configuration must be a regular file, not a symbolic link. Its owner must be root or the effective service user, and neither the file nor its containing directory may be group- or world-writable. These checks prevent a privileged collector from consuming configuration replaced by another account.
+The configuration must be a regular file, not a symbolic link. Its owner must be root or the effective service user. Its complete directory hierarchy is opened component by component without following symbolic links; every directory must have a trusted owner and must not be group- or world-writable, except for a root-owned sticky directory such as `/tmp`. The file itself may not be group- or world-writable. These checks prevent a privileged collector from consuming configuration replaced by another account.
 
 ## Schema version 1
 

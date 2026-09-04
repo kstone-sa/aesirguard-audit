@@ -155,7 +155,7 @@ The managed file sink:
 - automatically reopens after managed rename-based rotation;
 - never relies on unmanaged shell redirection for long-running rotation.
 
-The sink refuses symbolic links, non-regular files, untrusted owners, group- or world-writable files, and writable output directories. Newly created output files use mode `0600`; group-readable mode may be applied deliberately after creation when a local forwarding agent requires it.
+The sink opens the complete directory hierarchy with pinned descriptors and refuses symbolic links, non-regular files, untrusted owners, group- or world-writable files, and untrusted writable directories. Root-owned sticky directories are accepted. Newly created output files use mode `0600`; group-readable mode may be applied deliberately after creation when a local forwarding agent requires it.
 
 Input-log rotation and output-file rotation are independent state machines. Checkpoint coupling and managed rename-based output reopen are implemented.
 

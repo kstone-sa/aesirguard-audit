@@ -105,6 +105,27 @@ func TestFileSinkRejectsFIFOWithoutBlocking(t *testing.T) {
 	}
 }
 
+func TestFileSinkRejectsUnsafeDirectoryHierarchy(t *testing.T) {
+	root := t.TempDir()
+	realDirectory := filepath.Join(root, "real")
+	if err := os.Mkdir(realDirectory, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	symlinkDirectory := filepath.Join(root, "linked")
+	if err := os.Symlink(realDirectory, symlinkDirectory); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := OpenFileSink(filepath.Join(symlinkDirectory, "events.ndjson"), false); err == nil {
+		t.Fatal("expected symlinked output directory rejection")
+	}
+	if err := os.Chmod(realDirectory, 0o777); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := OpenFileSink(filepath.Join(realDirectory, "events.ndjson"), false); err == nil || !strings.Contains(err.Error(), "group- or world-writable") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
 func TestFileSinkReopensAfterRenameRotation(t *testing.T) {
 	directory := t.TempDir()
 	path := filepath.Join(directory, "audit.ndjson")
