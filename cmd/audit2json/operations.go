@@ -48,11 +48,11 @@ func (diagnostics *operationalDiagnostics) log(level, event string, fields map[s
 func (diagnostics *operationalDiagnostics) heartbeat(processor *eventProcessor, lagBytes int64) {
 	diagnostics.nextHeartbeat = time.Now().Add(diagnostics.heartbeatInterval)
 	fields := map[string]any{
-		"health":          "ok",
-		"uptime_seconds":  int64(time.Since(diagnostics.started).Seconds()),
-		"counters":        diagnostics.counters,
-		"pending_events":  processor.assembler.Pending(),
-		"pending_bytes":   processor.assembler.PendingBytes(),
+		"health":         "ok",
+		"uptime_seconds": int64(time.Since(diagnostics.started).Seconds()),
+		"counters":       diagnostics.counters,
+		"pending_events": processor.assembler.Pending(),
+		"pending_bytes":  processor.assembler.PendingBytes(),
 	}
 	if lagBytes >= 0 {
 		fields["input_lag_bytes"] = lagBytes
@@ -69,6 +69,6 @@ func writeFatalDiagnostic(writer io.Writer, err error) {
 	encoder.SetEscapeHTML(false)
 	_ = encoder.Encode(map[string]any{
 		"timestamp": time.Now().UTC().Format(time.RFC3339Nano),
-		"level": "error", "event": "fatal", "error": err.Error(),
+		"level":     "error", "event": "fatal", "error": err.Error(),
 	})
 }

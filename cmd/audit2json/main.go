@@ -126,7 +126,7 @@ func runContext(ctx context.Context, args []string, stdin io.Reader, stdout, std
 		stderr:        stderr,
 		canonical:     audit.CanonicalOptions{Host: options.sourceHost},
 		renderMessage: options.renderMessage,
-		diagnostics: diagnostics,
+		diagnostics:   diagnostics,
 	}
 	diagnostics.log("info", "started", map[string]any{"follow": options.follow, "input": options.inputPath, "sink": sinkName(options)})
 	defer diagnostics.log("info", "stopped", map[string]any{"counters": &diagnostics.counters})

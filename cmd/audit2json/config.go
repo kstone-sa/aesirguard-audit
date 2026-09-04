@@ -39,13 +39,13 @@ type checkpointConfig struct {
 }
 
 type collectionConfig struct {
-	PollInterval         string `json:"poll_interval"`
-	EventTimeout         string `json:"event_timeout"`
+	PollInterval          string `json:"poll_interval"`
+	EventTimeout          string `json:"event_timeout"`
 	RotationDrainInterval string `json:"rotation_drain_interval"`
-	MaxLineBytes         int    `json:"max_line_bytes"`
-	MaxPendingEvents     int    `json:"max_pending_events"`
-	MaxRecordsPerEvent   int    `json:"max_records_per_event"`
-	MaxPendingBytes      int    `json:"max_pending_bytes"`
+	MaxLineBytes          int    `json:"max_line_bytes"`
+	MaxPendingEvents      int    `json:"max_pending_events"`
+	MaxRecordsPerEvent    int    `json:"max_records_per_event"`
+	MaxPendingBytes       int    `json:"max_pending_bytes"`
 }
 
 type mappingConfig struct {
