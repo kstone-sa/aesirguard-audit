@@ -139,7 +139,7 @@ func TestAssemblerWaitsForEOEAfterOutOfOrderProctitle(t *testing.T) {
 }
 
 func TestCanonicalEventUsesProctitleAsArgvFallback(t *testing.T) {
-	record := mustParseRecord(t, `type=PROCTITLE msg=audit(1721721612.000:52): proctitle=2F7573722F62696E2F746F6C002D2D666C61670076616C756500`)
+	record := mustParseRecord(t, `type=PROCTITLE msg=audit(1721721612.000:52): proctitle=2F7573722F62696E2F746F6F6C002D2D666C61670076616C756500`)
 	event := BuildCanonicalEvent(AssembledEvent{
 		ID: record.ID, Records: []Record{record}, Complete: true, Completion: CompletionEOE,
 	}, CanonicalOptions{})
