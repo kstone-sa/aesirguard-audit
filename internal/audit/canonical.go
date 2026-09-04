@@ -331,6 +331,18 @@ func buildUnmappedRecords(records []Record) []UnmappedRecord {
 			if field.Key == "msg" && auditIDFromMessage(field.Value) != "" {
 				continue
 			}
+			if record.Type == "EXECVE" {
+				_, _, kind, isArgument := parseExecArgKey(field.Key)
+				if isArgument && kind == execArgWhole && field.Quoted {
+					continue
+				}
+			}
+			if record.Type == "PATH" && field.Key == "item" {
+				if _, err := strconv.Atoi(field.Value); err != nil {
+					fields[field.Key] = append(fields[field.Key], field.Value)
+					continue
+				}
+			}
 			if _, exists := consumed[field.Key]; exists {
 				continue
 			}

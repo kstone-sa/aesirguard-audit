@@ -60,14 +60,6 @@
       }
     },
     {
-      "type": "EXECVE",
-      "fields": {
-        "a0": ["sudo"],
-        "a1": ["cat"],
-        "a2": ["/etc/shadow"]
-      }
-    },
-    {
       "type": "PATH",
       "fields": {
         "cap_fp": ["none"]

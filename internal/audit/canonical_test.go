@@ -97,3 +97,16 @@ func TestBuildCanonicalEventReportsInvalidAuditID(t *testing.T) {
 		t.Fatalf("source = %#v", got.Source)
 	}
 }
+
+func TestBuildCanonicalEventPreservesMalformedPathItem(t *testing.T) {
+	record := mustParseRecord(t, `type=PATH msg=audit(1721721604.000:46): item=invalid name="/tmp/file"`)
+	assembled := AssembledEvent{ID: record.ID, Records: []Record{record}, Completion: CompletionEOF}
+
+	got := BuildCanonicalEvent(assembled, CanonicalOptions{})
+	if len(got.Paths) != 1 || got.Paths[0].Item != nil {
+		t.Fatalf("paths = %#v", got.Paths)
+	}
+	if len(got.Unmapped) != 1 || !reflect.DeepEqual(got.Unmapped[0].Fields["item"], []string{"invalid"}) {
+		t.Fatalf("unmapped = %#v", got.Unmapped)
+	}
+}
