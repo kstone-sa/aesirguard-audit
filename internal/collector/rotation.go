@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -50,6 +51,8 @@ type sourceCandidate struct {
 	identity   FileIdentity
 	modifiedAt time.Time
 	current    bool
+	number     uint64
+	numbered   bool
 }
 
 // RotatingFollower drains retained and live rename/create generations in
@@ -285,6 +288,7 @@ func discoverCandidates(inputPath string, excludes []string) ([]sourceCandidate,
 		return nil, err
 	}
 	candidates := make([]sourceCandidate, 0)
+	identities := make(map[FileIdentity]int)
 	for _, entry := range entries {
 		name := entry.Name()
 		if name != base && !strings.HasPrefix(name, base+".") && !strings.HasPrefix(name, base+"-") {
@@ -311,19 +315,36 @@ func discoverCandidates(inputPath string, excludes []string) ([]sourceCandidate,
 		if err != nil {
 			return nil, err
 		}
-		candidates = append(candidates, sourceCandidate{
-			path: path, identity: identity, modifiedAt: info.ModTime(), current: path == inputPath,
-		})
+		number, numbered := rotationNumber(base, name)
+		candidate := sourceCandidate{path: path, identity: identity, modifiedAt: info.ModTime(), current: path == inputPath, number: number, numbered: numbered}
+		if index, exists := identities[identity]; exists {
+			if candidate.current {
+				candidates[index] = candidate
+			}
+			continue
+		}
+		identities[identity] = len(candidates)
+		candidates = append(candidates, candidate)
 	}
 	if len(candidates) == 0 {
 		return nil, os.ErrNotExist
+	}
+	for i := 0; i < len(candidates); i++ {
+		for j := i + 1; j < len(candidates); j++ {
+			if candidates[i].current || candidates[j].current || !candidates[i].modifiedAt.Equal(candidates[j].modifiedAt) {
+				continue
+			}
+			if !candidates[i].numbered || !candidates[j].numbered || candidates[i].number == candidates[j].number {
+				return nil, fmt.Errorf("ambiguous retained generation order between %s and %s", candidates[i].path, candidates[j].path)
+			}
+		}
 	}
 	sort.SliceStable(candidates, func(i, j int) bool {
 		if candidates[i].current != candidates[j].current {
 			return !candidates[i].current
 		}
 		if candidates[i].modifiedAt.Equal(candidates[j].modifiedAt) {
-			return candidates[i].path < candidates[j].path
+			return candidates[i].number > candidates[j].number
 		}
 		return candidates[i].modifiedAt.Before(candidates[j].modifiedAt)
 	})
@@ -335,6 +356,20 @@ func discoverCandidates(inputPath string, excludes []string) ([]sourceCandidate,
 		return nil, errors.New("configured input path is not a regular file")
 	}
 	return candidates, nil
+}
+
+func rotationNumber(base, name string) (uint64, bool) {
+	suffix := strings.TrimPrefix(name, base+".")
+	if suffix == name || suffix == "" {
+		return 0, false
+	}
+	for _, character := range suffix {
+		if character < '0' || character > '9' {
+			return 0, false
+		}
+	}
+	number, err := strconv.ParseUint(suffix, 10, 64)
+	return number, err == nil
 }
 
 func isCompressedRotation(name string) bool {

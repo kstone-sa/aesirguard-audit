@@ -195,6 +195,74 @@ func TestRotatingFollowerRecoversThroughRetainedGenerations(t *testing.T) {
 	}
 }
 
+func TestRotatingFollowerOrdersEqualTimestampNumericRotations(t *testing.T) {
+	directory := t.TempDir()
+	path := filepath.Join(directory, "audit.log")
+	oldest := path + ".2"
+	middle := path + ".1"
+	if err := os.WriteFile(oldest, []byte("oldest\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(middle, []byte("middle\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("current\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	equalTime := time.Now().Add(-time.Hour)
+	for _, retained := range []string{oldest, middle} {
+		if err := os.Chtimes(retained, equalTime, equalTime); err != nil {
+			t.Fatal(err)
+		}
+	}
+	info, err := os.Stat(oldest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	identity, err := identityFromFileInfo(info)
+	if err != nil {
+		t.Fatal(err)
+	}
+	follower := mustOpenRotatingFollower(t, path, &Checkpoint{Device: identity.Device, Inode: identity.Inode})
+	defer follower.Close()
+	for index, want := range []string{"oldest", "middle", "current"} {
+		line := mustNextRotatingLine(t, follower)
+		if line.Text != want || line.Generation != uint64(index) {
+			t.Fatalf("equal-time line %d = %#v", index, line)
+		}
+	}
+}
+
+func TestRotatingFollowerRejectsAmbiguousEqualTimestampNames(t *testing.T) {
+	directory := t.TempDir()
+	path := filepath.Join(directory, "audit.log")
+	first := path + "-first"
+	second := path + "-second"
+	for _, candidate := range []string{first, second, path} {
+		if err := os.WriteFile(candidate, []byte("line\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	equalTime := time.Now().Add(-time.Hour)
+	for _, retained := range []string{first, second} {
+		if err := os.Chtimes(retained, equalTime, equalTime); err != nil {
+			t.Fatal(err)
+		}
+	}
+	info, err := os.Stat(first)
+	if err != nil {
+		t.Fatal(err)
+	}
+	identity, err := identityFromFileInfo(info)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = OpenRotatingFollower(path, testRotationOptions(), &Checkpoint{Device: identity.Device, Inode: identity.Inode})
+	if err == nil {
+		t.Fatal("expected ambiguous generation order error")
+	}
+}
+
 func TestRotatingFollowerDrainsLateWriteToRecoveredGeneration(t *testing.T) {
 	directory := t.TempDir()
 	path := filepath.Join(directory, "audit.log")
