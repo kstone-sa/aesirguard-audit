@@ -82,7 +82,10 @@ func (sink *NDJSONSink) reopenIfRotated() error {
 	if err != nil {
 		return err
 	}
-	pathInfo, err := os.Stat(sink.path)
+	pathInfo, err := os.Lstat(sink.path)
+	if err == nil && pathInfo.Mode()&os.ModeSymlink != 0 {
+		return fmt.Errorf("output %s is a symbolic link", sink.path)
+	}
 	if err == nil && os.SameFile(openedInfo, pathInfo) {
 		return nil
 	}

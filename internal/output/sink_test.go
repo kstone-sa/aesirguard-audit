@@ -117,6 +117,29 @@ func TestFileSinkReopensAfterRenameRotation(t *testing.T) {
 	}
 }
 
+func TestFileSinkRejectsSymlinkToRotatedInode(t *testing.T) {
+	directory := t.TempDir()
+	path := filepath.Join(directory, "audit.ndjson")
+	rotated := path + ".1"
+	sink, err := OpenFileSink(path, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer sink.Close()
+	if err := sink.Write(audit.CanonicalEvent{SchemaVersion: "0.3", Message: "before"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(path, rotated); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(rotated, path); err != nil {
+		t.Fatal(err)
+	}
+	if err := sink.Write(audit.CanonicalEvent{SchemaVersion: "0.3", Message: "after"}); err == nil || !strings.Contains(err.Error(), "symbolic link") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
 type blockingWriter struct {
 	started chan struct{}
 	release chan struct{}
