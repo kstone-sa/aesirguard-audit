@@ -107,30 +107,45 @@ func TestCanonicalEventOrdersPathsByItem(t *testing.T) {
 	}
 }
 
-func TestAssemblerHandlesInterleavedEventsAndConsumesStandaloneEOE(t *testing.T) {
+func TestAssemblerWaitsForEOEAfterOutOfOrderProctitle(t *testing.T) {
 	assembler := NewAssembler(0)
 	first := mustParseRecord(t, `type=SYSCALL msg=audit(1721721610.000:50): syscall=59`)
 	second := mustParseRecord(t, `type=SYSCALL msg=audit(1721721611.000:51): syscall=2`)
-	terminal := mustParseRecord(t, `type=PROCTITLE msg=audit(1721721610.000:50): proctitle=746F6F6C`)
+	proctitle := mustParseRecord(t, `type=PROCTITLE msg=audit(1721721610.000:50): proctitle=746F6F6C`)
+	path := mustParseRecord(t, `type=PATH msg=audit(1721721610.000:50): item=0 name="/bin/tool"`)
 	eoe := mustParseRecord(t, `type=EOE msg=audit(1721721610.000:50):`)
 
 	if events := assembler.Add(first); len(events) != 0 {
 		t.Fatalf("unexpected events: %#v", events)
 	}
 	assembler.Add(second)
-	events := assembler.Add(terminal)
-	if len(events) != 1 || events[0].ID != first.ID {
-		t.Fatalf("terminal events = %#v", events)
+	if events := assembler.Add(proctitle); len(events) != 0 {
+		t.Fatalf("PROCTITLE completed event early: %#v", events)
 	}
-	if !events[0].Complete || events[0].Completion != CompletionProctitle {
-		t.Fatalf("terminal completion = %#v", events[0])
+	if events := assembler.Add(path); len(events) != 0 {
+		t.Fatalf("PATH completed event early: %#v", events)
 	}
-	if events := assembler.Add(eoe); len(events) != 0 {
-		t.Fatalf("standalone EOE produced events: %#v", events)
+	events := assembler.Add(eoe)
+	if len(events) != 1 || events[0].ID != first.ID || len(events[0].Records) != 4 {
+		t.Fatalf("EOE events = %#v", events)
+	}
+	if !events[0].Complete || events[0].Completion != CompletionEOE {
+		t.Fatalf("EOE completion = %#v", events[0])
 	}
 	remaining := assembler.FlushAll()
 	if len(remaining) != 1 || remaining[0].ID != second.ID {
 		t.Fatalf("remaining events = %#v", remaining)
+	}
+}
+
+func TestCanonicalEventUsesProctitleAsArgvFallback(t *testing.T) {
+	record := mustParseRecord(t, `type=PROCTITLE msg=audit(1721721612.000:52): proctitle=2F7573722F62696E2F746F6C002D2D666C61670076616C756500`)
+	event := BuildCanonicalEvent(AssembledEvent{
+		ID: record.ID, Records: []Record{record}, Complete: true, Completion: CompletionEOE,
+	}, CanonicalOptions{})
+	want := []string{"/usr/bin/tool", "--flag", "value"}
+	if event.Process == nil || !reflect.DeepEqual(event.Process.Argv, want) {
+		t.Fatalf("argv = %#v, want %#v", event.Process, want)
 	}
 }
 

@@ -1,5 +1,0 @@
-audit2json
-*.exe
-*.test
-*.out
-coverage.out

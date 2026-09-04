@@ -1,3 +1,3 @@
-module github.com/marios-github/audit2json
+module github.com/kstone-sa/audit2json
 
 go 1.22

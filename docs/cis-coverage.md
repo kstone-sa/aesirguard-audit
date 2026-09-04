@@ -62,7 +62,9 @@ Renderer wording follows the tri-state result: past tense for success, `failed t
 
 - table-driven classifier tests exercise every canonical family and recent syscall variants such as `fchmodat2` and `renameat2`;
 - renderer tests require a deterministic message for every classified family;
-- distro fixtures cover Debian, Ubuntu, RHEL, and Oracle path overlays;
+- synthetic representative fixtures cover Debian, Ubuntu, RHEL, and Oracle path overlays;
 - unsupported or insufficiently evidenced activity receives no invented message.
 
 The mapping is versioned in `data/cis_audit_families.json`. Updating a CIS baseline requires updating this matrix, mapping data, and the affected fixtures together.
+
+These fixtures validate the current semantic contract but are not an empirical distro corpus. Capturing and sanitizing real Level 1 and Level 2 Audit output from every listed platform remains a v0.8 validation activity.

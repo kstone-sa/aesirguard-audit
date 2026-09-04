@@ -52,10 +52,11 @@ Groups records by audit ID. Linux Audit records may be interleaved and may arriv
 Completion may be established by:
 
 - an EOE record;
-- a terminal record such as PROCTITLE;
 - a known single-record message type;
 - an event-time watermark;
 - an inactivity timeout.
+
+`PROCTITLE` is context, not a reliable terminal marker: later `PATH`, `SYSCALL`, or other records may share the same Audit ID. It supplies an `argv` fallback when `EXECVE` is absent.
 
 The assembler must use bounded state and report incomplete events explicitly.
 

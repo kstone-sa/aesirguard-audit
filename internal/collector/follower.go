@@ -95,7 +95,7 @@ func OpenFileFollowerAt(path string, options FollowerOptions, offset int64, expe
 	}
 	if info.Size() < offset {
 		_ = file.Close()
-		return nil, fmt.Errorf("source size %d is before checkpoint offset %d", info.Size(), offset)
+		return nil, &SourceTruncatedError{Identity: identity, Offset: offset, Size: info.Size()}
 	}
 	if offset > 0 {
 		if _, err := file.Seek(offset-1, io.SeekStart); err != nil {

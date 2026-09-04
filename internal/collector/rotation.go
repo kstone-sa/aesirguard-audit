@@ -396,7 +396,8 @@ func discoverCandidates(inputPath string, excludes []string) ([]sourceCandidate,
 	identities := make(map[FileIdentity]int)
 	for _, entry := range entries {
 		name := entry.Name()
-		if name != base && !strings.HasPrefix(name, base+".") && !strings.HasPrefix(name, base+"-") {
+		number, numbered := rotationNumber(base, name)
+		if name != base && !numbered {
 			continue
 		}
 		if isCompressedRotation(name) {
@@ -420,7 +421,6 @@ func discoverCandidates(inputPath string, excludes []string) ([]sourceCandidate,
 		if err != nil {
 			return nil, err
 		}
-		number, numbered := rotationNumber(base, name)
 		candidate := sourceCandidate{path: path, identity: identity, modifiedAt: info.ModTime(), current: path == inputPath, number: number, numbered: numbered}
 		if index, exists := identities[identity]; exists {
 			if candidate.current {

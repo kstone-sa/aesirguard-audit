@@ -274,12 +274,22 @@ func decodeExecValue(field Field) string {
 	return string(decoded)
 }
 
-func decodeProctitle(value string) string {
+func decodeProctitleArgs(value string) ([]string, bool) {
+	if value == "" || len(value)%2 != 0 {
+		return nil, false
+	}
 	decoded, err := hex.DecodeString(value)
 	if err != nil {
-		return value
+		return nil, false
 	}
-	return strings.TrimSpace(strings.ReplaceAll(string(decoded), "\x00", " "))
+	parts := strings.Split(string(decoded), "\x00")
+	if len(parts) > 0 && parts[len(parts)-1] == "" {
+		parts = parts[:len(parts)-1]
+	}
+	if len(parts) == 0 {
+		return nil, false
+	}
+	return parts, true
 }
 
 func primaryRecordType(records []Record) string {

@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"strings"
 
-	mappingdata "github.com/marios-github/audit2json/data"
+	mappingdata "github.com/kstone-sa/audit2json/data"
 )
 
 type canonicalClassificationDocument struct {

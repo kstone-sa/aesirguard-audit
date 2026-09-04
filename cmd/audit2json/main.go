@@ -13,9 +13,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/marios-github/audit2json/internal/audit"
-	"github.com/marios-github/audit2json/internal/collector"
-	eventoutput "github.com/marios-github/audit2json/internal/output"
+	"github.com/kstone-sa/audit2json/internal/audit"
+	"github.com/kstone-sa/audit2json/internal/collector"
+	eventoutput "github.com/kstone-sa/audit2json/internal/output"
 )
 
 const (
@@ -77,15 +77,26 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 func runContext(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.Writer) (returnErr error) {
 	options, err := parseOptions(args, stderr)
 	if err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			writeUsage(stdout)
+			return nil
+		}
 		return err
 	}
 	diagnostics := newOperationalDiagnostics(stderr, options.heartbeatInterval)
 	if options.checkConfig {
-		diagnostics.log("info", "configuration_valid", map[string]any{"config": options.configPath})
-		return nil
+		return diagnostics.log("info", "configuration_valid", map[string]any{"config": options.configPath})
 	}
 
 	if options.follow {
+		if options.checkpointPath == "" {
+			if err := diagnostics.log("warn", "checkpoint_disabled", map[string]any{
+				"input": options.inputPath,
+				"risk":  "restart replays from the beginning of the retained input",
+			}); err != nil {
+				return err
+			}
+		}
 		lockPath := options.lockPath
 		if lockPath == "" {
 			lockPath = collector.DefaultLockPath(options.inputPath)
@@ -95,8 +106,7 @@ func runContext(ctx context.Context, args []string, stdin io.Reader, stdout, std
 			return fmt.Errorf("acquire lock: %w", err)
 		}
 		if !acquired {
-			diagnostics.log("info", "singleton_active", map[string]any{"input": options.inputPath, "lock": lockPath})
-			return nil
+			return diagnostics.log("info", "singleton_active", map[string]any{"input": options.inputPath, "lock": lockPath})
 		}
 		defer func() {
 			returnErr = errors.Join(returnErr, lock.Close())
@@ -126,8 +136,12 @@ func runContext(ctx context.Context, args []string, stdin io.Reader, stdout, std
 		renderMessage: options.renderMessage,
 		diagnostics:   diagnostics,
 	}
-	diagnostics.log("info", "started", map[string]any{"follow": options.follow, "input": options.inputPath, "sink": sinkName(options)})
-	defer diagnostics.log("info", "stopped", map[string]any{"counters": &diagnostics.counters})
+	if err := diagnostics.log("info", "started", map[string]any{"follow": options.follow, "input": options.inputPath, "sink": sinkName(options)}); err != nil {
+		return err
+	}
+	defer func() {
+		returnErr = errors.Join(returnErr, diagnostics.log("info", "stopped", map[string]any{"counters": &diagnostics.counters}))
+	}()
 
 	if options.follow {
 		return runFollower(ctx, options, processor)
@@ -135,13 +149,14 @@ func runContext(ctx context.Context, args []string, stdin io.Reader, stdout, std
 	return runBatch(options, stdin, processor)
 }
 
-func parseOptions(args []string, stderr io.Writer) (commandOptions, error) {
+func parseOptions(args []string, _ io.Writer) (commandOptions, error) {
 	configPath, err := bootstrapConfigPath(args)
 	if err != nil {
 		return commandOptions{}, err
 	}
 	flags := flag.NewFlagSet("audit2json", flag.ContinueOnError)
-	flags.SetOutput(stderr)
+	flags.SetOutput(io.Discard)
+	flags.Usage = func() {}
 	options := commandOptions{
 		pollInterval: defaultPollInterval, eventTimeout: defaultEventTimeout,
 		maxLineBytes: defaultMaxLineBytes, maxPendingEvents: defaultMaxPendingEvents,
@@ -235,6 +250,10 @@ func parseOptions(args []string, stderr io.Writer) (commandOptions, error) {
 	return options, nil
 }
 
+func writeUsage(writer io.Writer) {
+	fmt.Fprintln(writer, "usage: audit2json [options] [audit.log]")
+}
+
 func openSink(options commandOptions, stdout io.Writer) (eventoutput.Sink, error) {
 	if options.outputPath == "" {
 		return eventoutput.NewWriterSink(stdout), nil
@@ -301,8 +320,7 @@ func runFollower(ctx context.Context, options commandOptions, processor *eventPr
 		ExcludePaths:    []string{options.outputPath, options.checkpointPath, options.lockPath},
 	}, checkpoint)
 	if err != nil {
-		recordSourceGap(processor.diagnostics, err)
-		return err
+		return errors.Join(err, recordSourceGap(processor.diagnostics, err))
 	}
 	defer follower.Close()
 	if checkpoint == nil {
@@ -319,7 +337,9 @@ func runFollower(ctx context.Context, options commandOptions, processor *eventPr
 	rotationCount := follower.RotationCount()
 	processor.replayWindow = checkpoint != nil
 	if checkpoint != nil {
-		processor.diagnostics.log("info", "recovery_started", map[string]any{"device": checkpoint.Device, "inode": checkpoint.Inode, "offset": checkpoint.Offset})
+		if err := processor.diagnostics.log("info", "recovery_started", map[string]any{"device": checkpoint.Device, "inode": checkpoint.Inode, "offset": checkpoint.Offset}); err != nil {
+			return err
+		}
 	}
 
 	for {
@@ -331,8 +351,7 @@ func runFollower(ctx context.Context, options commandOptions, processor *eventPr
 			return checkpointWriter.persist(sourcePosition(follower.CompletePosition()), true)
 		}
 		if err != nil {
-			recordSourceGap(processor.diagnostics, err)
-			return err
+			return errors.Join(err, recordSourceGap(processor.diagnostics, err))
 		}
 		if ok {
 			source := audit.SourcePosition{
@@ -347,42 +366,56 @@ func runFollower(ctx context.Context, options commandOptions, processor *eventPr
 			if err := checkpointWriter.persist(safe, false); err != nil {
 				return err
 			}
+			if err := emitHeartbeat(processor, follower); err != nil {
+				return err
+			}
 			continue
 		}
 		if follower.RotationCount() != rotationCount {
 			rotationCount = follower.RotationCount()
 			processor.diagnostics.counters.Rotations = rotationCount
-			processor.diagnostics.log("info", "input_rotation", map[string]any{"generation": rotationCount})
+			if err := processor.diagnostics.log("info", "input_rotation", map[string]any{"generation": rotationCount}); err != nil {
+				return err
+			}
 		}
 		if err := processor.emit(processor.assembler.FlushExpired(time.Now())); err != nil {
 			return err
 		}
 		if processor.replayWindow && follower.CaughtUp() {
 			processor.replayWindow = false
-			processor.diagnostics.log("info", "recovery_caught_up", map[string]any{"replay_candidates": processor.diagnostics.counters.ReplayCandidates})
+			if err := processor.diagnostics.log("info", "recovery_caught_up", map[string]any{"replay_candidates": processor.diagnostics.counters.ReplayCandidates}); err != nil {
+				return err
+			}
 		}
 		safe := processor.assembler.SafeSourcePosition(sourcePosition(follower.CompletePosition()))
 		if err := checkpointWriter.persist(safe, false); err != nil {
 			return err
 		}
-		if processor.diagnostics.heartbeatDue() {
-			lagBytes := int64(-1)
-			if lag, err := follower.LagBytes(); err == nil {
-				lagBytes = lag
-			}
-			processor.diagnostics.heartbeat(processor, lagBytes)
+		if err := emitHeartbeat(processor, follower); err != nil {
+			return err
 		}
 	}
 }
 
-func recordSourceGap(diagnostics *operationalDiagnostics, err error) {
+func emitHeartbeat(processor *eventProcessor, follower *collector.RotatingFollower) error {
+	if !processor.diagnostics.heartbeatDue() {
+		return nil
+	}
+	lagBytes := int64(-1)
+	if lag, err := follower.LagBytes(); err == nil {
+		lagBytes = lag
+	}
+	return processor.diagnostics.heartbeat(processor, lagBytes)
+}
+
+func recordSourceGap(diagnostics *operationalDiagnostics, err error) error {
 	var gap *collector.SourceGapError
 	var truncated *collector.SourceTruncatedError
 	if !errors.As(err, &gap) && !errors.As(err, &truncated) {
-		return
+		return nil
 	}
 	diagnostics.counters.Gaps++
-	diagnostics.log("error", "source_gap", map[string]any{"error": err.Error()})
+	return diagnostics.log("error", "source_gap", map[string]any{"error": err.Error()})
 }
 
 func loadConfiguredCheckpoint(path, inputPath string) (*collector.Checkpoint, error) {
@@ -478,8 +511,10 @@ func (processor *eventProcessor) addSourceLine(line string, source audit.SourceP
 	record, err := audit.ParseRecord(line)
 	if err != nil {
 		processor.diagnostics.counters.ParseFailures++
-		processor.diagnostics.log("warn", "parse_failure", map[string]any{"error": err.Error()})
-		return nil
+		if diagnosticErr := processor.diagnostics.log("warn", "parse_failure", map[string]any{"error": err.Error()}); diagnosticErr != nil {
+			return diagnosticErr
+		}
+		return processor.emitCanonical(audit.BuildParseFailureEvent(line, err, processor.canonical))
 	}
 	if source.Valid {
 		record.Source = source
@@ -506,13 +541,20 @@ func (processor *eventProcessor) emit(events []audit.AssembledEvent) error {
 		if processor.renderMessage {
 			output = audit.WithHumanMessage(output)
 		}
-		if err := processor.sink.Write(output); err != nil {
+		if err := processor.emitCanonical(output); err != nil {
 			return err
 		}
-		processor.diagnostics.counters.EmittedEvents++
-		if processor.replayWindow {
-			processor.diagnostics.counters.ReplayCandidates++
-		}
+	}
+	return nil
+}
+
+func (processor *eventProcessor) emitCanonical(event audit.CanonicalEvent) error {
+	if err := processor.sink.Write(event); err != nil {
+		return err
+	}
+	processor.diagnostics.counters.EmittedEvents++
+	if processor.replayWindow {
+		processor.diagnostics.counters.ReplayCandidates++
 	}
 	return nil
 }

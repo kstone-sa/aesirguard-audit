@@ -131,21 +131,37 @@ func applyPositiveInt(value int, target *int) {
 }
 
 func bootstrapConfigPath(args []string) (string, error) {
+	var path string
 	for index := 0; index < len(args); index++ {
 		argument := args[index]
-		if argument == "--config" {
+		if argument == "--" {
+			break
+		}
+		if argument == "--config" || argument == "-config" {
 			if index+1 >= len(args) {
 				return "", fmt.Errorf("config requires a path")
 			}
-			return args[index+1], nil
-		}
-		const prefix = "--config="
-		if len(argument) >= len(prefix) && argument[:len(prefix)] == prefix {
-			if argument[len(prefix):] == "" {
+			if path != "" {
+				return "", fmt.Errorf("config specified more than once")
+			}
+			path = args[index+1]
+			if path == "" {
 				return "", fmt.Errorf("config requires a path")
 			}
-			return argument[len(prefix):], nil
+			index++
+			continue
+		}
+		for _, prefix := range []string{"--config=", "-config="} {
+			if len(argument) >= len(prefix) && argument[:len(prefix)] == prefix {
+				if path != "" {
+					return "", fmt.Errorf("config specified more than once")
+				}
+				path = argument[len(prefix):]
+				if path == "" {
+					return "", fmt.Errorf("config requires a path")
+				}
+			}
 		}
 	}
-	return "", nil
+	return path, nil
 }

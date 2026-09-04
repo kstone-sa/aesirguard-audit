@@ -34,7 +34,7 @@ func newOperationalDiagnostics(writer io.Writer, heartbeatInterval time.Duration
 	}
 }
 
-func (diagnostics *operationalDiagnostics) log(level, event string, fields map[string]any) {
+func (diagnostics *operationalDiagnostics) log(level, event string, fields map[string]any) error {
 	record := make(map[string]any, len(fields)+3)
 	record["timestamp"] = time.Now().UTC().Format(time.RFC3339Nano)
 	record["level"] = level
@@ -42,10 +42,10 @@ func (diagnostics *operationalDiagnostics) log(level, event string, fields map[s
 	for key, value := range fields {
 		record[key] = value
 	}
-	_ = diagnostics.encoder.Encode(record)
+	return diagnostics.encoder.Encode(record)
 }
 
-func (diagnostics *operationalDiagnostics) heartbeat(processor *eventProcessor, lagBytes int64) {
+func (diagnostics *operationalDiagnostics) heartbeat(processor *eventProcessor, lagBytes int64) error {
 	diagnostics.nextHeartbeat = time.Now().Add(diagnostics.heartbeatInterval)
 	fields := map[string]any{
 		"health":         "ok",
@@ -57,7 +57,7 @@ func (diagnostics *operationalDiagnostics) heartbeat(processor *eventProcessor, 
 	if lagBytes >= 0 {
 		fields["input_lag_bytes"] = lagBytes
 	}
-	diagnostics.log("info", "heartbeat", fields)
+	return diagnostics.log("info", "heartbeat", fields)
 }
 
 func (diagnostics *operationalDiagnostics) heartbeatDue() bool {

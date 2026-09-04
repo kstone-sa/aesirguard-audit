@@ -26,7 +26,7 @@ The milestone v0.7 development branch contains the canonical converter, CIS-orie
 - enforce a non-blocking singleton lock per followed input.
 - persist a versioned checkpoint at complete-line and accepted-output boundaries;
 - resume the same file generation with at-least-once delivery.
-- locate a checkpoint generation among retained `audit.log.*` or `audit.log-*` files;
+- locate a checkpoint generation among retained numeric rotations such as `audit.log.1`;
 - drain rename/create rotations before following the replacement inode;
 - preserve pending events and partial physical lines across generations;
 - detect same-inode truncation as an explicit source gap;
@@ -65,7 +65,7 @@ audit.log
     -> stdout or file sink
 ```
 
-Stdout is the default sink for consumers such as a Splunk scripted input. An append-only file sink is planned for file-monitoring agents and other SIEMs. Backend-specific parsing, data-model mapping, tags, aliases, and dashboards are outside this repository.
+Stdout is the default sink for consumers such as a Splunk scripted input. An append-only managed file sink is available for file-monitoring agents and other SIEMs. Backend-specific parsing, data-model mapping, tags, aliases, and dashboards are outside this repository.
 
 ## Build the current converter
 

@@ -371,33 +371,20 @@ func TestRotatingFollowerOrdersEqualTimestampNumericRotations(t *testing.T) {
 	}
 }
 
-func TestRotatingFollowerRejectsAmbiguousEqualTimestampNames(t *testing.T) {
+func TestDiscoverCandidatesIgnoresUnrelatedPrefixedFiles(t *testing.T) {
 	directory := t.TempDir()
 	path := filepath.Join(directory, "audit.log")
-	first := path + "-first"
-	second := path + "-second"
-	for _, candidate := range []string{first, second, path} {
+	for _, candidate := range []string{path, path + ".1", path + "-backup", path + ".ndjson", path + ".1.gz"} {
 		if err := os.WriteFile(candidate, []byte("line\n"), 0o600); err != nil {
 			t.Fatal(err)
 		}
 	}
-	equalTime := time.Now().Add(-time.Hour)
-	for _, retained := range []string{first, second} {
-		if err := os.Chtimes(retained, equalTime, equalTime); err != nil {
-			t.Fatal(err)
-		}
-	}
-	info, err := os.Stat(first)
+	candidates, err := discoverCandidates(path, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	identity, err := identityFromFileInfo(info)
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = OpenRotatingFollower(path, testRotationOptions(), &Checkpoint{Device: identity.Device, Inode: identity.Inode})
-	if err == nil {
-		t.Fatal("expected ambiguous generation order error")
+	if len(candidates) != 2 || candidates[0].path != path+".1" || candidates[1].path != path {
+		t.Fatalf("candidates = %#v", candidates)
 	}
 }
 
