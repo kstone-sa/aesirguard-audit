@@ -36,6 +36,77 @@ func TestRotatingFollowerDrainsRenameCreateRotation(t *testing.T) {
 	}
 }
 
+func TestRotatingFollowerReadsLateWriteToOldDescriptor(t *testing.T) {
+	directory := t.TempDir()
+	path := filepath.Join(directory, "audit.log")
+	rotated := path + ".1"
+	if err := os.WriteFile(path, []byte("first\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	follower := mustOpenRotatingFollower(t, path, nil)
+	defer follower.Close()
+	mustNextRotatingLine(t, follower)
+	if err := os.Rename(path, rotated); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("new\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok, err := follower.Next(context.Background()); err != nil || ok {
+		t.Fatalf("rotation detection = %v, %v", ok, err)
+	}
+	old, err := os.OpenFile(rotated, os.O_APPEND|os.O_WRONLY, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, writeErr := old.WriteString("late\n")
+	closeErr := old.Close()
+	if err := errors.Join(writeErr, closeErr); err != nil {
+		t.Fatal(err)
+	}
+	late := mustNextRotatingLine(t, follower)
+	if late.Text != "late" || late.Generation != 0 {
+		t.Fatalf("late old-generation line = %#v", late)
+	}
+	newLine := mustNextRotatingLine(t, follower)
+	if newLine.Text != "new" || newLine.Generation != 1 {
+		t.Fatalf("new-generation line = %#v", newLine)
+	}
+}
+
+func TestRotatingFollowerQueuesRapidRotations(t *testing.T) {
+	directory := t.TempDir()
+	path := filepath.Join(directory, "audit.log")
+	if err := os.WriteFile(path, []byte("old\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	follower := mustOpenRotatingFollower(t, path, nil)
+	defer follower.Close()
+	mustNextRotatingLine(t, follower)
+	if err := os.Rename(path, path+".2"); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path+".1", []byte("middle\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("current\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now()
+	if err := os.Chtimes(path+".2", now.Add(-2*time.Second), now.Add(-2*time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chtimes(path+".1", now.Add(-time.Second), now.Add(-time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	for index, want := range []string{"middle", "current"} {
+		line := mustNextRotatingLine(t, follower)
+		if line.Text != want || line.Generation != uint64(index+1) {
+			t.Fatalf("rapid rotation line %d = %#v", index, line)
+		}
+	}
+}
+
 func TestRotatingFollowerPreservesPartialLineAcrossRotation(t *testing.T) {
 	directory := t.TempDir()
 	path := filepath.Join(directory, "audit.log")
