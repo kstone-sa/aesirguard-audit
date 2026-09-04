@@ -15,7 +15,7 @@ These guarantees apply to audit2json and its selected sink. End-to-end indexing 
 
 ## Implementation status
 
-Milestone v0.4 implements bounded single-generation following, complete-line handling, synchronous sinks, graceful shutdown, and singleton locking. It does not yet persist checkpoints or follow input rotation. Consequently, restart recovery and cross-generation losslessness described below remain target behavior until v0.5 and v0.6 are complete.
+Milestone v0.5 implements durable opt-in checkpoints and restart recovery when the checkpointed device and inode still match the configured input path. It fails explicitly on a generation mismatch. Locating retained rotated generations, live rotation, truncation handling, and output reopen remain target behavior until v0.6 is complete.
 
 ## Delivery semantics
 
@@ -75,7 +75,7 @@ Checkpoint updates use:
 
 Updates are batched by a configurable time or progress interval. Per-event sync is not required and may conflict with throughput goals.
 
-A corrupted or unsupported checkpoint causes an explicit startup error or a configured recovery action. It never causes an implicit jump to the current EOF.
+A corrupted, unsupported, or mismatched checkpoint causes an explicit startup error. It never causes an implicit jump to the current EOF. Recovery policies other than fail-closed remain planned.
 
 ## Startup recovery
 
@@ -83,13 +83,11 @@ On startup:
 
 1. acquire the per-input singleton lock;
 2. read and validate the checkpoint;
-3. locate the checkpoint device and inode;
+3. verify the current path has the checkpoint device and inode;
 4. seek to the safe offset;
-5. drain that generation;
-6. continue through newer retained generations;
-7. switch to the current input path.
+5. continue following that generation.
 
-The collector searches current and rotated files for the checkpoint inode. If it cannot locate the inode, it reports a recovery gap and follows the configured fail-closed or operator-approved recovery policy.
+Milestone v0.6 extends this sequence by locating the checkpoint inode among retained rotated files, draining newer generations in order, and switching to the current input path. In v0.5, an inode mismatch is an explicit fail-closed error.
 
 ## Rotation handling
 
@@ -146,11 +144,11 @@ The managed file sink:
 - writes append-only NDJSON;
 - makes completed lines visible promptly;
 - optionally syncs each accepted event;
-- will sync durable output before advancing a durability-dependent input checkpoint;
+- syncs durable output before advancing a durability-dependent input checkpoint;
 - will support managed rename-based rotation or an explicit reopen signal;
 - never relies on unmanaged shell redirection for long-running rotation.
 
-Input-log rotation and output-file rotation are independent state machines. Managed output rotation and checkpoint coupling are not implemented in v0.4.
+Input-log rotation and output-file rotation are independent state machines. Checkpoint coupling is implemented in v0.5; managed output rotation remains planned for v0.6.
 
 ## Failure reporting
 

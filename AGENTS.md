@@ -20,7 +20,7 @@ Inspect additional files only when an observed dependency requires them.
 
 ## Status guardrail
 
-The milestone v0.4 branch adds persistent single-file following, synchronous stdout and append-only file sinks, bounded unresolved state, graceful shutdown, and per-input singleton locking. Broader non-CIS normalization, checkpoints, recovery, and rotation handling remain planned. Never describe a planned capability as implemented.
+The milestone v0.5 branch adds durable opt-in checkpointing and same-generation restart recovery to the v0.4 persistent collector. Input rotation, rotated-generation discovery, truncation handling, and output reopen remain planned for v0.6. Never describe a planned capability as implemented.
 
 ## Design rules
 

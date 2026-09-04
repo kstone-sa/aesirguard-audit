@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"github.com/marios-github/audit2json/internal/audit"
+	"github.com/marios-github/audit2json/internal/collector"
 )
 
 func TestRunFlushesIncompleteEventsInInputOrder(t *testing.T) {
@@ -203,6 +205,91 @@ func TestRunFollowerExitsSuccessfullyWhenLockIsOwned(t *testing.T) {
 	}
 }
 
+func TestRunFollowerResumesFromCheckpoint(t *testing.T) {
+	directory := t.TempDir()
+	inputPath := filepath.Join(directory, "audit.log")
+	checkpointPath := filepath.Join(directory, "audit.checkpoint")
+	if err := os.WriteFile(inputPath, []byte(strings.Join([]string{
+		`type=KERNEL msg=audit(1721721900.000:100): device=one`,
+		`type=KERNEL msg=audit(1721721901.000:101): device=two`,
+	}, "\n")+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	firstOutput := filepath.Join(directory, "first.ndjson")
+	runFollowerUntilOutput(t, inputPath, firstOutput, checkpointPath, 2)
+	checkpoint, err := collector.LoadCheckpoint(checkpointPath)
+	if err != nil || checkpoint == nil {
+		t.Fatalf("checkpoint = %#v, %v", checkpoint, err)
+	}
+	info, err := os.Stat(inputPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if checkpoint.Offset != info.Size() {
+		t.Fatalf("checkpoint offset = %d, want %d", checkpoint.Offset, info.Size())
+	}
+
+	file, err := os.OpenFile(inputPath, os.O_APPEND|os.O_WRONLY, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, writeErr := file.WriteString(`type=KERNEL msg=audit(1721721902.000:102): device=three` + "\n")
+	closeErr := file.Close()
+	if err := errors.Join(writeErr, closeErr); err != nil {
+		t.Fatal(err)
+	}
+	secondOutput := filepath.Join(directory, "second.ndjson")
+	runFollowerUntilOutput(t, inputPath, secondOutput, checkpointPath, 1)
+	contents, err := os.ReadFile(secondOutput)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(contents), `"100"`) || strings.Contains(string(contents), `"101"`) || !strings.Contains(string(contents), `1721721902.000:102`) {
+		t.Fatalf("resumed output = %s", contents)
+	}
+}
+
+func TestRunFollowerCheckpointStopsBeforeUnresolvedEvent(t *testing.T) {
+	directory := t.TempDir()
+	inputPath := filepath.Join(directory, "audit.log")
+	outputPath := filepath.Join(directory, "audit.ndjson")
+	checkpointPath := filepath.Join(directory, "audit.checkpoint")
+	lockPath := filepath.Join(directory, "audit.lock")
+	input := strings.Join([]string{
+		`type=SYSCALL msg=audit(1721721910.000:110): syscall=1`,
+		`type=KERNEL msg=audit(1721721911.000:111): device=complete`,
+	}, "\n") + "\n"
+	if err := os.WriteFile(inputPath, []byte(input), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() {
+		done <- runContext(ctx, []string{
+			"--follow", "--poll-interval=5ms", "--event-timeout=1h", "--checkpoint-interval=1ms",
+			"--output-file=" + outputPath, "--checkpoint-file=" + checkpointPath,
+			"--lock-file=" + lockPath, inputPath,
+		}, strings.NewReader(""), io.Discard, io.Discard)
+	}()
+	waitForOutput(t, outputPath)
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		checkpoint, err := collector.LoadCheckpoint(checkpointPath)
+		if err == nil && checkpoint != nil && checkpoint.Offset == 0 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("safe checkpoint not observed: %#v, %v", checkpoint, err)
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	cancel()
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestRunRejectsConflictingStatePaths(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "audit.log")
 	if err := os.WriteFile(path, nil, 0o600); err != nil {
@@ -238,4 +325,32 @@ func waitForOutput(t *testing.T, path string) {
 		time.Sleep(5 * time.Millisecond)
 	}
 	t.Fatalf("output was not written: %s", path)
+}
+
+func runFollowerUntilOutput(t *testing.T, inputPath, outputPath, checkpointPath string, lines int) {
+	t.Helper()
+	lockPath := outputPath + ".lock"
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() {
+		done <- runContext(ctx, []string{
+			"--follow", "--poll-interval=5ms", "--checkpoint-interval=5ms",
+			"--output-file=" + outputPath, "--checkpoint-file=" + checkpointPath,
+			"--lock-file=" + lockPath, inputPath,
+		}, strings.NewReader(""), io.Discard, io.Discard)
+	}()
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if contents, err := os.ReadFile(outputPath); err == nil && strings.Count(string(contents), "\n") >= lines {
+			cancel()
+			if err := <-done; err != nil {
+				t.Fatal(err)
+			}
+			return
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	cancel()
+	<-done
+	t.Fatalf("output did not reach %d lines", lines)
 }

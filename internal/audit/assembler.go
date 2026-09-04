@@ -177,6 +177,32 @@ func (assembler *Assembler) PendingBytes() int {
 	return assembler.pendingBytes
 }
 
+// SafeSourcePosition returns the earliest unresolved source line or fallback
+// when every line through fallback can be replayed from its end offset.
+func (assembler *Assembler) SafeSourcePosition(fallback SourcePosition) SourcePosition {
+	safe := fallback
+	for _, pending := range assembler.pending {
+		for _, record := range pending.records {
+			if !record.Source.Valid {
+				continue
+			}
+			candidate := record.Source
+			candidate.End = candidate.Start
+			if !safe.Valid || sourcePositionBefore(candidate, safe) {
+				safe = candidate
+			}
+		}
+	}
+	return safe
+}
+
+func sourcePositionBefore(left, right SourcePosition) bool {
+	if left.Generation != right.Generation {
+		return left.Generation < right.Generation
+	}
+	return left.Start < right.Start
+}
+
 func (assembler *Assembler) finish(id string, completion Completion, complete bool) readyEvent {
 	pending := assembler.pending[id]
 	delete(assembler.pending, id)

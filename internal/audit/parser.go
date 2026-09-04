@@ -24,6 +24,18 @@ type Record struct {
 	Values      map[string][]string
 	AllFields   []Field
 	SourceBytes int
+	Source      SourcePosition
+}
+
+// SourcePosition identifies a complete physical source line. It is internal
+// recovery metadata and is never copied into the canonical event.
+type SourcePosition struct {
+	Device     uint64
+	Inode      uint64
+	Generation uint64
+	Start      int64
+	End        int64
+	Valid      bool
 }
 
 // ParseRecord parses one auditd line without depending on libauparse.
