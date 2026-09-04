@@ -19,8 +19,7 @@ func TestBuildCanonicalEventGolden(t *testing.T) {
 	var events []AssembledEvent
 	scanner := bufio.NewScanner(input)
 	for scanner.Scan() {
-		record := mustParseRecord(t, scanner.Text())
-		events = append(events, assembler.Add(record)...)
+		events = append(events, assembler.Add(mustParseRecord(t, scanner.Text()))...)
 	}
 	if err := scanner.Err(); err != nil {
 		t.Fatal(err)
@@ -45,68 +44,73 @@ func TestBuildCanonicalEventGolden(t *testing.T) {
 	}
 }
 
-func TestBuildCanonicalEventMarksIncompleteEOF(t *testing.T) {
+func TestBuildCanonicalEventMarksOnlyIncompleteBoundaries(t *testing.T) {
 	record := mustParseRecord(t, `type=SYSCALL msg=audit(1721721700.000:80): syscall=1`)
-	assembled := NewAssembler(0)
-	assembled.Add(record)
-	events := assembled.FlushAll()
+	assembler := NewAssembler(0)
+	assembler.Add(record)
+	events := assembler.FlushAll()
 
 	got := BuildCanonicalEvent(events[0], CanonicalOptions{})
-	if got.Event.Complete {
-		t.Fatal("EOF-flushed event reported complete")
-	}
-	if got.Event.Completion != CompletionEOF {
-		t.Fatalf("completion = %q", got.Event.Completion)
+	if got.Event.Integrity == nil || got.Event.Integrity.State != "incomplete" || got.Event.Integrity.Reason != CompletionEOF {
+		t.Fatalf("integrity = %#v", got.Event.Integrity)
 	}
 }
 
-func TestBuildCanonicalEventPreservesRepeatedUnmappedFields(t *testing.T) {
-	record := mustParseRecord(t, `type=USER_AUTH msg=audit(1721721601.456:43): pid=300 uid=0 msg='op=PAM:authentication res=failed' detail=first detail=second`)
-	assembled := AssembledEvent{
-		ID:         record.ID,
-		Records:    []Record{record},
-		Complete:   false,
-		Completion: CompletionEOF,
-	}
+func TestBuildCanonicalEventCollapsesEqualEnrichedUsers(t *testing.T) {
+	record := mustParseRecord(t, `type=SYSCALL msg=audit(1721721601.456:43): auid=1000 uid=1000 euid=1000 AUID="mario" UID="mario" EUID="mario"`)
+	assembled := AssembledEvent{ID: record.ID, Records: []Record{record}, Complete: true, Completion: CompletionEOE}
 
 	got := BuildCanonicalEvent(assembled, CanonicalOptions{})
-	if len(got.Unmapped) != 1 {
-		t.Fatalf("unmapped = %#v", got.Unmapped)
+	if got.Actor == nil || got.Actor.User != "mario" || got.Actor.UserID != "" {
+		t.Fatalf("actor = %#v", got.Actor)
 	}
-	fields := got.Unmapped[0].Fields
-	if want := []string{`op=PAM:authentication res=failed`}; !reflect.DeepEqual(fields["msg"], want) {
-		t.Fatalf("nested msg = %#v, want %#v", fields["msg"], want)
+	if got.Process != nil {
+		t.Fatalf("redundant process identity = %#v", got.Process)
 	}
-	if want := []string{"first", "second"}; !reflect.DeepEqual(fields["detail"], want) {
-		t.Fatalf("detail = %#v, want %#v", fields["detail"], want)
+	if got.Event.Integrity != nil {
+		t.Fatalf("integrity on complete event = %#v", got.Event.Integrity)
 	}
 }
 
-func TestBuildCanonicalEventReportsInvalidAuditID(t *testing.T) {
+func TestBuildCanonicalEventUsesIDsForRawInput(t *testing.T) {
+	record := mustParseRecord(t, `type=SYSCALL msg=audit(1721721601.456:43): auid=1000 uid=1000 euid=0 pid=10`)
+	assembled := AssembledEvent{ID: record.ID, Records: []Record{record}, Complete: true, Completion: CompletionEOE}
+
+	got := BuildCanonicalEvent(assembled, CanonicalOptions{})
+	if got.Actor == nil || got.Actor.UserID != "1000" || got.Actor.User != "" {
+		t.Fatalf("actor = %#v", got.Actor)
+	}
+	if got.Process == nil || got.Process.UserID != "0" || got.Process.User != "" || got.Process.RealUserID != "" {
+		t.Fatalf("process = %#v", got.Process)
+	}
+}
+
+func TestBuildCanonicalEventReportsInvalidAndUnsupportedInput(t *testing.T) {
 	record := mustParseRecord(t, `type=TEST msg=audit(not-a-valid-id): value=kept`)
 	assembled := AssembledEvent{ID: record.ID, Records: []Record{record}, Completion: CompletionEOF}
 
-	got := BuildCanonicalEvent(assembled, CanonicalOptions{Host: "override", BootID: "boot-1"})
-	if got.Audit.Time != "" || got.Audit.Serial != nil {
+	got := BuildCanonicalEvent(assembled, CanonicalOptions{Host: "override"})
+	if got.Audit.Time != "" {
 		t.Fatalf("audit metadata = %#v", got.Audit)
 	}
-	if len(got.Event.Issues) != 1 || got.Event.Issues[0].Code != "invalid_audit_id" {
-		t.Fatalf("issues = %#v", got.Event.Issues)
+	wantIssues := []CanonicalIssue{
+		{Code: "invalid_audit_id", Field: "audit.id", Value: "not-a-valid-id"},
+		{Code: "unsupported_record", RecordType: "TEST"},
 	}
-	if got.Source == nil || got.Source.Host != "override" || got.Source.BootID != "boot-1" {
+	if !reflect.DeepEqual(got.Event.Issues, wantIssues) {
+		t.Fatalf("issues = %#v, want %#v", got.Event.Issues, wantIssues)
+	}
+	if got.Source == nil || got.Source.Host != "override" {
 		t.Fatalf("source = %#v", got.Source)
 	}
 }
 
-func TestBuildCanonicalEventPreservesMalformedPathItem(t *testing.T) {
-	record := mustParseRecord(t, `type=PATH msg=audit(1721721604.000:46): item=invalid name="/tmp/file"`)
+func TestBuildCanonicalEventOmitsEmptyCapabilities(t *testing.T) {
+	record := mustParseRecord(t, `type=PATH msg=audit(1721721604.000:46): item=0 name="/tmp/file" cap_fp=none cap_fi=0000000000000000 cap_fe=0`)
 	assembled := AssembledEvent{ID: record.ID, Records: []Record{record}, Completion: CompletionEOF}
 
 	got := BuildCanonicalEvent(assembled, CanonicalOptions{})
-	if len(got.Paths) != 1 || got.Paths[0].Item != nil {
+	if len(got.Paths) != 1 || got.Paths[0].Capabilities != nil {
 		t.Fatalf("paths = %#v", got.Paths)
-	}
-	if len(got.Unmapped) != 1 || !reflect.DeepEqual(got.Unmapped[0].Fields["item"], []string{"invalid"}) {
-		t.Fatalf("unmapped = %#v", got.Unmapped)
 	}
 }

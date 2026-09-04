@@ -21,14 +21,9 @@ func main() {
 func run(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	flags := flag.NewFlagSet("audit2json", flag.ContinueOnError)
 	flags.SetOutput(stderr)
-	schema := flags.String("schema", "v0.2", "output schema: v0.2 or v0.1")
 	sourceHost := flags.String("source-host", "", "source host override for canonical identity")
-	sourceBootID := flags.String("source-boot-id", "", "source boot ID for canonical identity")
 	if err := flags.Parse(args); err != nil {
 		return err
-	}
-	if *schema != "v0.2" && *schema != "v0.1" {
-		return fmt.Errorf("unsupported schema %q: expected v0.2 or v0.1", *schema)
 	}
 
 	var input io.Reader = stdin
@@ -50,16 +45,10 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	enc := json.NewEncoder(stdout)
 	enc.SetEscapeHTML(false)
 	assembler := audit.NewAssembler(0)
-	canonicalOptions := audit.CanonicalOptions{Host: *sourceHost, BootID: *sourceBootID}
+	canonicalOptions := audit.CanonicalOptions{Host: *sourceHost}
 	emit := func(events []audit.AssembledEvent) error {
 		for _, event := range events {
-			var output any
-			if *schema == "v0.1" {
-				output = audit.BuildEvent(event.Records)
-			} else {
-				output = audit.BuildCanonicalEvent(event, canonicalOptions)
-			}
-			if err := enc.Encode(output); err != nil {
+			if err := enc.Encode(audit.BuildCanonicalEvent(event, canonicalOptions)); err != nil {
 				return err
 			}
 		}

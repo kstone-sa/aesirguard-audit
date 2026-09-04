@@ -11,10 +11,9 @@ import (
 const CanonicalSchemaVersion = "0.2"
 
 // CanonicalOptions supplies source identity that is not present in every
-// audit record. Explicit options take precedence over the record node field.
+// audit record. An explicit host takes precedence over the record node field.
 type CanonicalOptions struct {
-	Host   string
-	BootID string
+	Host string
 }
 
 // CanonicalEvent is the SIEM-agnostic v0.2 event representation.
@@ -27,38 +26,34 @@ type CanonicalEvent struct {
 	Actor         *CanonicalActor    `json:"actor,omitempty"`
 	Process       *CanonicalProcess  `json:"process,omitempty"`
 	Paths         []CanonicalPath    `json:"paths,omitempty"`
-	Unmapped      []UnmappedRecord   `json:"unmapped,omitempty"`
 }
 
 type CanonicalAudit struct {
-	ID     string  `json:"id"`
-	Time   string  `json:"time,omitempty"`
-	Serial *uint64 `json:"serial,omitempty"`
+	ID   string `json:"id"`
+	Time string `json:"time,omitempty"`
 }
 
 type CanonicalSource struct {
-	Host   string `json:"host,omitempty"`
-	BootID string `json:"boot_id,omitempty"`
+	Host string `json:"host"`
 }
 
 type CanonicalEventMeta struct {
-	Type        string           `json:"type"`
-	RecordTypes []string         `json:"record_types"`
-	RecordCount int              `json:"record_count"`
-	Complete    bool             `json:"complete"`
-	Completion  Completion       `json:"completion"`
-	Result      *CanonicalResult `json:"result,omitempty"`
-	Issues      []CanonicalIssue `json:"issues,omitempty"`
+	Type      string              `json:"type"`
+	Success   *bool               `json:"success,omitempty"`
+	Integrity *CanonicalIntegrity `json:"integrity,omitempty"`
+	Issues    []CanonicalIssue    `json:"issues,omitempty"`
 }
 
-type CanonicalResult struct {
-	Raw string `json:"raw"`
+type CanonicalIntegrity struct {
+	State  string     `json:"state"`
+	Reason Completion `json:"reason"`
 }
 
 type CanonicalIssue struct {
-	Code  string `json:"code"`
-	Field string `json:"field,omitempty"`
-	Value string `json:"value,omitempty"`
+	Code       string `json:"code"`
+	RecordType string `json:"record_type,omitempty"`
+	Field      string `json:"field,omitempty"`
+	Value      string `json:"value,omitempty"`
 }
 
 type CanonicalRule struct {
@@ -66,42 +61,53 @@ type CanonicalRule struct {
 }
 
 type CanonicalActor struct {
-	AUID string `json:"auid,omitempty"`
-	UID  string `json:"uid,omitempty"`
-	EUID string `json:"euid,omitempty"`
-	GID  string `json:"gid,omitempty"`
-	EGID string `json:"egid,omitempty"`
-	Ses  string `json:"session,omitempty"`
+	User   string `json:"user,omitempty"`
+	UserID string `json:"user_id,omitempty"`
 }
 
 type CanonicalProcess struct {
-	PID        string   `json:"pid,omitempty"`
-	PPID       string   `json:"ppid,omitempty"`
-	Executable string   `json:"executable,omitempty"`
-	Command    string   `json:"command,omitempty"`
-	Argv       []string `json:"argv,omitempty"`
-	CWD        string   `json:"cwd,omitempty"`
-	TTY        string   `json:"tty,omitempty"`
-	ArchRaw    string   `json:"arch_raw,omitempty"`
-	SyscallRaw string   `json:"syscall_raw,omitempty"`
+	PID              string   `json:"pid,omitempty"`
+	PPID             string   `json:"ppid,omitempty"`
+	User             string   `json:"user,omitempty"`
+	UserID           string   `json:"user_id,omitempty"`
+	RealUser         string   `json:"real_user,omitempty"`
+	RealUserID       string   `json:"real_user_id,omitempty"`
+	Name             string   `json:"name,omitempty"`
+	Executable       string   `json:"executable,omitempty"`
+	Argv             []string `json:"argv,omitempty"`
+	CWD              string   `json:"cwd,omitempty"`
+	TTY              string   `json:"tty,omitempty"`
+	Architecture     string   `json:"architecture,omitempty"`
+	ArchitectureCode string   `json:"architecture_code,omitempty"`
+	Syscall          string   `json:"syscall,omitempty"`
+	SyscallNumber    string   `json:"syscall_number,omitempty"`
+	ReturnValue      string   `json:"return_value,omitempty"`
 }
 
 type CanonicalPath struct {
-	Item     *int   `json:"item,omitempty"`
-	Name     string `json:"name,omitempty"`
-	NameType string `json:"name_type,omitempty"`
-	Inode    string `json:"inode,omitempty"`
-	Device   string `json:"device,omitempty"`
-	Mode     string `json:"mode,omitempty"`
-	OUID     string `json:"ouid,omitempty"`
-	OGID     string `json:"ogid,omitempty"`
+	Name         string                     `json:"name,omitempty"`
+	NameType     string                     `json:"name_type,omitempty"`
+	Inode        string                     `json:"inode,omitempty"`
+	Device       string                     `json:"device,omitempty"`
+	Mode         string                     `json:"mode,omitempty"`
+	Owner        string                     `json:"owner,omitempty"`
+	OwnerID      string                     `json:"owner_id,omitempty"`
+	Group        string                     `json:"group,omitempty"`
+	GroupID      string                     `json:"group_id,omitempty"`
+	Capabilities *CanonicalFileCapabilities `json:"capabilities,omitempty"`
 }
 
-// UnmappedRecord preserves fields that the canonical v0.2 model does not yet
-// understand. Values are always arrays so repeated fields remain loss-aware.
-type UnmappedRecord struct {
-	Type   string              `json:"type"`
-	Fields map[string][]string `json:"fields"`
+type CanonicalFileCapabilities struct {
+	Permitted   string `json:"permitted,omitempty"`
+	Inheritable string `json:"inheritable,omitempty"`
+	Effective   string `json:"effective,omitempty"`
+	Version     string `json:"version,omitempty"`
+	RootID      string `json:"root_id,omitempty"`
+}
+
+type sourceIdentity struct {
+	name string
+	id   string
 }
 
 // BuildCanonicalEvent converts one assembled logical event into schema v0.2.
@@ -110,19 +116,36 @@ func BuildCanonicalEvent(assembled AssembledEvent, options CanonicalOptions) Can
 		SchemaVersion: CanonicalSchemaVersion,
 		Audit:         canonicalAudit(assembled.ID),
 		Event: CanonicalEventMeta{
-			Type:        primaryRecordType(assembled.Records),
-			RecordTypes: recordTypes(assembled.Records),
-			RecordCount: len(assembled.Records),
-			Complete:    assembled.Complete,
-			Completion:  assembled.Completion,
+			Type: primaryRecordType(assembled.Records),
 		},
 	}
 
-	if event.Audit.Time == "" || event.Audit.Serial == nil {
+	if event.Audit.Time == "" {
 		event.Event.Issues = append(event.Event.Issues, CanonicalIssue{
 			Code:  "invalid_audit_id",
 			Field: "audit.id",
 			Value: assembled.ID,
+		})
+	}
+	if !assembled.Complete {
+		event.Event.Integrity = &CanonicalIntegrity{
+			State:  "incomplete",
+			Reason: assembled.Completion,
+		}
+	}
+	if success, ok := canonicalSuccess(assembled.Records); ok {
+		event.Event.Success = &success
+	} else if raw := firstNonemptyRecordValue(assembled.Records, "success", "res"); raw != "" {
+		event.Event.Issues = append(event.Event.Issues, CanonicalIssue{
+			Code:  "unknown_result",
+			Field: "event.success",
+			Value: raw,
+		})
+	}
+	for _, recordType := range unsupportedRecordTypes(assembled.Records) {
+		event.Event.Issues = append(event.Event.Issues, CanonicalIssue{
+			Code:       "unsupported_record",
+			RecordType: recordType,
 		})
 	}
 
@@ -130,8 +153,8 @@ func BuildCanonicalEvent(assembled AssembledEvent, options CanonicalOptions) Can
 	if host == "" {
 		host = firstRecordValue(assembled.Records, "node")
 	}
-	if host != "" || options.BootID != "" {
-		event.Source = &CanonicalSource{Host: host, BootID: options.BootID}
+	if host != "" {
+		event.Source = &CanonicalSource{Host: host}
 	}
 
 	keys := uniqueRecordValues(assembled.Records, "key")
@@ -139,28 +162,29 @@ func BuildCanonicalEvent(assembled AssembledEvent, options CanonicalOptions) Can
 		event.Rule = &CanonicalRule{Keys: keys}
 	}
 
-	actor := CanonicalActor{
-		AUID: firstRecordValue(assembled.Records, "auid"),
-		UID:  firstRecordValue(assembled.Records, "uid"),
-		EUID: firstRecordValue(assembled.Records, "euid"),
-		GID:  firstRecordValue(assembled.Records, "gid"),
-		EGID: firstRecordValue(assembled.Records, "egid"),
-		Ses:  firstRecordValue(assembled.Records, "ses"),
+	login := recordIdentity(assembled.Records, "AUID", "auid")
+	real := recordIdentity(assembled.Records, "UID", "uid")
+	effective := recordIdentity(assembled.Records, "EUID", "euid")
+	if identityEmpty(effective) {
+		effective = real
 	}
-	if actor != (CanonicalActor{}) {
+	if !identityEmpty(login) {
+		actor := CanonicalActor{}
+		setActorIdentity(&actor, login)
 		event.Actor = &actor
 	}
 
 	process := buildCanonicalProcess(assembled.Records)
+	if !identityEmpty(effective) && !sameIdentity(effective, login) {
+		setProcessIdentity(&process, effective)
+	}
+	if !identityEmpty(real) && !sameIdentity(real, login) && !sameIdentity(real, effective) {
+		setRealProcessIdentity(&process, real)
+	}
 	if hasCanonicalProcess(process) {
 		event.Process = &process
 	}
 	event.Paths = buildCanonicalPaths(assembled.Records)
-
-	if result := firstNonemptyRecordValue(assembled.Records, "success", "res"); result != "" {
-		event.Event.Result = &CanonicalResult{Raw: result}
-	}
-	event.Unmapped = buildUnmappedRecords(assembled.Records)
 	return event
 }
 
@@ -169,35 +193,45 @@ func canonicalAudit(id string) CanonicalAudit {
 	if timestamp, ok := auditTimeFromID(id); ok {
 		audit.Time = timestamp.Format(time.RFC3339Nano)
 	}
-	colon := strings.LastIndexByte(id, ':')
-	if colon < 0 || colon == len(id)-1 {
-		return audit
-	}
-	serial, err := strconv.ParseUint(id[colon+1:], 10, 64)
-	if err == nil {
-		audit.Serial = &serial
-	}
 	return audit
+}
+
+func canonicalSuccess(records []Record) (bool, bool) {
+	switch strings.ToLower(firstNonemptyRecordValue(records, "success", "res")) {
+	case "yes", "success", "succeeded":
+		return true, true
+	case "no", "failed", "failure":
+		return false, true
+	default:
+		return false, false
+	}
 }
 
 func buildCanonicalProcess(records []Record) CanonicalProcess {
 	process := CanonicalProcess{
-		PID:        firstRecordValue(records, "pid"),
-		PPID:       firstRecordValue(records, "ppid"),
-		Executable: firstRecordValue(records, "exe"),
-		CWD:        firstRecordValue(records, "cwd"),
-		TTY:        firstRecordValue(records, "tty"),
-		ArchRaw:    firstRecordValue(records, "arch"),
-		SyscallRaw: firstRecordValue(records, "syscall"),
+		PID:         firstRecordValue(records, "pid"),
+		PPID:        firstRecordValue(records, "ppid"),
+		Name:        firstRecordValue(records, "comm"),
+		Executable:  firstRecordValue(records, "exe"),
+		CWD:         firstRecordValue(records, "cwd"),
+		TTY:         firstRecordValue(records, "tty"),
+		ReturnValue: firstRecordValue(records, "exit"),
+	}
+	if name := interpretedValue(records, "ARCH"); name != "" {
+		process.Architecture = name
+	} else {
+		process.ArchitectureCode = firstRecordValue(records, "arch")
+	}
+	if name := interpretedValue(records, "SYSCALL"); name != "" {
+		process.Syscall = name
+	} else {
+		process.SyscallNumber = firstRecordValue(records, "syscall")
 	}
 
 	argv := map[int]*execArg{}
 	for _, record := range records {
 		if record.Type == "EXECVE" {
 			collectExecArgs(argv, record.AllFields)
-		}
-		if record.Type == "PROCTITLE" && process.Command == "" {
-			process.Command = decodeProctitle(recordValue(record, "proctitle"))
 		}
 	}
 	if len(argv) > 0 {
@@ -211,19 +245,23 @@ func buildCanonicalProcess(records []Record) CanonicalProcess {
 				process.Argv = append(process.Argv, value)
 			}
 		}
-		process.Command = strings.Join(process.Argv, " ")
 	}
 	return process
 }
 
 func hasCanonicalProcess(process CanonicalProcess) bool {
-	return process.PID != "" || process.PPID != "" || process.Executable != "" ||
-		process.Command != "" || len(process.Argv) > 0 || process.CWD != "" ||
-		process.TTY != "" || process.ArchRaw != "" || process.SyscallRaw != ""
+	return process.PID != "" || process.PPID != "" || process.User != "" ||
+		process.UserID != "" || process.RealUser != "" || process.RealUserID != "" ||
+		process.Name != "" || process.Executable != "" || len(process.Argv) > 0 ||
+		process.CWD != "" || process.TTY != "" || process.Architecture != "" ||
+		process.ArchitectureCode != "" || process.Syscall != "" ||
+		process.SyscallNumber != "" || process.ReturnValue != ""
 }
 
 type canonicalPathEntry struct {
 	path        CanonicalPath
+	item        int
+	hasItem     bool
 	recordIndex int
 }
 
@@ -233,27 +271,31 @@ func buildCanonicalPaths(records []Record) []CanonicalPath {
 		if record.Type != "PATH" {
 			continue
 		}
+		owner := singleRecordIdentity(record, "OUID", "ouid")
+		group := singleRecordIdentity(record, "OGID", "ogid")
 		path := CanonicalPath{
-			Name:     recordValue(record, "name"),
-			NameType: recordValue(record, "nametype"),
-			Inode:    recordValue(record, "inode"),
-			Device:   recordValue(record, "dev"),
-			Mode:     recordValue(record, "mode"),
-			OUID:     recordValue(record, "ouid"),
-			OGID:     recordValue(record, "ogid"),
+			Name:         recordValue(record, "name"),
+			NameType:     recordValue(record, "nametype"),
+			Inode:        recordValue(record, "inode"),
+			Device:       recordValue(record, "dev"),
+			Mode:         recordValue(record, "mode"),
+			Capabilities: fileCapabilities(record),
 		}
+		setPathOwner(&path, owner)
+		setPathGroup(&path, group)
+		entry := canonicalPathEntry{path: path, recordIndex: index}
 		if item, err := strconv.Atoi(recordValue(record, "item")); err == nil {
-			path.Item = &item
+			entry.item = item
+			entry.hasItem = true
 		}
-		entries = append(entries, canonicalPathEntry{path: path, recordIndex: index})
+		entries = append(entries, entry)
 	}
 	sort.SliceStable(entries, func(i, j int) bool {
-		left, right := entries[i].path.Item, entries[j].path.Item
-		if (left != nil) != (right != nil) {
-			return left != nil
+		if entries[i].hasItem != entries[j].hasItem {
+			return entries[i].hasItem
 		}
-		if left != nil && *left != *right {
-			return *left < *right
+		if entries[i].hasItem && entries[i].item != entries[j].item {
+			return entries[i].item < entries[j].item
 		}
 		return entries[i].recordIndex < entries[j].recordIndex
 	})
@@ -264,20 +306,124 @@ func buildCanonicalPaths(records []Record) []CanonicalPath {
 	return paths
 }
 
-func recordTypes(records []Record) []string {
-	seen := map[string]struct{}{}
-	types := make([]string, 0)
-	for _, record := range records {
-		if record.Type == "" {
-			continue
-		}
-		if _, exists := seen[record.Type]; exists {
-			continue
-		}
-		seen[record.Type] = struct{}{}
-		types = append(types, record.Type)
+func fileCapabilities(record Record) *CanonicalFileCapabilities {
+	capabilities := CanonicalFileCapabilities{
+		Permitted:   meaningfulCapability(recordValue(record, "cap_fp")),
+		Inheritable: meaningfulCapability(recordValue(record, "cap_fi")),
+		Effective:   meaningfulCapability(recordValue(record, "cap_fe")),
+		Version:     meaningfulCapability(recordValue(record, "cap_fver")),
+		RootID:      meaningfulCapability(recordValue(record, "cap_frootid")),
 	}
-	return types
+	if capabilities == (CanonicalFileCapabilities{}) {
+		return nil
+	}
+	return &capabilities
+}
+
+func meaningfulCapability(value string) string {
+	switch strings.ToLower(value) {
+	case "", "none", "0", "0000000000000000":
+		return ""
+	default:
+		return value
+	}
+}
+
+func recordIdentity(records []Record, nameKey, idKey string) sourceIdentity {
+	return sourceIdentity{
+		name: interpretedValue(records, nameKey),
+		id:   firstRecordValue(records, idKey),
+	}
+}
+
+func singleRecordIdentity(record Record, nameKey, idKey string) sourceIdentity {
+	return sourceIdentity{
+		name: interpretedRecordValue(record, nameKey),
+		id:   recordValue(record, idKey),
+	}
+}
+
+func interpretedValue(records []Record, key string) string {
+	for _, record := range records {
+		if value := interpretedRecordValue(record, key); value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
+func interpretedRecordValue(record Record, key string) string {
+	value := recordValue(record, key)
+	if value == "" || strings.EqualFold(value, "unset") || isDecimal(value) {
+		return ""
+	}
+	return value
+}
+
+func isDecimal(value string) bool {
+	if value == "" {
+		return false
+	}
+	for _, character := range value {
+		if character < '0' || character > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+func identityEmpty(identity sourceIdentity) bool {
+	return identity.name == "" && identity.id == ""
+}
+
+func sameIdentity(left, right sourceIdentity) bool {
+	if identityEmpty(left) || identityEmpty(right) {
+		return false
+	}
+	if left.id != "" && right.id != "" {
+		return left.id == right.id
+	}
+	return left.name != "" && right.name != "" && left.name == right.name
+}
+
+func setActorIdentity(actor *CanonicalActor, identity sourceIdentity) {
+	if identity.name != "" {
+		actor.User = identity.name
+	} else {
+		actor.UserID = identity.id
+	}
+}
+
+func setProcessIdentity(process *CanonicalProcess, identity sourceIdentity) {
+	if identity.name != "" {
+		process.User = identity.name
+	} else {
+		process.UserID = identity.id
+	}
+}
+
+func setRealProcessIdentity(process *CanonicalProcess, identity sourceIdentity) {
+	if identity.name != "" {
+		process.RealUser = identity.name
+	} else {
+		process.RealUserID = identity.id
+	}
+}
+
+func setPathOwner(path *CanonicalPath, identity sourceIdentity) {
+	if identity.name != "" {
+		path.Owner = identity.name
+	} else {
+		path.OwnerID = identity.id
+	}
+}
+
+func setPathGroup(path *CanonicalPath, identity sourceIdentity) {
+	if identity.name != "" {
+		path.Group = identity.name
+	} else {
+		path.GroupID = identity.id
+	}
 }
 
 func firstRecordValue(records []Record, key string) string {
@@ -322,55 +468,22 @@ func uniqueNonempty(values []string) []string {
 	return result
 }
 
-func buildUnmappedRecords(records []Record) []UnmappedRecord {
-	result := make([]UnmappedRecord, 0)
+func unsupportedRecordTypes(records []Record) []string {
+	known := map[string]struct{}{
+		"SYSCALL": {}, "EXECVE": {}, "CWD": {}, "PATH": {},
+		"PROCTITLE": {}, "EOE": {},
+	}
+	result := make([]string, 0)
+	seen := map[string]struct{}{}
 	for _, record := range records {
-		consumed := consumedFields(record.Type)
-		fields := map[string][]string{}
-		for _, field := range record.AllFields {
-			if field.Key == "msg" && auditIDFromMessage(field.Value) != "" {
-				continue
-			}
-			if record.Type == "EXECVE" {
-				_, _, kind, isArgument := parseExecArgKey(field.Key)
-				if isArgument && kind == execArgWhole && field.Quoted {
-					continue
-				}
-			}
-			if record.Type == "PATH" && field.Key == "item" {
-				if _, err := strconv.Atoi(field.Value); err != nil {
-					fields[field.Key] = append(fields[field.Key], field.Value)
-					continue
-				}
-			}
-			if _, exists := consumed[field.Key]; exists {
-				continue
-			}
-			fields[field.Key] = append(fields[field.Key], field.Value)
+		if _, supported := known[record.Type]; supported {
+			continue
 		}
-		if len(fields) > 0 {
-			result = append(result, UnmappedRecord{Type: record.Type, Fields: fields})
+		if _, exists := seen[record.Type]; exists {
+			continue
 		}
+		seen[record.Type] = struct{}{}
+		result = append(result, record.Type)
 	}
 	return result
-}
-
-func consumedFields(recordType string) map[string]struct{} {
-	fields := map[string]struct{}{
-		"type": {}, "node": {}, "key": {}, "success": {}, "res": {},
-		"auid": {}, "uid": {}, "euid": {}, "gid": {}, "egid": {}, "ses": {},
-		"pid": {}, "ppid": {}, "exe": {}, "cwd": {}, "tty": {},
-		"arch": {}, "syscall": {},
-	}
-	switch recordType {
-	case "EXECVE":
-		fields["argc"] = struct{}{}
-	case "PROCTITLE":
-		fields["proctitle"] = struct{}{}
-	case "PATH":
-		for _, key := range []string{"item", "name", "nametype", "inode", "dev", "mode", "ouid", "ogid"} {
-			fields[key] = struct{}{}
-		}
-	}
-	return fields
 }
