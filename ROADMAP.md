@@ -167,6 +167,14 @@ Deliverables:
 
 Optimize only after correctness and measurement.
 
+### Validation tracks and release gates
+
+- **8A:** synthetic hardening is implemented in PR #8, pending integration and review follow-up.
+- **8B:** empirical RAW/ENRICHED validation remains pending on Debian 12/13, Ubuntu 22.04/24.04, RHEL 8/9, and Oracle Linux 8/9. Tests may be run locally by the operator with guided instructions; sharing raw logs is not required. Record versions, commands, expected results, and sanitized outcomes.
+- **8C:** expanded security-family normalization and renderer version 3 are implemented in PR #9, including regressions for nested USER_AVC payloads and security classification precedence.
+
+8B may take time. Independent v0.9 hardening and v1.0 documentation/publication preparation may proceed while it remains open. Synthetic tests do not establish distro compatibility. A stable release must have empirical evidence for every platform it claims to support; any reduction in the initial supported-platform scope requires an explicit decision.
+
 ## v0.9 - Production hardening
 
 Deliverables:
@@ -189,3 +197,20 @@ Requirements:
 - bounded resource use under sustained load;
 - production packaging and operating guidance;
 - no backend-specific data model in the core.
+
+### Public release preparation
+
+Planned acceptance checklist:
+
+- consolidate README, installation, quickstart, schema, coverage, reliability, and operations documentation;
+- distinguish implemented behavior, known limitations, and future work; archive historical milestone detail without deleting useful provenance;
+- keep AGENTS.md concise and route development context to focused documents;
+- remove obsolete examples, duplicate documentation, and temporary artifacts after reviewing exact targets;
+- add contribution guidance, a security reporting policy, changelog, and release notes;
+- verify Apache-2.0 licensing and third-party attribution;
+- prepare reproducible release builds, checksums, installation and rollback instructions;
+- review the entire Git history and all branches/tags for secrets and confidential information, not only the current tree;
+- inspect issues, PR discussions, workflow logs/artifacts, fixtures, and release assets for private or client-identifying content before publication;
+- sanitize examples and document the resulting compatibility matrix and delivery limitations.
+
+History rewriting, destructive cleanup, and changing repository visibility require explicit approval. The repository remains private until the owner approves publication after the checklist is complete.
