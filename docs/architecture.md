@@ -4,7 +4,7 @@
 
 audit2json converts Linux Audit streams into canonical newline-delimited JSON. The core understands Linux Audit semantics but does not understand Splunk CIM, Sentinel ASIM, Elastic ECS, or any other backend schema.
 
-The current code is a v0.2 batch converter with one canonical output schema and an optional deterministic process renderer. This document describes the target persistent architecture; planned components must not be treated as implemented.
+The milestone v0.3 branch is a batch converter with one canonical schema, CIS-oriented semantic classification, and deterministic rendering for the supported CIS Linux Audit families. This document describes the target persistent architecture; planned collector components must not be treated as implemented.
 
 ## Target data flow
 
@@ -65,7 +65,7 @@ The canonical model is SIEM-agnostic. A local audit rule key is preserved as met
 
 ### Human renderer
 
-Optionally derives a deterministic analyst-readable message from normalized fields. The message is not authoritative, must not replace structured fields, and may be disabled to minimize output volume.
+Optionally derives a deterministic analyst-readable message from normalized fields. Renderer version 2 covers the supported CIS Linux Audit families. The message is not authoritative, must not replace structured fields, and may be disabled to minimize output volume.
 
 Security conclusions such as privilege escalation or credential theft belong to backend detections, not to this renderer.
 

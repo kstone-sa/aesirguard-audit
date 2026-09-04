@@ -1,0 +1,2 @@
+type=SYSCALL msg=audit(1721722004.000:104): arch=c000003e syscall=164 success=yes exit=0 auid=1000 uid=1000 euid=1000 pid=1004 ppid=900 comm="timedatectl" exe="/usr/bin/timedatectl" key="time-change" ARCH=x86_64 SYSCALL=settimeofday AUID="mario" UID="mario" EUID="mario"
+type=EOE msg=audit(1721722004.000:104):

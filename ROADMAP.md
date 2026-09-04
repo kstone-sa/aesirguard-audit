@@ -54,9 +54,11 @@ Deliverables:
 - optional deterministic human-readable process messages;
 - golden tests using representative Linux Audit samples.
 
-## v0.3 - Extended normalization and event families
+## v0.3 - Extended normalization and CIS event families
 
-Goal: translate Linux Audit semantics without introducing backend-specific schemas.
+**Status: in progress**
+
+Goal: translate Linux Audit semantics without introducing backend-specific schemas. Initial guaranteed coverage targets CIS Server Level 1 and Level 2 Audit event families across Debian 12/13, Ubuntu 22.04/24.04, RHEL 8/9, and Oracle Linux 8/9.
 
 Deliverables:
 
@@ -65,7 +67,8 @@ Deliverables:
 - permissions, capabilities, signals, socket families, and message-type mappings;
 - record-family classifiers for process, authentication, file, policy, and network activity;
 - stable canonical event codes;
-- additional deterministic human-readable templates;
+- deterministic human-readable templates for every supported CIS Audit family;
+- a versioned CIS coverage matrix and multi-distribution corpus;
 - raw and normalized values kept distinct where interpretation may vary;
 - mapping version metadata.
 

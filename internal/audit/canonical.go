@@ -11,7 +11,7 @@ import (
 )
 
 // CanonicalSchemaVersion identifies the emitted canonical contract.
-const CanonicalSchemaVersion = "0.2"
+const CanonicalSchemaVersion = "0.3"
 
 // CanonicalOptions supplies optional source identity. Source metadata is
 // emitted only when explicitly configured by the caller.
@@ -19,7 +19,7 @@ type CanonicalOptions struct {
 	Host string
 }
 
-// CanonicalEvent is the SIEM-agnostic v0.2 event representation.
+// CanonicalEvent is the SIEM-agnostic v0.3 event representation.
 type CanonicalEvent struct {
 	SchemaVersion string             `json:"schema_version"`
 	Audit         CanonicalAudit     `json:"audit"`
@@ -44,6 +44,8 @@ type CanonicalSource struct {
 
 type CanonicalEventMeta struct {
 	Type      string              `json:"type"`
+	Category  string              `json:"category,omitempty"`
+	Action    string              `json:"action,omitempty"`
 	Success   *bool               `json:"success,omitempty"`
 	Integrity *CanonicalIntegrity `json:"integrity,omitempty"`
 	Issues    []CanonicalIssue    `json:"issues,omitempty"`
@@ -111,7 +113,7 @@ type sourceIdentity struct {
 	id   string
 }
 
-// BuildCanonicalEvent converts one assembled logical event into schema v0.2.
+// BuildCanonicalEvent converts one assembled logical event into schema v0.3.
 func BuildCanonicalEvent(assembled AssembledEvent, options CanonicalOptions) CanonicalEvent {
 	event := CanonicalEvent{
 		SchemaVersion: CanonicalSchemaVersion,
@@ -184,6 +186,7 @@ func BuildCanonicalEvent(assembled AssembledEvent, options CanonicalOptions) Can
 	var pathIssues []CanonicalIssue
 	event.Paths, pathIssues = buildCanonicalPaths(assembled.Records)
 	event.Event.Issues = append(event.Event.Issues, pathIssues...)
+	classifyCanonicalEvent(&event)
 	return event
 }
 

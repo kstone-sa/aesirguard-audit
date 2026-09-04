@@ -1,0 +1,3 @@
+type=SYSCALL msg=audit(1721722002.000:102): arch=c000003e syscall=257 success=yes exit=0 auid=1000 uid=1000 euid=1000 pid=1002 ppid=900 comm="editor" exe="/usr/bin/editor" key="MAC-policy" ARCH=x86_64 SYSCALL=openat AUID="mario" UID="mario" EUID="mario"
+type=PATH msg=audit(1721722002.000:102): item=0 name="/etc/apparmor.d/usr.bin.example" nametype=NORMAL ouid=0 ogid=0 OUID="root" OGID="root"
+type=EOE msg=audit(1721722002.000:102):

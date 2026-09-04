@@ -20,7 +20,7 @@ Inspect additional files only when an observed dependency requires them.
 
 ## Status guardrail
 
-The current implementation is the v0.2 batch converter with one canonical output schema and an optional deterministic process renderer. Persistent following, broader semantic normalization and rendering, checkpoints, rotation, singleton execution, and file sinks are target capabilities documented for later milestones. Never describe a planned capability as implemented.
+The milestone v0.3 branch is a batch converter with a canonical schema, CIS-oriented semantic classification, and deterministic rendering for the supported CIS Linux Audit families. Persistent following, broader non-CIS event normalization, checkpoints, rotation, singleton execution, and file sinks remain planned. Never describe a planned capability as implemented.
 
 ## Design rules
 
