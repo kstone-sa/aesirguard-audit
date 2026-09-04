@@ -22,6 +22,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	flags := flag.NewFlagSet("audit2json", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	sourceHost := flags.String("source-host", "", "source host override for canonical identity")
+	renderMessage := flags.Bool("render-message", false, "include a deterministic analyst-readable message")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
@@ -48,7 +49,11 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	canonicalOptions := audit.CanonicalOptions{Host: *sourceHost}
 	emit := func(events []audit.AssembledEvent) error {
 		for _, event := range events {
-			if err := enc.Encode(audit.BuildCanonicalEvent(event, canonicalOptions)); err != nil {
+			output := audit.BuildCanonicalEvent(event, canonicalOptions)
+			if *renderMessage {
+				output = audit.WithHumanMessage(output)
+			}
+			if err := enc.Encode(output); err != nil {
 				return err
 			}
 		}

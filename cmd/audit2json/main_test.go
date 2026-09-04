@@ -44,3 +44,24 @@ func TestRunFlushesIncompleteEventsInInputOrder(t *testing.T) {
 		t.Fatalf("completion metadata = %#v", events[0].Event)
 	}
 }
+
+func TestRunOptionallyRendersMessage(t *testing.T) {
+	input := strings.Join([]string{
+		`type=SYSCALL msg=audit(1721721700.000:80): auid=1000 euid=0 pid=10 exe="/usr/bin/sudo" AUID="mario" EUID="root"`,
+		`type=EXECVE msg=audit(1721721700.000:80): argc=2 a0="sudo" a1="id"`,
+		`type=EOE msg=audit(1721721700.000:80):`,
+	}, "\n")
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	if err := run([]string{"--render-message"}, strings.NewReader(input), &stdout, &stderr); err != nil {
+		t.Fatal(err)
+	}
+	var event audit.CanonicalEvent
+	if err := json.NewDecoder(&stdout).Decode(&event); err != nil {
+		t.Fatal(err)
+	}
+	if event.Message != "mario executed /usr/bin/sudo as root with arguments: id" || event.Renderer != "1" {
+		t.Fatalf("rendered event = %#v", event)
+	}
+}

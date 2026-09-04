@@ -26,6 +26,8 @@ type CanonicalEvent struct {
 	Actor         *CanonicalActor    `json:"actor,omitempty"`
 	Process       *CanonicalProcess  `json:"process,omitempty"`
 	Paths         []CanonicalPath    `json:"paths,omitempty"`
+	Message       string             `json:"message,omitempty"`
+	Renderer      string             `json:"renderer_version,omitempty"`
 }
 
 type CanonicalAudit struct {

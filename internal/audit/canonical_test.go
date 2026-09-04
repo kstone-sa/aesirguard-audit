@@ -29,7 +29,7 @@ func TestBuildCanonicalEventGolden(t *testing.T) {
 		t.Fatalf("assembled events = %#v", events)
 	}
 
-	got := BuildCanonicalEvent(events[0], CanonicalOptions{})
+	got := WithHumanMessage(BuildCanonicalEvent(events[0], CanonicalOptions{}))
 	wantJSON, err := os.ReadFile("../../testdata/execve.v0.2.json")
 	if err != nil {
 		t.Fatal(err)
