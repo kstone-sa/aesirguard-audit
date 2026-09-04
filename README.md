@@ -12,11 +12,12 @@ The repository currently contains the v0.2 batch converter. It can:
 - preserve ordered and repeated Audit fields;
 - group interleaved records by audit ID with explicit completion metadata;
 - reconstruct EXECVE arguments and structured PATH records;
-- emit the canonical v0.2 schema by default;
-- retain unmapped fields in a stable loss-aware fallback;
-- emit the former compact schema with `--schema v0.1`.
+- emit one security-oriented canonical v0.2 schema;
+- prefer names supplied by Audit ENRICHED records and fall back to explicit ID fields;
+- collapse identical login, real, and effective identities;
+- optionally add a deterministic analyst-readable process message.
 
-The current implementation still exits at EOF. Semantic mappings, human-readable rendering, persistent following, checkpoints, rotation, singleton execution, and managed file output are planned and are not implemented yet.
+The current implementation still exits at EOF. Broader event-family mappings and rendering, persistent following, checkpoints, rotation, singleton execution, and managed file output are planned and are not implemented yet.
 
 See `ROADMAP.md` for delivery order.
 
@@ -68,14 +69,13 @@ Read a sample file using canonical v0.2 output:
 Read stdin and supply source identity not present in the records:
 
 ```bash
-cat /var/log/audit/audit.log | ./audit2json \
-  --source-host host01 --source-boot-id 8b9c...
+cat /var/log/audit/audit.log | ./audit2json --source-host host01
 ```
 
-Request the former compact output during migration:
+Include the optional analyst-readable message:
 
 ```bash
-./audit2json --schema v0.1 testdata/execve.audit
+./audit2json --render-message testdata/execve.audit
 ```
 
 Write current output to a file:

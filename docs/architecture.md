@@ -4,7 +4,7 @@
 
 audit2json converts Linux Audit streams into canonical newline-delimited JSON. The core understands Linux Audit semantics but does not understand Splunk CIM, Sentinel ASIM, Elastic ECS, or any other backend schema.
 
-The current code is a v0.2 batch converter with canonical output and an explicit v0.1 compatibility mode. This document describes the target persistent architecture; planned components must not be treated as implemented.
+The current code is a v0.2 batch converter with one canonical output schema and an optional deterministic process renderer. This document describes the target persistent architecture; planned components must not be treated as implemented.
 
 ## Target data flow
 
