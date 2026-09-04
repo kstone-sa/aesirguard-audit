@@ -61,7 +61,7 @@ func TestRunOptionallyRendersMessage(t *testing.T) {
 	if err := json.NewDecoder(&stdout).Decode(&event); err != nil {
 		t.Fatal(err)
 	}
-	if event.Message != "mario executed /usr/bin/sudo as root with arguments: id" || event.Renderer != audit.HumanRendererVersion {
+	if event.Message != "mario attempted to execute /usr/bin/sudo as root with arguments: id" || event.Renderer != audit.HumanRendererVersion {
 		t.Fatalf("rendered event = %#v", event)
 	}
 }

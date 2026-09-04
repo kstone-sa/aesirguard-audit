@@ -26,7 +26,7 @@ func renderCanonicalMessage(event CanonicalEvent) (string, bool) {
 	case "execute":
 		return renderProcessMessage(event)
 	case "change_privilege_scope":
-		return renderMappedAction(event, "changed sudo privilege scope", "failed to change sudo privilege scope", "attempted to change sudo privilege scope", "at", true)
+		return renderMappedAction(event, "changed sudo privilege scope", "failed to change sudo privilege scope", "attempted to change sudo privilege scope", "at", false)
 	case "write_sudo_log":
 		return renderMappedAction(event, "modified the sudo log", "failed to modify the sudo log", "attempted to modify the sudo log", "at", true)
 	case "change_time":
