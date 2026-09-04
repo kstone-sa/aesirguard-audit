@@ -131,6 +131,54 @@ func TestRotatingFollowerQueuesRapidRotations(t *testing.T) {
 	}
 }
 
+func TestRotatingFollowerExtendsRecoveryQueueDuringDrain(t *testing.T) {
+	directory := t.TempDir()
+	path := filepath.Join(directory, "audit.log")
+	retained := path + ".1"
+	if err := os.WriteFile(retained, []byte("old\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("middle\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(retained)
+	if err != nil {
+		t.Fatal(err)
+	}
+	identity, err := identityFromFileInfo(info)
+	if err != nil {
+		t.Fatal(err)
+	}
+	follower := mustOpenRotatingFollower(t, path, &Checkpoint{Device: identity.Device, Inode: identity.Inode})
+	defer follower.Close()
+	old := mustNextRotatingLine(t, follower)
+	if old.Text != "old" {
+		t.Fatalf("old line = %#v", old)
+	}
+	if err := os.Rename(retained, path+".2"); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(path, retained); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("current\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now()
+	if err := os.Chtimes(path+".2", now.Add(-2*time.Second), now.Add(-2*time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chtimes(retained, now.Add(-time.Second), now.Add(-time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	for index, want := range []string{"middle", "current"} {
+		line := mustNextRotatingLine(t, follower)
+		if line.Text != want || line.Generation != uint64(index+1) {
+			t.Fatalf("extended queue line %d = %#v", index, line)
+		}
+	}
+}
+
 func TestRotatingFollowerPreservesPartialLineAcrossRotation(t *testing.T) {
 	directory := t.TempDir()
 	path := filepath.Join(directory, "audit.log")
@@ -260,6 +308,29 @@ func TestRotatingFollowerRejectsAmbiguousEqualTimestampNames(t *testing.T) {
 	_, err = OpenRotatingFollower(path, testRotationOptions(), &Checkpoint{Device: identity.Device, Inode: identity.Inode})
 	if err == nil {
 		t.Fatal("expected ambiguous generation order error")
+	}
+}
+
+func TestDiscoverCandidatesExcludesStatePathFamilies(t *testing.T) {
+	directory := t.TempDir()
+	input := filepath.Join(directory, "audit.log")
+	output := filepath.Join(directory, "audit.log.ndjson")
+	for _, path := range []string{input, input + ".1", output, output + ".1"} {
+		if err := os.WriteFile(path, []byte("line\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	candidates, err := discoverCandidates(input, []string{output})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(candidates) != 2 {
+		t.Fatalf("candidates = %#v", candidates)
+	}
+	for _, candidate := range candidates {
+		if candidate.path == output || candidate.path == output+".1" {
+			t.Fatalf("output family included as input: %#v", candidate)
+		}
 	}
 }
 

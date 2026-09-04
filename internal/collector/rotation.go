@@ -130,6 +130,12 @@ func (follower *RotatingFollower) Next(ctx context.Context) (SourceLine, bool, e
 		return line, ok, err
 	}
 	if len(follower.queued) != 0 && !follower.currentAtPath {
+		if err := follower.refreshQueue(); err != nil {
+			return SourceLine{}, false, err
+		}
+		if follower.currentAtPath {
+			return SourceLine{}, false, nil
+		}
 		stable, err := follower.stableForSwitch(follower.queued[0].identity)
 		if err != nil || !stable {
 			return SourceLine{}, false, err
@@ -142,7 +148,10 @@ func (follower *RotatingFollower) Next(ctx context.Context) (SourceLine, bool, e
 		return SourceLine{}, false, nil
 	}
 	if !follower.currentAtPath {
-		return SourceLine{}, false, fmt.Errorf("retained source chain ended before current input path")
+		if err := follower.refreshQueue(); err != nil {
+			return SourceLine{}, false, err
+		}
+		return SourceLine{}, false, nil
 	}
 	pathInfo, err := os.Stat(follower.inputPath)
 	if errors.Is(err, os.ErrNotExist) {
@@ -163,21 +172,9 @@ func (follower *RotatingFollower) Next(ctx context.Context) (SourceLine, bool, e
 		}
 		return SourceLine{}, false, nil
 	}
-	candidates, err := discoverCandidates(follower.inputPath, follower.options.ExcludePaths)
-	if err != nil {
+	if err := follower.refreshQueue(); err != nil {
 		return SourceLine{}, false, err
 	}
-	currentIndex := -1
-	for i, candidate := range candidates {
-		if candidate.identity == follower.current.Identity() {
-			currentIndex = i
-			break
-		}
-	}
-	if currentIndex < 0 || currentIndex+1 >= len(candidates) {
-		return SourceLine{}, false, &SourceGapError{Identity: follower.current.Identity()}
-	}
-	follower.queued = candidates[currentIndex+1:]
 	stable, err := follower.stableForSwitch(follower.queued[0].identity)
 	if err != nil || !stable {
 		return SourceLine{}, false, err
@@ -189,6 +186,30 @@ func (follower *RotatingFollower) Next(ctx context.Context) (SourceLine, bool, e
 	follower.queued = follower.queued[1:]
 	follower.resetDrain()
 	return SourceLine{}, false, nil
+}
+
+func (follower *RotatingFollower) refreshQueue() error {
+	candidates, err := discoverCandidates(follower.inputPath, follower.options.ExcludePaths)
+	if err != nil {
+		return err
+	}
+	currentIndex := -1
+	for i, candidate := range candidates {
+		if candidate.identity == follower.current.Identity() {
+			currentIndex = i
+			if candidate.current {
+				follower.currentAtPath = true
+				follower.queued = nil
+				return nil
+			}
+			break
+		}
+	}
+	if currentIndex < 0 || currentIndex+1 >= len(candidates) {
+		return &SourceGapError{Identity: follower.current.Identity()}
+	}
+	follower.queued = candidates[currentIndex+1:]
+	return nil
 }
 
 func (follower *RotatingFollower) stableForSwitch(next FileIdentity) (bool, error) {
@@ -273,14 +294,14 @@ func (follower *RotatingFollower) Close() error { return follower.current.Close(
 func discoverCandidates(inputPath string, excludes []string) ([]sourceCandidate, error) {
 	directory := filepath.Dir(inputPath)
 	base := filepath.Base(inputPath)
-	excluded := make(map[string]struct{}, len(excludes))
+	excluded := make([]string, 0, len(excludes))
 	for _, path := range excludes {
 		if path == "" {
 			continue
 		}
 		canonical, err := CanonicalPath(path)
 		if err == nil {
-			excluded[canonical] = struct{}{}
+			excluded = append(excluded, canonical)
 		}
 	}
 	entries, err := os.ReadDir(directory)
@@ -298,7 +319,7 @@ func discoverCandidates(inputPath string, excludes []string) ([]sourceCandidate,
 			continue
 		}
 		path := filepath.Join(directory, name)
-		if _, skip := excluded[path]; skip {
+		if isExcludedPath(path, excluded) {
 			continue
 		}
 		if entry.Type()&os.ModeSymlink != 0 {
@@ -356,6 +377,15 @@ func discoverCandidates(inputPath string, excludes []string) ([]sourceCandidate,
 		return nil, errors.New("configured input path is not a regular file")
 	}
 	return candidates, nil
+}
+
+func isExcludedPath(path string, excluded []string) bool {
+	for _, statePath := range excluded {
+		if path == statePath || strings.HasPrefix(path, statePath+".") || strings.HasPrefix(path, statePath+"-") {
+			return true
+		}
+	}
+	return false
 }
 
 func rotationNumber(base, name string) (uint64, bool) {
