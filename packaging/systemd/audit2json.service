@@ -1,0 +1,26 @@
+[Unit]
+Description=Linux Audit to canonical NDJSON collector
+Documentation=https://github.com/kstone-sa/audit2json
+After=auditd.service
+
+[Service]
+Type=simple
+User=audit2json
+Group=audit2json
+ExecStart=/usr/bin/audit2json --config /etc/audit2json/config.json
+Restart=on-failure
+RestartSec=5s
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadOnlyPaths=/var/log/audit
+ReadWritePaths=/var/lib/audit2json /var/log/audit2json
+RestrictAddressFamilies=AF_UNIX
+LockPersonality=true
+MemoryDenyWriteExecute=true
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

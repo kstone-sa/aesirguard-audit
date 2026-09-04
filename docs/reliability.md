@@ -79,6 +79,8 @@ Updates are batched by a configurable time or progress interval. Per-event sync 
 
 A corrupted, unsupported, or mismatched checkpoint causes an explicit startup error. It never causes an implicit jump to the current EOF. Recovery policies other than fail-closed remain planned.
 
+Checkpoint schema version 1 is the only durable format released so far. It is not rewritten into a different version implicitly. Interrupted temporary checkpoint files are ignored; the last atomically renamed checkpoint remains authoritative. Upgrade and rollback steps are documented in `runbook.md`.
+
 ## Startup recovery
 
 On startup:
@@ -152,6 +154,8 @@ The managed file sink:
 - syncs durable output before advancing a durability-dependent input checkpoint;
 - automatically reopens after managed rename-based rotation;
 - never relies on unmanaged shell redirection for long-running rotation.
+
+The sink refuses symbolic links, non-regular files, untrusted owners, group- or world-writable files, and writable output directories. Newly created output files use mode `0600`; group-readable mode may be applied deliberately after creation when a local forwarding agent requires it.
 
 Input-log rotation and output-file rotation are independent state machines. Checkpoint coupling and managed rename-based output reopen are implemented.
 

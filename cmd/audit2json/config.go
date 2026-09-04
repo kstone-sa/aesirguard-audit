@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
+	"syscall"
 	"time"
 )
 
@@ -57,7 +59,7 @@ type operationsConfig struct {
 }
 
 func loadFileConfig(path string) (fileConfig, error) {
-	file, err := os.Open(path)
+	file, err := openConfigFile(path)
 	if err != nil {
 		return fileConfig{}, err
 	}
@@ -79,6 +81,45 @@ func loadFileConfig(path string) (fileConfig, error) {
 		return fileConfig{}, fmt.Errorf("unsupported configuration version %d", config.Version)
 	}
 	return config, nil
+}
+
+func openConfigFile(path string) (*os.File, error) {
+	directory := filepath.Dir(path)
+	info, err := os.Lstat(directory)
+	if err != nil {
+		return nil, err
+	}
+	if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+		return nil, fmt.Errorf("configuration directory %s is not a directory", directory)
+	}
+	stat, ok := info.Sys().(*syscall.Stat_t)
+	if !ok || (stat.Uid != uint32(os.Geteuid()) && stat.Uid != 0) {
+		return nil, fmt.Errorf("configuration directory %s has an untrusted owner", directory)
+	}
+	if info.Mode().Perm()&0o022 != 0 {
+		return nil, fmt.Errorf("configuration directory %s is group- or world-writable", directory)
+	}
+
+	fd, err := syscall.Open(path, syscall.O_RDONLY|syscall.O_CLOEXEC|syscall.O_NOFOLLOW, 0)
+	if err != nil {
+		return nil, err
+	}
+	file := os.NewFile(uintptr(fd), path)
+	fileInfo, err := file.Stat()
+	if err != nil {
+		return nil, errors.Join(err, file.Close())
+	}
+	fileStat, ok := fileInfo.Sys().(*syscall.Stat_t)
+	if !fileInfo.Mode().IsRegular() || !ok {
+		return nil, errors.Join(fmt.Errorf("configuration %s is not a regular file", path), file.Close())
+	}
+	if fileStat.Uid != uint32(os.Geteuid()) && fileStat.Uid != 0 {
+		return nil, errors.Join(fmt.Errorf("configuration %s has an untrusted owner", path), file.Close())
+	}
+	if fileInfo.Mode().Perm()&0o022 != 0 {
+		return nil, errors.Join(fmt.Errorf("configuration %s is group- or world-writable", path), file.Close())
+	}
+	return file, nil
 }
 
 func (config fileConfig) apply(options *commandOptions) error {

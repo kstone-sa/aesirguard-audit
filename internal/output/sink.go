@@ -3,8 +3,11 @@ package output
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"os"
+	"path/filepath"
+	"syscall"
 
 	"github.com/kstone-sa/audit2json/internal/audit"
 )
@@ -34,7 +37,7 @@ func NewWriterSink(writer io.Writer) *NDJSONSink {
 // OpenFileSink opens an append-only managed output file. When syncEachWrite is
 // true, Write returns only after the event line is synced locally.
 func OpenFileSink(path string, syncEachWrite bool) (*NDJSONSink, error) {
-	file, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
+	file, err := openManagedFile(path)
 	if err != nil {
 		return nil, err
 	}
@@ -86,7 +89,7 @@ func (sink *NDJSONSink) reopenIfRotated() error {
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
-	replacement, err := os.OpenFile(sink.path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
+	replacement, err := openManagedFile(sink.path)
 	if err != nil {
 		return err
 	}
@@ -99,6 +102,45 @@ func (sink *NDJSONSink) reopenIfRotated() error {
 	sink.encoder = json.NewEncoder(replacement)
 	sink.encoder.SetEscapeHTML(false)
 	return previous.Close()
+}
+
+func openManagedFile(path string) (*os.File, error) {
+	directory := filepath.Dir(path)
+	info, err := os.Lstat(directory)
+	if err != nil {
+		return nil, err
+	}
+	if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+		return nil, fmt.Errorf("output directory %s is not a directory", directory)
+	}
+	stat, ok := info.Sys().(*syscall.Stat_t)
+	if !ok || (stat.Uid != uint32(os.Geteuid()) && stat.Uid != 0) {
+		return nil, fmt.Errorf("output directory %s has an untrusted owner", directory)
+	}
+	if info.Mode().Perm()&0o022 != 0 {
+		return nil, fmt.Errorf("output directory %s is group- or world-writable", directory)
+	}
+
+	fd, err := syscall.Open(path, syscall.O_CREAT|syscall.O_APPEND|syscall.O_WRONLY|syscall.O_CLOEXEC|syscall.O_NOFOLLOW, 0o600)
+	if err != nil {
+		return nil, err
+	}
+	file := os.NewFile(uintptr(fd), path)
+	fileInfo, err := file.Stat()
+	if err != nil {
+		return nil, errors.Join(err, file.Close())
+	}
+	fileStat, ok := fileInfo.Sys().(*syscall.Stat_t)
+	if !fileInfo.Mode().IsRegular() || !ok {
+		return nil, errors.Join(fmt.Errorf("output %s is not a regular file", path), file.Close())
+	}
+	if fileStat.Uid != uint32(os.Geteuid()) {
+		return nil, errors.Join(fmt.Errorf("output %s has an untrusted owner", path), file.Close())
+	}
+	if fileInfo.Mode().Perm()&0o022 != 0 {
+		return nil, errors.Join(fmt.Errorf("output %s is group- or world-writable", path), file.Close())
+	}
+	return file, nil
 }
 
 // Close releases a managed file. Caller-owned writers are not closed.

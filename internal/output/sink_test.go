@@ -63,6 +63,27 @@ func TestFileSinkCommitSyncsWithoutPerEventSync(t *testing.T) {
 	}
 }
 
+func TestFileSinkRejectsUnsafeTargets(t *testing.T) {
+	directory := t.TempDir()
+	target := filepath.Join(directory, "target.ndjson")
+	if err := os.WriteFile(target, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	symlink := filepath.Join(directory, "symlink.ndjson")
+	if err := os.Symlink(target, symlink); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := OpenFileSink(symlink, false); err == nil {
+		t.Fatal("expected symlink output rejection")
+	}
+	if err := os.Chmod(target, 0o666); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := OpenFileSink(target, false); err == nil || !strings.Contains(err.Error(), "group- or world-writable") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
 func TestFileSinkReopensAfterRenameRotation(t *testing.T) {
 	directory := t.TempDir()
 	path := filepath.Join(directory, "audit.ndjson")

@@ -20,7 +20,7 @@ Inspect additional files only when an observed dependency requires them.
 
 ## Status guardrail
 
-Milestones v0.7, v0.8A, and v0.8C are implemented. Milestone v0.8A adds synthetic fuzzing, invariant tests, fault injection, stress tests, and reproducible benchmarks. Milestone v0.8C expands security-event normalization and rendering beyond the CIS rule profile. Empirical validation against real audit output from every supported distribution is v0.8B and remains incomplete. Never describe synthetic fixtures as verified distro coverage.
+Milestones v0.7, v0.8A, v0.8C, and v0.9 are implemented. Milestone v0.9 adds secure filesystem boundaries, versioned release builds, compatibility documentation, packaging guidance, and upgrade/rollback procedures. Empirical validation against real audit output from every supported distribution is v0.8B and remains incomplete. Never describe synthetic fixtures as verified distro coverage.
 
 ## Design rules
 
