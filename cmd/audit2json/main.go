@@ -55,7 +55,6 @@ type commandOptions struct {
 type eventProcessor struct {
 	assembler     *audit.Assembler
 	sink          eventoutput.Sink
-	stderr        io.Writer
 	canonical     audit.CanonicalOptions
 	renderMessage bool
 	diagnostics   *operationalDiagnostics
@@ -123,7 +122,6 @@ func runContext(ctx context.Context, args []string, stdin io.Reader, stdout, std
 	processor := &eventProcessor{
 		assembler:     assembler,
 		sink:          sink,
-		stderr:        stderr,
 		canonical:     audit.CanonicalOptions{Host: options.sourceHost},
 		renderMessage: options.renderMessage,
 		diagnostics:   diagnostics,
@@ -202,8 +200,11 @@ func parseOptions(args []string, stderr io.Writer) (commandOptions, error) {
 	if options.syncOutput && options.outputPath == "" {
 		return options, fmt.Errorf("sync-output requires output-file")
 	}
-	if options.pollInterval <= 0 || options.eventTimeout <= 0 || options.checkpointInterval <= 0 || options.rotationDrain <= 0 || options.heartbeatInterval < 0 {
+	if options.pollInterval <= 0 || options.eventTimeout <= 0 || options.checkpointInterval <= 0 || options.rotationDrain <= 0 {
 		return options, fmt.Errorf("poll, event timeout, checkpoint, and rotation drain intervals must be positive")
+	}
+	if options.heartbeatInterval < 0 {
+		return options, fmt.Errorf("heartbeat interval must be non-negative")
 	}
 	if options.maxLineBytes <= 0 || options.maxPendingEvents <= 0 || options.maxRecordsPerEvent <= 0 || options.maxPendingBytes <= 0 {
 		return options, fmt.Errorf("collection limits must be positive")
@@ -300,6 +301,7 @@ func runFollower(ctx context.Context, options commandOptions, processor *eventPr
 		ExcludePaths:    []string{options.outputPath, options.checkpointPath, options.lockPath},
 	}, checkpoint)
 	if err != nil {
+		recordSourceGap(processor.diagnostics, err)
 		return err
 	}
 	defer follower.Close()
@@ -329,12 +331,7 @@ func runFollower(ctx context.Context, options commandOptions, processor *eventPr
 			return checkpointWriter.persist(sourcePosition(follower.CompletePosition()), true)
 		}
 		if err != nil {
-			var gap *collector.SourceGapError
-			var truncated *collector.SourceTruncatedError
-			if errors.As(err, &gap) || errors.As(err, &truncated) {
-				processor.diagnostics.counters.Gaps++
-				processor.diagnostics.log("error", "source_gap", map[string]any{"error": err.Error()})
-			}
+			recordSourceGap(processor.diagnostics, err)
 			return err
 		}
 		if ok {
@@ -376,6 +373,16 @@ func runFollower(ctx context.Context, options commandOptions, processor *eventPr
 			processor.diagnostics.heartbeat(processor, lagBytes)
 		}
 	}
+}
+
+func recordSourceGap(diagnostics *operationalDiagnostics, err error) {
+	var gap *collector.SourceGapError
+	var truncated *collector.SourceTruncatedError
+	if !errors.As(err, &gap) && !errors.As(err, &truncated) {
+		return
+	}
+	diagnostics.counters.Gaps++
+	diagnostics.log("error", "source_gap", map[string]any{"error": err.Error()})
 }
 
 func loadConfiguredCheckpoint(path, inputPath string) (*collector.Checkpoint, error) {
