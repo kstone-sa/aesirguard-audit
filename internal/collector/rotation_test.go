@@ -195,6 +195,49 @@ func TestRotatingFollowerRecoversThroughRetainedGenerations(t *testing.T) {
 	}
 }
 
+func TestRotatingFollowerDrainsLateWriteToRecoveredGeneration(t *testing.T) {
+	directory := t.TempDir()
+	path := filepath.Join(directory, "audit.log")
+	retained := path + ".1"
+	if err := os.WriteFile(retained, []byte("already\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("current\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(retained)
+	if err != nil {
+		t.Fatal(err)
+	}
+	identity, err := identityFromFileInfo(info)
+	if err != nil {
+		t.Fatal(err)
+	}
+	checkpoint := &Checkpoint{Device: identity.Device, Inode: identity.Inode, Offset: int64(len("already\n"))}
+	follower := mustOpenRotatingFollower(t, path, checkpoint)
+	defer follower.Close()
+	if _, ok, err := follower.Next(context.Background()); err != nil || ok {
+		t.Fatalf("recovered EOF = %v, %v", ok, err)
+	}
+	file, err := os.OpenFile(retained, os.O_APPEND|os.O_WRONLY, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, writeErr := file.WriteString("late\n")
+	closeErr := file.Close()
+	if err := errors.Join(writeErr, closeErr); err != nil {
+		t.Fatal(err)
+	}
+	late := mustNextRotatingLine(t, follower)
+	if late.Text != "late" || late.Generation != 0 {
+		t.Fatalf("late recovered line = %#v", late)
+	}
+	current := mustNextRotatingLine(t, follower)
+	if current.Text != "current" || current.Generation != 1 {
+		t.Fatalf("current line = %#v", current)
+	}
+}
+
 func TestRotatingFollowerReportsMissingCheckpointGeneration(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "audit.log")
 	if err := os.WriteFile(path, nil, 0o600); err != nil {

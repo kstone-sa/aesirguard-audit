@@ -127,10 +127,15 @@ func (follower *RotatingFollower) Next(ctx context.Context) (SourceLine, bool, e
 		return line, ok, err
 	}
 	if len(follower.queued) != 0 && !follower.currentAtPath {
+		stable, err := follower.stableForSwitch(follower.queued[0].identity)
+		if err != nil || !stable {
+			return SourceLine{}, false, err
+		}
 		if err := follower.switchTo(follower.queued[0]); err != nil {
 			return SourceLine{}, false, err
 		}
 		follower.queued = follower.queued[1:]
+		follower.resetDrain()
 		return SourceLine{}, false, nil
 	}
 	if !follower.currentAtPath {
@@ -149,8 +154,7 @@ func (follower *RotatingFollower) Next(ctx context.Context) (SourceLine, bool, e
 	}
 	if pathIdentity == follower.current.Identity() {
 		follower.queued = nil
-		follower.pendingIdentity = FileIdentity{}
-		follower.drainStarted = time.Time{}
+		follower.resetDrain()
 		if pathInfo.Size() < follower.current.CurrentOffset() {
 			return SourceLine{}, false, &SourceTruncatedError{Identity: pathIdentity, Offset: follower.current.CurrentOffset(), Size: pathInfo.Size()}
 		}
@@ -171,28 +175,41 @@ func (follower *RotatingFollower) Next(ctx context.Context) (SourceLine, bool, e
 		return SourceLine{}, false, &SourceGapError{Identity: follower.current.Identity()}
 	}
 	follower.queued = candidates[currentIndex+1:]
-	size, err := follower.current.descriptorSize()
-	if err != nil {
+	stable, err := follower.stableForSwitch(follower.queued[0].identity)
+	if err != nil || !stable {
 		return SourceLine{}, false, err
-	}
-	now := time.Now()
-	if follower.queued[0].identity != follower.pendingIdentity || size != follower.drainSize {
-		follower.pendingIdentity = follower.queued[0].identity
-		follower.drainSize = size
-		follower.drainStarted = now
-		return SourceLine{}, false, nil
-	}
-	if now.Sub(follower.drainStarted) < follower.options.DrainInterval {
-		return SourceLine{}, false, nil
 	}
 	candidate := follower.queued[0]
 	if err := follower.switchTo(candidate); err != nil {
 		return SourceLine{}, false, err
 	}
 	follower.queued = follower.queued[1:]
+	follower.resetDrain()
+	return SourceLine{}, false, nil
+}
+
+func (follower *RotatingFollower) stableForSwitch(next FileIdentity) (bool, error) {
+	size, err := follower.current.descriptorSize()
+	if err != nil {
+		return false, err
+	}
+	now := time.Now()
+	if next != follower.pendingIdentity || size != follower.drainSize {
+		follower.pendingIdentity = next
+		follower.drainSize = size
+		follower.drainStarted = now
+		return false, nil
+	}
+	if now.Sub(follower.drainStarted) < follower.options.DrainInterval {
+		return false, nil
+	}
+	return true, nil
+}
+
+func (follower *RotatingFollower) resetDrain() {
 	follower.pendingIdentity = FileIdentity{}
 	follower.drainStarted = time.Time{}
-	return SourceLine{}, false, nil
+	follower.drainSize = 0
 }
 
 func (follower *RotatingFollower) switchTo(candidate sourceCandidate) error {
