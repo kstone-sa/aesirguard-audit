@@ -30,3 +30,18 @@ jobs:
         run: go test -race ./...
       - name: Run vet
         run: go vet ./...
+
+  synthetic:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Fuzz record parser
+        run: go test ./internal/audit -run '^$' -fuzz '^FuzzParseRecordDoesNotPanic$' -fuzztime=5s
+      - name: Fuzz event assembler
+        run: go test ./internal/audit -run '^$' -fuzz '^FuzzAssemblerPreservesAcceptedRecords$' -fuzztime=5s
+      - name: Exercise pipeline benchmark
+        run: go test ./internal/audit -run '^$' -bench '^BenchmarkAuditPipeline$' -benchtime=200ms -benchmem

@@ -154,6 +154,30 @@ Configuration schema version 1 is strict and supports CLI overrides. Operational
 
 ## v0.8 - Performance and regression
 
+**Status: 8A implemented on the development branch; 8B pending empirical corpus**
+
+### v0.8A - Synthetic hardening
+
+Implemented:
+
+- bounded fuzz campaigns for the record parser and assembler state transitions;
+- generated interleaved and out-of-order multi-record events with conservation and determinism assertions;
+- large fragmented EXECVE reconstruction;
+- sink failure and checkpoint commit-order fault injection;
+- slow-consumer back-pressure tests;
+- rapid rotation, missing generation, truncation, partial-line, and many-generation recovery stress tests;
+- an allocation-aware end-to-end parsing, assembly, normalization, rendering, and JSON benchmark;
+- race-detector validation.
+
+### v0.8B - Empirical distribution validation
+
+Pending:
+
+- capture and sanitize real RAW and ENRICHED Audit output;
+- validate CIS Server Level 1 and Level 2 families on Debian 12/13, Ubuntu 22.04/24.04, RHEL 8/9, and Oracle Linux 8/9;
+- convert confirmed distro differences and previously unseen record shapes into regression fixtures;
+- document the tested auditd, kernel, and distribution versions.
+
 Deliverables:
 
 - events/sec and MB/sec benchmarks;

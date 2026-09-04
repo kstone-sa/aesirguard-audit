@@ -6,7 +6,7 @@ The project is intended to become a persistent, low-latency collector that follo
 
 ## Current status
 
-The milestone v0.7 development branch contains the canonical converter, CIS-oriented semantic classifier, checkpointed rotation-aware persistent collector, and its operational configuration and health surface. It can:
+Milestone v0.7 contains the canonical converter, CIS-oriented semantic classifier, checkpointed rotation-aware persistent collector, and its operational configuration and health surface. Milestone v0.8A adds synthetic correctness, fault, stress, fuzz, and benchmark coverage. The project can:
 
 - read stdin or one existing file;
 - preserve ordered and repeated Audit fields;
@@ -33,10 +33,12 @@ The milestone v0.7 development branch contains the canonical converter, CIS-orie
 - reopen a managed output file automatically after rename rotation;
 - load strict versioned JSON configuration with command-line overrides;
 - emit structured operational diagnostics, counters, and heartbeats on stderr.
+- verify generated interleaving, large fragmented EXECVE, sink/checkpoint failure windows, and recovery across many retained generations;
+- run bounded fuzz campaigns and a reproducible end-to-end pipeline benchmark in CI.
 
 Batch mode still exits at EOF. Follow mode waits at EOF, recovers through retained uncompressed generations, and follows rename/create rotation. Compressed historical logs are not decoded; if the checkpoint inode is no longer available as an uncompressed file, startup fails explicitly.
 
-See `ROADMAP.md` for delivery order.
+See `ROADMAP.md` for delivery order and `docs/performance.md` for the synthetic validation and benchmark model.
 
 ## Design goals
 
@@ -52,6 +54,8 @@ See `ROADMAP.md` for delivery order.
 - compact output suitable for licensed-volume ingestion.
 
 Guaranteed CIS semantic rendering assumes `auditd` is configured with `log_format=ENRICHED`. RAW records remain accepted with explicit numeric fallbacks, but classification may be less specific when only architecture-dependent syscall numbers are available.
+
+The existing distro-labelled fixtures are synthetic representatives. Empirical validation with captured and sanitized Audit output from Debian, Ubuntu, RHEL, and Oracle Linux is milestone v0.8B and has not yet been completed.
 
 ## Target runtime model
 

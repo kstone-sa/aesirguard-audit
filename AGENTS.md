@@ -20,7 +20,7 @@ Inspect additional files only when an observed dependency requires them.
 
 ## Status guardrail
 
-The milestone v0.7 branch adds strict versioned JSON configuration, CLI overrides, structured stderr diagnostics, operational counters, lag and pending-state gauges, and heartbeat reporting to the rotation-aware checkpointed collector. Performance and fault-injection hardening remain planned. Never describe a planned capability as implemented.
+Milestone v0.7 is implemented. Milestone v0.8A adds synthetic fuzzing, invariant tests, fault injection, stress tests, and reproducible benchmarks. Empirical validation against real audit output from every supported distribution is v0.8B and remains incomplete. Never describe synthetic fixtures as verified distro coverage.
 
 ## Design rules
 

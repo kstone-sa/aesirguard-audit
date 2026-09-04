@@ -67,4 +67,4 @@ Renderer wording follows the tri-state result: past tense for success, `failed t
 
 The mapping is versioned in `data/cis_audit_families.json`. Updating a CIS baseline requires updating this matrix, mapping data, and the affected fixtures together.
 
-These fixtures validate the current semantic contract but are not an empirical distro corpus. Capturing and sanitizing real Level 1 and Level 2 Audit output from every listed platform remains a v0.8 validation activity.
+These fixtures validate the current semantic contract but are not an empirical distro corpus. Capturing and sanitizing real RAW and ENRICHED Level 1 and Level 2 Audit output from every listed platform is milestone v0.8B and has not yet been completed. Until then, distro-specific coverage is a target rather than a verified compatibility claim.
