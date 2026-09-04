@@ -100,7 +100,7 @@ func openConfigFile(path string) (*os.File, error) {
 		return nil, fmt.Errorf("configuration directory %s is group- or world-writable", directory)
 	}
 
-	fd, err := syscall.Open(path, syscall.O_RDONLY|syscall.O_CLOEXEC|syscall.O_NOFOLLOW, 0)
+	fd, err := syscall.Open(path, syscall.O_RDONLY|syscall.O_CLOEXEC|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
 	if err != nil {
 		return nil, err
 	}

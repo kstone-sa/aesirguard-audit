@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"syscall"
 	"testing"
 	"time"
 
@@ -81,6 +82,26 @@ func TestFileSinkRejectsUnsafeTargets(t *testing.T) {
 	}
 	if _, err := OpenFileSink(target, false); err == nil || !strings.Contains(err.Error(), "group- or world-writable") {
 		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestFileSinkRejectsFIFOWithoutBlocking(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "output.fifo")
+	if err := syscall.Mkfifo(path, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan error, 1)
+	go func() {
+		_, err := OpenFileSink(path, false)
+		done <- err
+	}()
+	select {
+	case err := <-done:
+		if err == nil {
+			t.Fatal("expected FIFO output rejection")
+		}
+	case <-time.After(time.Second):
+		t.Fatal("FIFO output blocked sink setup")
 	}
 }
 

@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -469,6 +470,26 @@ func TestParseOptionsRejectsUnsafeConfigFile(t *testing.T) {
 	}
 	if _, err := parseOptions([]string{"--config=" + target}, io.Discard); err == nil || !strings.Contains(err.Error(), "group- or world-writable") {
 		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestParseOptionsRejectsFIFOConfigWithoutBlocking(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.fifo")
+	if err := syscall.Mkfifo(path, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan error, 1)
+	go func() {
+		_, err := parseOptions([]string{"--config=" + path}, io.Discard)
+		done <- err
+	}()
+	select {
+	case err := <-done:
+		if err == nil || !strings.Contains(err.Error(), "not a regular file") {
+			t.Fatalf("error = %v", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("FIFO configuration blocked validation")
 	}
 }
 
