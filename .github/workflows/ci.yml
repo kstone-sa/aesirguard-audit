@@ -21,6 +21,7 @@ jobs:
           unformatted_files="$(gofmt -l .)"
           if [ -n "$unformatted_files" ]; then
             printf '%s\n' "$unformatted_files"
+            gofmt -d $unformatted_files
             exit 1
           fi
       - name: Run tests
