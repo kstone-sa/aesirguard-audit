@@ -178,3 +178,29 @@ func TestEveryCISClassificationHasRendererCoverage(t *testing.T) {
 		})
 	}
 }
+
+func TestEverySecurityEventFamilyHasRendererCoverage(t *testing.T) {
+	for recordType, family := range securityEventFamilies.RecordTypes {
+		t.Run(recordType, func(t *testing.T) {
+			event := CanonicalEvent{
+				Event: CanonicalEventMeta{Type: recordType},
+				Actor: &CanonicalActor{User: "analyst"},
+			}
+			classifyCanonicalEvent(&event)
+			if event.Event.Category != family.Category || event.Event.Action != family.Action {
+				t.Fatalf("classification = %s/%s, want %s/%s", event.Event.Category, event.Event.Action, family.Category, family.Action)
+			}
+			rendered := WithHumanMessage(event)
+			if rendered.Message == "" || rendered.Renderer != HumanRendererVersion {
+				t.Fatalf("missing renderer for %s/%s", family.Category, family.Action)
+			}
+		})
+	}
+	for _, rule := range securityEventFamilies.RecordPrefixes {
+		event := CanonicalEvent{Event: CanonicalEventMeta{Type: rule.Prefix + "TEST"}, Actor: &CanonicalActor{User: "analyst"}}
+		classifyCanonicalEvent(&event)
+		if rendered := WithHumanMessage(event); rendered.Message == "" || rendered.Renderer != HumanRendererVersion {
+			t.Fatalf("missing renderer for prefix %s", rule.Prefix)
+		}
+	}
+}

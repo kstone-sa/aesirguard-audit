@@ -47,6 +47,28 @@ func TestParseRecordPreservesRepeatedMessages(t *testing.T) {
 	if record.Fields["msg"] != "audit(1721721601.456:43):" {
 		t.Fatalf("first msg = %q", record.Fields["msg"])
 	}
+	if record.EmbeddedFields["acct"] != "mario" || record.EmbeddedFields["res"] != "failed" {
+		t.Fatalf("embedded fields = %#v", record.EmbeddedFields)
+	}
+}
+
+func TestParseRecordHandlesUserMarkerAndEmbeddedMessage(t *testing.T) {
+	line := `type=USER_LOGIN msg=audit(1721721601.456:44): user pid=8859 uid=0 auid=1000 ses=6158 msg='op=login acct="mario" exe="/usr/sbin/sshd" hostname=? addr=192.0.2.4 terminal=ssh res=failed'`
+	record := mustParseRecord(t, line)
+	if record.Type != "USER_LOGIN" || record.Fields["pid"] != "8859" {
+		t.Fatalf("record = %#v", record)
+	}
+	if record.EmbeddedFields["op"] != "login" || record.EmbeddedFields["addr"] != "192.0.2.4" {
+		t.Fatalf("embedded fields = %#v", record.EmbeddedFields)
+	}
+}
+
+func TestParseRecordNormalizesAVCProse(t *testing.T) {
+	line := `type=AVC msg=audit(1721721601.456:45): avc: denied { read write } for pid=3912 comm="cat" name="shadow" dev="dm-0" ino=42 scontext=staff_u:staff_r:staff_t:s0 tcontext=system_u:object_r:shadow_t:s0 tclass=file permissive=0`
+	record := mustParseRecord(t, line)
+	if record.Fields["decision"] != "denied" || record.Fields["permissions"] != "read write" || record.Fields["pid"] != "3912" {
+		t.Fatalf("fields = %#v", record.Fields)
+	}
 }
 
 func TestParseRecordUnescapesQuotedDelimiters(t *testing.T) {
@@ -190,6 +212,24 @@ func TestAssemblerEmitsKnownSingleRecordType(t *testing.T) {
 	events := assembler.Add(record)
 	if len(events) != 1 || events[0].ID != record.ID {
 		t.Fatalf("kernel events = %#v", events)
+	}
+}
+
+func TestAssemblerEmitsUserSpaceSecurityRecordImmediately(t *testing.T) {
+	assembler := NewAssembler(2 * time.Second)
+	record := mustParseRecord(t, `type=USER_AUTH msg=audit(1721721625.000:63): pid=300 uid=0 auid=1000 msg='op=PAM:authentication acct="mario" res=success'`)
+
+	events := assembler.Add(record)
+	if len(events) != 1 || !events[0].Complete || events[0].Completion != CompletionSingleRecord {
+		t.Fatalf("events = %#v", events)
+	}
+}
+
+func TestAssemblerWaitsForEOEForKernelSecurityRecord(t *testing.T) {
+	assembler := NewAssembler(2 * time.Second)
+	record := mustParseRecord(t, `type=AVC msg=audit(1721721625.000:64): avc: denied { read } for pid=10 comm="cat" name="shadow"`)
+	if events := assembler.Add(record); len(events) != 0 {
+		t.Fatalf("AVC completed event early: %#v", events)
 	}
 }
 

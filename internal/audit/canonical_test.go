@@ -179,3 +179,50 @@ func TestBuildCanonicalEventEmitsSourceOnlyWhenConfigured(t *testing.T) {
 		t.Fatalf("configured source = %#v", withSource.Source)
 	}
 }
+
+func TestBuildCanonicalAuthenticationEvent(t *testing.T) {
+	record := mustParseRecord(t, `type=USER_AUTH msg=audit(1721721700.000:90): user pid=300 uid=0 auid=1000 AUID="mario" UID="root" msg='op=PAM:authentication acct="alice" exe="/usr/bin/sudo" hostname=? addr=192.0.2.10 terminal=/dev/pts/0 res=failed'`)
+	got := WithHumanMessage(BuildCanonicalEvent(AssembledEvent{
+		ID: record.ID, Records: []Record{record}, Complete: true, Completion: CompletionSingleRecord,
+	}, CanonicalOptions{}))
+	if got.Event.Type != "USER_AUTH" || got.Event.Category != "authentication" || got.Event.Action != "authenticate" {
+		t.Fatalf("event = %#v", got.Event)
+	}
+	if got.Event.Success == nil || *got.Event.Success || got.Event.OriginalAction != "PAM:authentication" {
+		t.Fatalf("outcome = %#v", got.Event)
+	}
+	if got.Target == nil || got.Target.User != "alice" || got.Origin == nil || got.Origin.Address != "192.0.2.10" || got.Origin.Terminal != "/dev/pts/0" {
+		t.Fatalf("target=%#v origin=%#v", got.Target, got.Origin)
+	}
+	if got.Security != nil {
+		t.Fatalf("irrelevant security context = %#v", got.Security)
+	}
+	want := "mario failed to authenticate for account alice from 192.0.2.10 via /dev/pts/0 during PAM:authentication"
+	if got.Message != want {
+		t.Fatalf("message = %q, want %q", got.Message, want)
+	}
+}
+
+func TestBuildCanonicalAVCEventPreservesDecisionContext(t *testing.T) {
+	avc := mustParseRecord(t, `type=AVC msg=audit(1721721700.000:91): avc: denied { read write } for pid=3912 comm="cat" name="shadow" scontext=staff_u:staff_r:staff_t:s0 tcontext=system_u:object_r:shadow_t:s0 tclass=file permissive=0`)
+	syscall := mustParseRecord(t, `type=SYSCALL msg=audit(1721721700.000:91): arch=c000003e syscall=257 success=no exit=-13 auid=1000 AUID="mario" SYSCALL="openat"`)
+	got := WithHumanMessage(BuildCanonicalEvent(AssembledEvent{
+		ID: avc.ID, Records: []Record{syscall, avc}, Complete: true, Completion: CompletionEOE,
+	}, CanonicalOptions{}))
+	if got.Event.Type != "AVC" || got.Event.Category != "access_control" || got.Event.Action != "enforce_access_control" {
+		t.Fatalf("event = %#v", got.Event)
+	}
+	if got.Security == nil || got.Security.Decision != "denied" || !reflect.DeepEqual(got.Security.Permissions, []string{"read", "write"}) || got.Security.Permissive == nil || *got.Security.Permissive {
+		t.Fatalf("security = %#v", got.Security)
+	}
+	if got.Target == nil || got.Target.Name != "shadow" {
+		t.Fatalf("target = %#v", got.Target)
+	}
+	if len(got.Event.Issues) != 0 {
+		t.Fatalf("issues = %#v", got.Event.Issues)
+	}
+	want := "mario was denied access by mandatory access-control policy for read, write on shadow"
+	if got.Message != want {
+		t.Fatalf("message = %q, want %q", got.Message, want)
+	}
+}
