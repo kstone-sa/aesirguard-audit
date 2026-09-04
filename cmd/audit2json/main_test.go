@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -430,6 +431,17 @@ func TestRunHelpUsesStdoutWithoutDiagnostics(t *testing.T) {
 	}
 }
 
+func TestRunVersionUsesStdoutWithoutDiagnostics(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	if err := run([]string{"--version"}, strings.NewReader(""), &stdout, &stderr); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(stdout.String(), "audit2json dev commit=unknown built=unknown") || stderr.Len() != 0 {
+		t.Fatalf("stdout = %q, stderr = %q", stdout.String(), stderr.String())
+	}
+}
+
 func TestParseOptionsRejectsUnknownConfigField(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "audit2json.json")
 	if err := os.WriteFile(configPath, []byte(`{"version":1,"surprise":true}`), 0o600); err != nil {
@@ -437,6 +449,47 @@ func TestParseOptionsRejectsUnknownConfigField(t *testing.T) {
 	}
 	if _, err := parseOptions([]string{"--config=" + configPath, "--check-config"}, io.Discard); err == nil || !strings.Contains(err.Error(), "unknown field") {
 		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestParseOptionsRejectsUnsafeConfigFile(t *testing.T) {
+	directory := t.TempDir()
+	target := filepath.Join(directory, "target.json")
+	if err := os.WriteFile(target, []byte(`{"version":1}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	symlink := filepath.Join(directory, "symlink.json")
+	if err := os.Symlink(target, symlink); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := parseOptions([]string{"--config=" + symlink}, io.Discard); err == nil {
+		t.Fatal("expected symlink configuration rejection")
+	}
+	if err := os.Chmod(target, 0o666); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := parseOptions([]string{"--config=" + target}, io.Discard); err == nil || !strings.Contains(err.Error(), "group- or world-writable") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestParseOptionsRejectsFIFOConfigWithoutBlocking(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.fifo")
+	if err := syscall.Mkfifo(path, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan error, 1)
+	go func() {
+		_, err := parseOptions([]string{"--config=" + path}, io.Discard)
+		done <- err
+	}()
+	select {
+	case err := <-done:
+		if err == nil || !strings.Contains(err.Error(), "not a regular file") {
+			t.Fatalf("error = %v", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("FIFO configuration blocked validation")
 	}
 }
 

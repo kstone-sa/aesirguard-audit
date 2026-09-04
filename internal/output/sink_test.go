@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"syscall"
 	"testing"
 	"time"
 
@@ -63,6 +64,68 @@ func TestFileSinkCommitSyncsWithoutPerEventSync(t *testing.T) {
 	}
 }
 
+func TestFileSinkRejectsUnsafeTargets(t *testing.T) {
+	directory := t.TempDir()
+	target := filepath.Join(directory, "target.ndjson")
+	if err := os.WriteFile(target, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	symlink := filepath.Join(directory, "symlink.ndjson")
+	if err := os.Symlink(target, symlink); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := OpenFileSink(symlink, false); err == nil {
+		t.Fatal("expected symlink output rejection")
+	}
+	if err := os.Chmod(target, 0o666); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := OpenFileSink(target, false); err == nil || !strings.Contains(err.Error(), "group- or world-writable") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestFileSinkRejectsFIFOWithoutBlocking(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "output.fifo")
+	if err := syscall.Mkfifo(path, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan error, 1)
+	go func() {
+		_, err := OpenFileSink(path, false)
+		done <- err
+	}()
+	select {
+	case err := <-done:
+		if err == nil {
+			t.Fatal("expected FIFO output rejection")
+		}
+	case <-time.After(time.Second):
+		t.Fatal("FIFO output blocked sink setup")
+	}
+}
+
+func TestFileSinkRejectsUnsafeDirectoryHierarchy(t *testing.T) {
+	root := t.TempDir()
+	realDirectory := filepath.Join(root, "real")
+	if err := os.Mkdir(realDirectory, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	symlinkDirectory := filepath.Join(root, "linked")
+	if err := os.Symlink(realDirectory, symlinkDirectory); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := OpenFileSink(filepath.Join(symlinkDirectory, "events.ndjson"), false); err == nil {
+		t.Fatal("expected symlinked output directory rejection")
+	}
+	if err := os.Chmod(realDirectory, 0o777); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := OpenFileSink(filepath.Join(realDirectory, "events.ndjson"), false); err == nil || !strings.Contains(err.Error(), "group- or world-writable") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
 func TestFileSinkReopensAfterRenameRotation(t *testing.T) {
 	directory := t.TempDir()
 	path := filepath.Join(directory, "audit.ndjson")
@@ -93,6 +156,29 @@ func TestFileSinkReopensAfterRenameRotation(t *testing.T) {
 	}
 	if !strings.Contains(string(oldContents), "before") || strings.Contains(string(oldContents), "after") || !strings.Contains(string(newContents), "after") {
 		t.Fatalf("rotated outputs: old=%s new=%s", oldContents, newContents)
+	}
+}
+
+func TestFileSinkRejectsSymlinkToRotatedInode(t *testing.T) {
+	directory := t.TempDir()
+	path := filepath.Join(directory, "audit.ndjson")
+	rotated := path + ".1"
+	sink, err := OpenFileSink(path, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer sink.Close()
+	if err := sink.Write(audit.CanonicalEvent{SchemaVersion: "0.3", Message: "before"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(path, rotated); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(rotated, path); err != nil {
+		t.Fatal(err)
+	}
+	if err := sink.Write(audit.CanonicalEvent{SchemaVersion: "0.3", Message: "after"}); err == nil || !strings.Contains(err.Error(), "symbolic link") {
+		t.Fatalf("error = %v", err)
 	}
 }
 

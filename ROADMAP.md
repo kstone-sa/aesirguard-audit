@@ -211,15 +211,17 @@ Development toward v0.9 and v1.0 may proceed while 8B remains open. Until 8B is 
 
 ## v0.9 - Production hardening
 
-Deliverables:
+**Status: implemented**
 
-- configuration migration;
-- checkpoint migration and crash testing;
-- permissions and secure file creation;
-- packaging documentation;
-- operational runbooks;
-- compatibility matrix;
-- release and rollback procedure.
+Implemented:
+
+- explicit version-1 configuration and checkpoint compatibility policy, with fail-closed handling for unsupported versions;
+- interrupted checkpoint replacement and crash-window tests;
+- symlink, ownership, writable-path, and regular-file checks at configuration and managed-output boundaries;
+- restrictive managed-file creation and a hardened example systemd service;
+- embedded build version reporting and tagged static Linux amd64/arm64 release archives with checksums;
+- operational installation, monitoring, recovery, upgrade, release, and rollback procedures;
+- an honest compatibility matrix that keeps empirical distro validation in milestone 8B.
 
 ## v1.0 - Stable release
 

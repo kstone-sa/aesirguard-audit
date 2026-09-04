@@ -30,6 +30,12 @@ const (
 	defaultHeartbeatInterval  = 30 * time.Second
 )
 
+var (
+	version   = "dev"
+	commit    = "unknown"
+	buildDate = "unknown"
+)
+
 type commandOptions struct {
 	inputPath          string
 	sourceHost         string
@@ -50,6 +56,7 @@ type commandOptions struct {
 	heartbeatInterval  time.Duration
 	configPath         string
 	checkConfig        bool
+	showVersion        bool
 }
 
 type eventProcessor struct {
@@ -84,6 +91,10 @@ func runContext(ctx context.Context, args []string, stdin io.Reader, stdout, std
 		return err
 	}
 	diagnostics := newOperationalDiagnostics(stderr, options.heartbeatInterval)
+	if options.showVersion {
+		fmt.Fprintf(stdout, "audit2json %s commit=%s built=%s\n", version, commit, buildDate)
+		return nil
+	}
 	if options.checkConfig {
 		return diagnostics.log("info", "configuration_valid", map[string]any{"config": options.configPath})
 	}
@@ -175,6 +186,7 @@ func parseOptions(args []string, _ io.Writer) (commandOptions, error) {
 	}
 	flags.StringVar(&options.configPath, "config", configPath, "load versioned JSON configuration")
 	flags.BoolVar(&options.checkConfig, "check-config", false, "validate configuration and exit")
+	flags.BoolVar(&options.showVersion, "version", false, "print build version and exit")
 	flags.StringVar(&options.sourceHost, "source-host", options.sourceHost, "include this source host in canonical events")
 	flags.StringVar(&options.outputPath, "output-file", options.outputPath, "append NDJSON to this managed output file instead of stdout")
 	flags.StringVar(&options.lockPath, "lock-file", options.lockPath, "singleton lock path for follow mode")

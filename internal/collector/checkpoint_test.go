@@ -69,3 +69,21 @@ func TestCheckpointValidateRequiresTimestampAfterSaveOnly(t *testing.T) {
 		t.Fatal("expected missing timestamp rejection")
 	}
 }
+
+func TestCheckpointIgnoresInterruptedTemporaryReplacement(t *testing.T) {
+	directory := t.TempDir()
+	path := filepath.Join(directory, "checkpoint")
+	if err := SaveCheckpoint(path, Checkpoint{InputPath: "/audit.log", Device: 1, Inode: 2, Offset: 42}); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(directory, ".audit2json-checkpoint-interrupted"), []byte("partial"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := LoadCheckpoint(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if loaded == nil || loaded.Offset != 42 {
+		t.Fatalf("loaded checkpoint = %#v", loaded)
+	}
+}

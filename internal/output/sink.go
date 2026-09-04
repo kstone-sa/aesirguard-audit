@@ -3,10 +3,12 @@ package output
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 
 	"github.com/kstone-sa/audit2json/internal/audit"
+	"github.com/kstone-sa/audit2json/internal/securefile"
 )
 
 // Sink synchronously accepts canonical events.
@@ -34,7 +36,7 @@ func NewWriterSink(writer io.Writer) *NDJSONSink {
 // OpenFileSink opens an append-only managed output file. When syncEachWrite is
 // true, Write returns only after the event line is synced locally.
 func OpenFileSink(path string, syncEachWrite bool) (*NDJSONSink, error) {
-	file, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
+	file, err := openManagedFile(path)
 	if err != nil {
 		return nil, err
 	}
@@ -79,14 +81,17 @@ func (sink *NDJSONSink) reopenIfRotated() error {
 	if err != nil {
 		return err
 	}
-	pathInfo, err := os.Stat(sink.path)
+	pathInfo, err := os.Lstat(sink.path)
+	if err == nil && pathInfo.Mode()&os.ModeSymlink != 0 {
+		return fmt.Errorf("output %s is a symbolic link", sink.path)
+	}
 	if err == nil && os.SameFile(openedInfo, pathInfo) {
 		return nil
 	}
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
-	replacement, err := os.OpenFile(sink.path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
+	replacement, err := openManagedFile(sink.path)
 	if err != nil {
 		return err
 	}
@@ -99,6 +104,10 @@ func (sink *NDJSONSink) reopenIfRotated() error {
 	sink.encoder = json.NewEncoder(replacement)
 	sink.encoder.SetEscapeHTML(false)
 	return previous.Close()
+}
+
+func openManagedFile(path string) (*os.File, error) {
+	return securefile.OpenAppend(path, "output", 0o600)
 }
 
 // Close releases a managed file. Caller-owned writers are not closed.

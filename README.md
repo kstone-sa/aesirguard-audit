@@ -10,7 +10,7 @@ This project was designed and developed by Kstone SA with assistance from OpenAI
 
 ## Current status
 
-Milestone v0.7 contains the canonical converter, CIS-oriented semantic classifier, checkpointed rotation-aware persistent collector, and its operational configuration and health surface. Milestone v0.8A adds synthetic correctness, fault, stress, fuzz, and benchmark coverage. The project can:
+Milestones through v0.9 provide the canonical converter, CIS-oriented and broader security-event classification, checkpointed rotation-aware collection, synthetic hardening, secure filesystem boundaries, and versioned Linux release packaging. The project can:
 
 - read stdin or one existing file;
 - preserve ordered and repeated Audit fields;
@@ -40,6 +40,9 @@ Milestone v0.7 contains the canonical converter, CIS-oriented semantic classifie
 - emit structured operational diagnostics, counters, and heartbeats on stderr.
 - verify generated interleaving, large fragmented EXECVE, sink/checkpoint failure windows, and recovery across many retained generations;
 - run bounded fuzz campaigns and a reproducible end-to-end pipeline benchmark in CI.
+- reject unsafe configuration and managed-output filesystem targets;
+- report embedded build version, commit, and date metadata;
+- produce tagged static Linux amd64 and arm64 release archives with SHA-256 checksums.
 
 Batch mode still exits at EOF. Follow mode waits at EOF, recovers through retained uncompressed generations, and follows rename/create rotation. Compressed historical logs are not decoded; if the checkpoint inode is no longer available as an uncompressed file, startup fails explicitly.
 
@@ -83,6 +86,7 @@ Stdout is the default sink for consumers such as a Splunk scripted input. An app
 go test ./...
 go vet ./...
 go build -o audit2json ./cmd/audit2json
+./audit2json --version
 ```
 
 ## Run the current converter
@@ -164,6 +168,9 @@ For live rename/create rotation, the old descriptor must remain at a stable EOF 
 - `docs/configuration.md`: versioned JSON fields, validation, and CLI overrides;
 - `docs/operations.md`: structured diagnostics, counters, lag, and heartbeat semantics;
 - `docs/development.md`: focused development modes and validation;
+- `docs/compatibility.md`: runtime, distribution, and rotation compatibility matrix;
+- `docs/runbook.md`: installation, monitoring, recovery, upgrade, and rollback;
+- `docs/release.md`: tagged build and publication procedure;
 - `ROADMAP.md`: implementation order and release gates.
 
 ## Repository layout
@@ -173,6 +180,7 @@ cmd/audit2json/      command-line program
 internal/audit/      current parser and event builder
 data/                embedded static mapping data
 configs/             example operational configuration
+packaging/systemd/   service, sysusers, and tmpfiles examples
 docs/                architecture, schema, reliability, and development guidance
 testdata/            reviewable Linux Audit samples
 AGENTS.md             scoped instructions for humans and coding agents

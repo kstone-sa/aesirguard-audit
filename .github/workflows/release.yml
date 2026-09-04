@@ -1,0 +1,49 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Test
+        run: go test ./...
+      - name: Build release archives
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          build_date="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          for arch in amd64 arm64; do
+            name="audit2json_${GITHUB_REF_NAME}_linux_${arch}"
+            mkdir -p "dist/${name}"
+            CGO_ENABLED=0 GOOS=linux GOARCH="${arch}" go build -trimpath \
+              -ldflags="-s -w -X main.version=${GITHUB_REF_NAME} -X main.commit=${GITHUB_SHA} -X main.buildDate=${build_date}" \
+              -o "dist/${name}/audit2json" ./cmd/audit2json
+            cp LICENSE README.md "dist/${name}/"
+            cp -R packaging "dist/${name}/"
+            mkdir -p "dist/${name}/configs" "dist/${name}/docs"
+            cp configs/audit2json.example.json "dist/${name}/configs/"
+            cp docs/compatibility.md docs/configuration.md docs/operations.md \
+              docs/release.md docs/reliability.md docs/runbook.md "dist/${name}/docs/"
+            test -f "dist/${name}/packaging/systemd/audit2json.service"
+            test -f "dist/${name}/configs/audit2json.example.json"
+            tar -C dist -czf "dist/${name}.tar.gz" "${name}"
+            rm -rf "dist/${name}"
+          done
+          (cd dist && sha256sum ./*.tar.gz > SHA256SUMS)
+          gh release create "${GITHUB_REF_NAME}" dist/* --verify-tag --generate-notes

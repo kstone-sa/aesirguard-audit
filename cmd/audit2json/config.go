@@ -7,6 +7,8 @@ import (
 	"io"
 	"os"
 	"time"
+
+	"github.com/kstone-sa/audit2json/internal/securefile"
 )
 
 const configVersion = 1
@@ -57,7 +59,7 @@ type operationsConfig struct {
 }
 
 func loadFileConfig(path string) (fileConfig, error) {
-	file, err := os.Open(path)
+	file, err := openConfigFile(path)
 	if err != nil {
 		return fileConfig{}, err
 	}
@@ -79,6 +81,10 @@ func loadFileConfig(path string) (fileConfig, error) {
 		return fileConfig{}, fmt.Errorf("unsupported configuration version %d", config.Version)
 	}
 	return config, nil
+}
+
+func openConfigFile(path string) (*os.File, error) {
+	return securefile.OpenReadOnly(path, "configuration", true)
 }
 
 func (config fileConfig) apply(options *commandOptions) error {

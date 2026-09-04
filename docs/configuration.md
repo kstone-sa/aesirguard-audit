@@ -13,6 +13,8 @@ audit2json --config /etc/audit2json/config.json --check-config
 
 Command-line options override values loaded from the file. This includes explicit Boolean overrides such as `--render-message=false`. A positional input path overrides `input.path`.
 
+The configuration must be a regular file, not a symbolic link. Its owner must be root or the effective service user. Its complete directory hierarchy is opened component by component without following symbolic links; every directory must have a trusted owner and must not be group- or world-writable, except for a root-owned sticky directory such as `/tmp`. The file itself may not be group- or world-writable. These checks prevent a privileged collector from consuming configuration replaced by another account.
+
 ## Schema version 1
 
 See `configs/audit2json.example.json` for a complete example.
@@ -40,3 +42,9 @@ See `configs/audit2json.example.json` for a complete example.
 Durations use Go duration syntax, for example `200ms`, `2s`, or `1m30s`. Zero-valued integer limits mean "use the built-in default"; negative values are invalid.
 
 Configuration reload is deliberately not implemented. A validated restart makes configuration changes explicit and preserves the existing checkpoint and singleton model.
+
+## Compatibility and migration
+
+Schema version 1 is the only configuration version released so far, so there is no historical transformation to perform. The process never rewrites its configuration automatically. Before an upgrade, validate a candidate file with the candidate binary and retain the previous binary and configuration for rollback.
+
+Future schema changes must provide an explicit, documented migration path. Unknown older or newer versions continue to fail closed rather than being interpreted approximately.
