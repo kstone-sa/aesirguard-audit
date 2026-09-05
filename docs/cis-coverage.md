@@ -2,7 +2,7 @@
 
 ## Scope
 
-The guaranteed target is the union of Linux Audit event-collection recommendations in CIS Server Level 1 and Level 2 for:
+The intended validation target is the union of Linux Audit event-collection recommendations in CIS Server Level 1 and Level 2 for:
 
 | Platform | Reference baseline |
 |---|---|
@@ -17,7 +17,7 @@ The guaranteed target is the union of Linux Audit event-collection recommendatio
 
 Recommendation numbers are documentation references, not runtime identifiers. They differ between releases even when the audited activity is unchanged.
 
-Guaranteed semantic coverage assumes `auditd` uses `log_format=ENRICHED`. RAW input is still parsed and retains numeric identity and architecture-dependent syscall fallbacks, but it may not contain enough portable evidence to select every renderer template.
+The targeted semantic coverage is designed for `auditd` using `log_format=ENRICHED`. RAW input is still parsed and retains numeric identity and architecture-dependent syscall fallbacks, but it may not contain enough portable evidence to select every renderer template.
 
 ## Semantic coverage
 
@@ -67,4 +67,4 @@ Renderer wording follows the tri-state result: past tense for success, `failed t
 
 The mapping is versioned in `data/cis_audit_families.json`. Updating a CIS baseline requires updating this matrix, mapping data, and the affected fixtures together.
 
-These fixtures validate the current semantic contract but are not an empirical distro corpus. Capturing and sanitizing real RAW and ENRICHED Level 1 and Level 2 Audit output from every listed platform is milestone v0.8B and has not yet been completed. Until then, distro-specific coverage is a target rather than a verified compatibility claim.
+These fixtures validate the current semantic contract but are not an empirical distribution corpus. Controlled local testing with real RAW and ENRICHED Level 1 and Level 2 Audit output from every listed platform has not yet been completed. Until then, distribution-specific coverage is a target rather than a verified compatibility claim.

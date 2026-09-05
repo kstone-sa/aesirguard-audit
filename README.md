@@ -14,7 +14,7 @@ This project was designed and developed by Kstone SA with assistance from OpenAI
 
 The v1.0 implementation is feature-complete but has not been released. Empirical validation against real Linux Audit output is still pending; see [Compatibility](docs/compatibility.md). Until that work is complete, distro-labelled fixtures are synthetic regression data rather than compatibility certification.
 
-The release candidate provides:
+The current `main` branch provides:
 
 - read stdin or one existing file;
 - preserve ordered and repeated Audit fields;
@@ -50,7 +50,7 @@ The release candidate provides:
 
 Batch mode still exits at EOF. Follow mode waits at EOF, recovers through retained uncompressed generations, and follows rename/create rotation. Compressed historical logs are not decoded; if the checkpoint inode is no longer available as an uncompressed file, startup fails explicitly.
 
-See `ROADMAP.md` for delivery order, `docs/performance.md` for the synthetic validation model, and `docs/security-event-coverage.md` for security-relevant Audit families beyond the CIS rule profile.
+See `ROADMAP.md` for planned validation and future work, `docs/performance.md` for the synthetic validation model, and `docs/security-event-coverage.md` for security-relevant Audit families beyond the CIS rule profile.
 
 ## Design goals
 
@@ -65,7 +65,7 @@ See `ROADMAP.md` for delivery order, `docs/performance.md` for the synthetic val
 - deterministic behavior and explicit failure reporting;
 - compact output suitable for licensed-volume ingestion.
 
-Guaranteed CIS semantic rendering assumes `auditd` is configured with `log_format=ENRICHED`. RAW records remain accepted with explicit numeric fallbacks, but classification may be less specific when only architecture-dependent syscall numbers are available.
+The targeted CIS semantic rendering is designed for `auditd` configured with `log_format=ENRICHED`. RAW records remain accepted with explicit numeric fallbacks, but classification may be less specific when only architecture-dependent syscall numbers are available. Distribution-specific behavior still requires empirical validation.
 
 ## Target runtime model
 
@@ -179,7 +179,7 @@ For live rename/create rotation, the old descriptor must remain at a stable EOF 
 
 - `docs/architecture.md`: component boundaries and target data flow;
 - `docs/schema.md`: current schema and canonical-schema principles;
-- `docs/cis-coverage.md`: guaranteed CIS Linux audit-family coverage and test matrix;
+- `docs/cis-coverage.md`: targeted CIS Linux audit-family coverage and validation matrix;
 - `docs/security-event-coverage.md`: additional normalized security-event families and renderer coverage;
 - `docs/reliability.md`: checkpoints, delivery semantics, rotation, and failure handling;
 - `docs/configuration.md`: versioned JSON fields, validation, and CLI overrides;
@@ -190,7 +190,7 @@ For live rename/create rotation, the old descriptor must remain at a stable EOF 
 - `docs/release.md`: tagged build and publication procedure;
 - `docs/public-release-checklist.md`: final checks before changing repository visibility and tagging v1.0;
 - `schema/audit2json-v1.schema.json`: machine-readable canonical event contract;
-- `ROADMAP.md`: implementation order and release gates.
+- `ROADMAP.md`: pending validation, release gates, and future work.
 
 ## Contributing and security
 

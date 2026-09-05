@@ -102,7 +102,7 @@ Always distinguish:
 Do not copy the same detailed invariant into multiple files. Use:
 
 - `README.md` for orientation and current status;
-- `ROADMAP.md` for implementation order;
+- `ROADMAP.md` for pending validation, release gates, and future work;
 - `docs/architecture.md` for component ownership;
 - `docs/schema.md` for event contracts;
 - `docs/reliability.md` for recovery and delivery invariants;
