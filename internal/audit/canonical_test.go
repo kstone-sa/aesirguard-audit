@@ -125,6 +125,20 @@ func TestBuildCanonicalEventReportsInvalidAndUnsupportedInput(t *testing.T) {
 	}
 }
 
+func TestBuildCanonicalEventRejectsTimeOutsideRFC3339YearRange(t *testing.T) {
+	record := mustParseRecord(t, `type=SYSCALL msg=audit(253402300800.000:103): syscall=1`)
+	assembled := AssembledEvent{ID: record.ID, Records: []Record{record}, Complete: true, Completion: CompletionEOE}
+
+	got := BuildCanonicalEvent(assembled, CanonicalOptions{})
+	if got.Audit.Time != "" {
+		t.Fatalf("out-of-range audit time = %q", got.Audit.Time)
+	}
+	want := CanonicalIssue{Code: "invalid_audit_id", Field: "audit.id", Value: "253402300800.000:103"}
+	if len(got.Event.Issues) == 0 || !reflect.DeepEqual(got.Event.Issues[0], want) {
+		t.Fatalf("issues = %#v, want first issue %#v", got.Event.Issues, want)
+	}
+}
+
 func TestBuildCanonicalEventOmitsEmptyCapabilities(t *testing.T) {
 	record := mustParseRecord(t, `type=PATH msg=audit(1721721604.000:46): item=0 name="/tmp/file" cap_fp=none cap_fi=0000000000000000 cap_fe=0`)
 	assembled := AssembledEvent{ID: record.ID, Records: []Record{record}, Completion: CompletionEOF}
