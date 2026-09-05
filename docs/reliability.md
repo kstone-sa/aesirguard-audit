@@ -13,10 +13,6 @@ The target collector prioritizes:
 
 These guarantees apply to audit2json and its selected sink. End-to-end indexing guarantees depend on the backend and its acknowledgement model.
 
-## Implementation status
-
-Milestone v0.7 adds validated operational configuration, structured diagnostics, counters, lag and pending-state gauges, and heartbeats to the durable checkpoint and rotation implementation.
-
 ## Delivery semantics
 
 The target delivery model is at-least-once.
@@ -62,7 +58,7 @@ The safe offset:
 
 Audit events can be interleaved. Holding the safe offset behind an incomplete event can cause already-emitted later events to be replayed after a crash. This is acceptable under at-least-once semantics and bounds duplication to the unresolved and checkpoint windows.
 
-A small durable cache of recently emitted event identities may reduce replay duplicates, but it does not create exactly-once delivery.
+The checkpoint may retain recent event identities to reduce replay duplicates, but this does not create exactly-once delivery.
 
 ## Checkpoint persistence
 

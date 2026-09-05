@@ -12,14 +12,14 @@ func TestCISDistroCorpus(t *testing.T) {
 		action  string
 		message string
 	}{
-		{"debian12.audit", "update_session_record", "mario updated session records at /var/log/wtmp"},
-		{"debian13.audit", "change_permissions", "mario changed file permissions or ownership on /srv/data using fchmodat2"},
-		{"ubuntu2204.audit", "change_mac_policy", "mario changed mandatory access control policy at /etc/apparmor.d/usr.bin.example"},
-		{"ubuntu2404.audit", "change_network_configuration", "mario changed network configuration using sethostname"},
-		{"rhel8.audit", "change_time", "mario changed system time using settimeofday"},
-		{"rhel9.audit", "change_mac_policy", "mario changed mandatory access control policy at /etc/selinux/targeted/contexts/files/file_contexts.local"},
-		{"oracle8.audit", "change_privilege_scope", "mario changed sudo privilege scope at /etc/sudoers.d/operators"},
-		{"oracle9.audit", "load_kernel_module", "mario loaded a kernel module from /lib/modules/example.ko using finit_module"},
+		{"debian12.audit", "update_session_record", "operator updated session records at /var/log/wtmp"},
+		{"debian13.audit", "change_permissions", "operator changed file permissions or ownership on /srv/data using fchmodat2"},
+		{"ubuntu2204.audit", "change_mac_policy", "operator changed mandatory access control policy at /etc/apparmor.d/usr.bin.example"},
+		{"ubuntu2404.audit", "change_network_configuration", "operator changed network configuration using sethostname"},
+		{"rhel8.audit", "change_time", "operator changed system time using settimeofday"},
+		{"rhel9.audit", "change_mac_policy", "operator changed mandatory access control policy at /etc/selinux/targeted/contexts/files/file_contexts.local"},
+		{"oracle8.audit", "change_privilege_scope", "operator changed sudo privilege scope at /etc/sudoers.d/operators"},
+		{"oracle9.audit", "load_kernel_module", "operator loaded a kernel module from /lib/modules/example.ko using finit_module"},
 	}
 
 	for _, test := range tests {

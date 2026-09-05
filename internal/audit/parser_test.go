@@ -35,7 +35,7 @@ func TestParseRecord(t *testing.T) {
 }
 
 func TestParseRecordPreservesRepeatedMessages(t *testing.T) {
-	line := `type=USER_AUTH msg=audit(1721721601.456:43): pid=300 uid=0 auid=1000 msg='op=PAM:authentication acct="mario" terminal=ssh res=failed'`
+	line := `type=USER_AUTH msg=audit(1721721601.456:43): pid=300 uid=0 auid=1000 msg='op=PAM:authentication acct="operator" terminal=ssh res=failed'`
 
 	record := mustParseRecord(t, line)
 	if record.ID != "1721721601.456:43" {
@@ -47,13 +47,13 @@ func TestParseRecordPreservesRepeatedMessages(t *testing.T) {
 	if record.Fields["msg"] != "audit(1721721601.456:43):" {
 		t.Fatalf("first msg = %q", record.Fields["msg"])
 	}
-	if record.EmbeddedFields["acct"] != "mario" || record.EmbeddedFields["res"] != "failed" {
+	if record.EmbeddedFields["acct"] != "operator" || record.EmbeddedFields["res"] != "failed" {
 		t.Fatalf("embedded fields = %#v", record.EmbeddedFields)
 	}
 }
 
 func TestParseRecordHandlesUserMarkerAndEmbeddedMessage(t *testing.T) {
-	line := `type=USER_LOGIN msg=audit(1721721601.456:44): user pid=8859 uid=0 auid=1000 ses=6158 msg='op=login acct="mario" exe="/usr/sbin/sshd" hostname=? addr=192.0.2.4 terminal=ssh res=failed'`
+	line := `type=USER_LOGIN msg=audit(1721721601.456:44): user pid=8859 uid=0 auid=1000 ses=6158 msg='op=login acct="operator" exe="/usr/sbin/sshd" hostname=? addr=192.0.2.4 terminal=ssh res=failed'`
 	record := mustParseRecord(t, line)
 	if record.Type != "USER_LOGIN" || record.Fields["pid"] != "8859" {
 		t.Fatalf("record = %#v", record)
@@ -217,7 +217,7 @@ func TestAssemblerEmitsKnownSingleRecordType(t *testing.T) {
 
 func TestAssemblerEmitsUserSpaceSecurityRecordImmediately(t *testing.T) {
 	assembler := NewAssembler(2 * time.Second)
-	record := mustParseRecord(t, `type=USER_AUTH msg=audit(1721721625.000:63): pid=300 uid=0 auid=1000 msg='op=PAM:authentication acct="mario" res=success'`)
+	record := mustParseRecord(t, `type=USER_AUTH msg=audit(1721721625.000:63): pid=300 uid=0 auid=1000 msg='op=PAM:authentication acct="operator" res=success'`)
 
 	events := assembler.Add(record)
 	if len(events) != 1 || !events[0].Complete || events[0].Completion != CompletionSingleRecord {

@@ -4,7 +4,7 @@
 
 audit2json converts Linux Audit streams into canonical newline-delimited JSON. The core understands Linux Audit semantics but does not understand Splunk CIM, Sentinel ASIM, Elastic ECS, or any other backend schema.
 
-The milestone v0.7 branch adds strict operational configuration and a structured health surface to the versioned checkpoint and rotation model.
+The implementation combines strict operational configuration and a structured health surface with the versioned checkpoint and rotation model.
 
 ## Target data flow
 

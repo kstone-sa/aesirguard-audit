@@ -57,7 +57,7 @@ func TestClassifyCanonicalEventCoversCISAuditFamilies(t *testing.T) {
 		},
 		{
 			name:     "login record",
-			event:    CanonicalEvent{Rule: &CanonicalRule{Keys: []string{"logins"}}, Paths: []CanonicalPath{{Name: "/run/faillock/mario"}}},
+			event:    CanonicalEvent{Rule: &CanonicalRule{Keys: []string{"logins"}}, Paths: []CanonicalPath{{Name: "/run/faillock/operator"}}},
 			category: "authentication", action: "update_login_record",
 		},
 		{

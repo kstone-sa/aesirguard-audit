@@ -54,7 +54,7 @@ func TestRunFlushesIncompleteEventsInInputOrder(t *testing.T) {
 
 func TestRunOptionallyRendersMessage(t *testing.T) {
 	input := strings.Join([]string{
-		`type=SYSCALL msg=audit(1721721700.000:80): auid=1000 euid=0 pid=10 exe="/usr/bin/sudo" AUID="mario" EUID="root"`,
+		`type=SYSCALL msg=audit(1721721700.000:80): auid=1000 euid=0 pid=10 exe="/usr/bin/sudo" AUID="operator" EUID="root"`,
 		`type=EXECVE msg=audit(1721721700.000:80): argc=2 a0="sudo" a1="id"`,
 		`type=EOE msg=audit(1721721700.000:80):`,
 	}, "\n")
@@ -68,7 +68,7 @@ func TestRunOptionallyRendersMessage(t *testing.T) {
 	if err := json.NewDecoder(&stdout).Decode(&event); err != nil {
 		t.Fatal(err)
 	}
-	if event.Message != "mario attempted to execute /usr/bin/sudo as root with arguments: id" || event.Renderer != audit.HumanRendererVersion {
+	if event.Message != "operator attempted to execute /usr/bin/sudo as root with arguments: id" || event.Renderer != audit.HumanRendererVersion {
 		t.Fatalf("rendered event = %#v", event)
 	}
 }
@@ -117,7 +117,7 @@ func TestRunFollowerStreamsAppendedEventAndStops(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, err = file.WriteString(strings.Join([]string{
-		`type=SYSCALL msg=audit(1721721800.000:90): success=yes auid=1000 AUID="mario"`,
+		`type=SYSCALL msg=audit(1721721800.000:90): success=yes auid=1000 AUID="operator"`,
 		`type=EOE msg=audit(1721721800.000:90):`,
 	}, "\n") + "\n")
 	if closeErr := file.Close(); err == nil {

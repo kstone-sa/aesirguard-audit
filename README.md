@@ -8,9 +8,11 @@ It is a persistent, low-latency collector that follows the audit log, assembles 
 
 This project was designed and developed by Kstone SA with assistance from OpenAI Codex. AI-assisted changes were reviewed, tested, and accepted by the maintainer, who retains responsibility for the project’s architecture, security, quality, and licensing compliance.
 
-## Current status
+## Release status
 
-The v1.0 implementation is feature-complete and is being held as a release candidate until empirical validation milestone 8B is complete. It provides the canonical converter, CIS-oriented and broader security-event classification, checkpointed rotation-aware collection, synthetic hardening, secure filesystem boundaries, and versioned Linux release packaging. The project can:
+The v1.0 implementation is feature-complete but has not been released. Empirical validation against real Linux Audit output is still pending; see [Compatibility](docs/compatibility.md). Until that work is complete, distro-labelled fixtures are synthetic regression data rather than compatibility certification.
+
+The release candidate provides:
 
 - read stdin or one existing file;
 - preserve ordered and repeated Audit fields;
@@ -42,7 +44,7 @@ The v1.0 implementation is feature-complete and is being held as a release candi
 - run bounded fuzz campaigns and a reproducible end-to-end pipeline benchmark in CI.
 - reject unsafe configuration and managed-output filesystem targets;
 - report embedded build version, commit, and date metadata;
-- produce reproducible standalone and systemd Linux amd64/arm64 release archives with SHA-256 checksums.
+- produce reproducible Linux amd64/arm64 release archives with SHA-256 checksums.
 
 Batch mode still exits at EOF. Follow mode waits at EOF, recovers through retained uncompressed generations, and follows rename/create rotation. Compressed historical logs are not decoded; if the checkpoint inode is no longer available as an uncompressed file, startup fails explicitly.
 
@@ -63,8 +65,6 @@ See `ROADMAP.md` for delivery order, `docs/performance.md` for the synthetic val
 
 Guaranteed CIS semantic rendering assumes `auditd` is configured with `log_format=ENRICHED`. RAW records remain accepted with explicit numeric fallbacks, but classification may be less specific when only architecture-dependent syscall numbers are available.
 
-The existing distro-labelled fixtures are synthetic representatives. Empirical validation with captured and sanitized Audit output from Debian, Ubuntu, RHEL, and Oracle Linux is milestone v0.8B and has not yet been completed.
-
 ## Target runtime model
 
 ```text
@@ -79,12 +79,12 @@ audit.log
 
 Stdout is the default sink for consumers such as a Splunk scripted input. An append-only managed file sink is available for file-monitoring agents and other SIEMs. Backend-specific parsing, data-model mapping, tags, aliases, and dashboards are outside this repository.
 
-## Install
+## Installation
 
-Tagged releases provide two archives per Linux architecture:
+Tagged releases will provide two independent archives per Linux architecture:
 
-- `*_standalone.tar.gz` contains the static binary, example configuration, JSON Schema, license, README, and documentation. It makes no service-manager assumption.
-- `*_systemd.tar.gz` contains the same files plus the systemd unit, sysusers, and tmpfiles examples.
+- `*_standalone.tar.gz` is the portable package. It contains the static binary, example configuration, JSON Schema, license, changelog, and documentation. It makes no service-manager assumption and is the appropriate artifact for Splunk, containers, schedulers, and custom supervisors.
+- `*_systemd.tar.gz` is the optional host-service package. It contains the standalone payload plus a hardened systemd unit and its sysusers/tmpfiles definitions.
 
 Verify the selected archive using `SHA256SUMS`, extract it, and run:
 
@@ -93,7 +93,7 @@ Verify the selected archive using `SHA256SUMS`, extract it, and run:
 ./audit2json --config configs/audit2json.example.json --check-config
 ```
 
-See `docs/runbook.md` for system installation and least-privilege guidance.
+See `docs/runbook.md` for standalone and systemd installation instructions and least-privilege guidance. The supplied service is a deployment option, not a requirement of audit2json.
 
 ## Build from source
 
@@ -201,7 +201,7 @@ cmd/audit2json/      command-line program
 internal/audit/      current parser and event builder
 data/                embedded static mapping data
 configs/             example operational configuration
-packaging/systemd/   service, sysusers, and tmpfiles examples
+packaging/systemd/   optional host-service deployment files
 schema/              machine-readable canonical event contract
 scripts/             release packaging automation
 docs/                architecture, schema, reliability, and development guidance

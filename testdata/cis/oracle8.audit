@@ -1,3 +1,3 @@
-type=SYSCALL msg=audit(1721722006.000:106): arch=c000003e syscall=257 success=yes exit=0 auid=1000 uid=1000 euid=1000 pid=1006 ppid=900 comm="visudo" exe="/usr/sbin/visudo" key="scope" ARCH=x86_64 SYSCALL=openat AUID="mario" UID="mario" EUID="mario"
+type=SYSCALL msg=audit(1721722006.000:106): arch=c000003e syscall=257 success=yes exit=0 auid=1000 uid=1000 euid=1000 pid=1006 ppid=900 comm="visudo" exe="/usr/sbin/visudo" key="scope" ARCH=x86_64 SYSCALL=openat AUID="operator" UID="operator" EUID="operator"
 type=PATH msg=audit(1721722006.000:106): item=0 name="/etc/sudoers.d/operators" nametype=NORMAL ouid=0 ogid=0 OUID="root" OGID="root"
 type=EOE msg=audit(1721722006.000:106):
