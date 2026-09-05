@@ -27,6 +27,8 @@ jobs:
           source_date_epoch="$(git show -s --format=%ct "${GITHUB_SHA}")"
           ./scripts/package-release.sh \
             "${GITHUB_REF_NAME}" "${GITHUB_SHA}" "${source_date_epoch}" dist
+      - name: Verify release archives
+        run: ./scripts/verify-release.sh dist "${GITHUB_REF_NAME}"
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}

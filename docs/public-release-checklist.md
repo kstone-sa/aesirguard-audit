@@ -7,6 +7,7 @@ This is the authoritative operational gate for making the repository public and 
 - [x] Freeze canonical schema v1.0 and publish a machine-readable JSON Schema.
 - [x] Separate standalone archives from optional systemd deployment bundles.
 - [x] Make release archive metadata reproducible from the tagged commit.
+- [x] Verify complete package checksums, contents, binary startup, and configuration before release publication.
 - [x] Add contribution, security, changelog, compatibility, release, and operations guidance.
 - [x] Remove stale development-branch wording and obsolete diagnostic workflow configuration.
 - [x] Scan the current tree, pull requests, review comments, commit metadata, and failed workflow logs for credentials, private infrastructure, customer data, and obsolete repository-owner links.
@@ -22,6 +23,9 @@ This is the authoritative operational gate for making the repository public and 
 - [ ] Set the public repository description, topics, and homepage as appropriate.
 - [ ] Obtain explicit maintainer approval to change visibility.
 - [ ] Create and verify the annotated v1.0 tag only from the approved `main` commit.
-- [ ] Download both package variants, verify `SHA256SUMS`, inspect their contents, and smoke-test the amd64 binary and example configuration.
+
+## Mandatory after tagging, before promotion
+
+- [ ] Download both package variants and `SHA256SUMS` from the GitHub release and verify the published files independently.
 
 History rewriting, deletion of review records, and repository visibility changes are never implicit parts of this checklist. They require an explicit, separately reviewed maintainer decision.
