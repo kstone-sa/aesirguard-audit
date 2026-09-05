@@ -34,7 +34,7 @@ for arch in amd64 arm64; do
     -ldflags="-s -w -X main.version=${version} -X main.commit=${commit} -X main.buildDate=${build_date}" \
     -o "${output_directory}/${standalone}/audit2json" ./cmd/audit2json
 
-  cp LICENSE README.md "${output_directory}/${standalone}/"
+  cp LICENSE README.md CHANGELOG.md CONTRIBUTING.md SECURITY.md "${output_directory}/${standalone}/"
   cp configs/audit2json.example.json "${output_directory}/${standalone}/configs/"
   cp -R docs schema "${output_directory}/${standalone}/"
 
@@ -46,6 +46,7 @@ for arch in amd64 arm64; do
   test -f "${output_directory}/${standalone}/configs/audit2json.example.json"
   test -f "${output_directory}/${standalone}/schema/audit2json-v1.schema.json"
   test -f "${output_directory}/${systemd}/packaging/systemd/audit2json.service"
+  test -f "${output_directory}/${systemd}/packaging/systemd/README.md"
 
   find "${output_directory}/${standalone}" "${output_directory}/${systemd}" \
     -type d -exec chmod 0755 {} +

@@ -77,11 +77,11 @@ func TestBuildCanonicalEventMarksOnlyIncompleteBoundaries(t *testing.T) {
 }
 
 func TestBuildCanonicalEventCollapsesEqualEnrichedUsers(t *testing.T) {
-	record := mustParseRecord(t, `type=SYSCALL msg=audit(1721721601.456:43): auid=1000 uid=1000 euid=1000 AUID="mario" UID="mario" EUID="mario"`)
+	record := mustParseRecord(t, `type=SYSCALL msg=audit(1721721601.456:43): auid=1000 uid=1000 euid=1000 AUID="operator" UID="operator" EUID="operator"`)
 	assembled := AssembledEvent{ID: record.ID, Records: []Record{record}, Complete: true, Completion: CompletionEOE}
 
 	got := BuildCanonicalEvent(assembled, CanonicalOptions{})
-	if got.Actor == nil || got.Actor.User != "mario" || got.Actor.UserID != "" {
+	if got.Actor == nil || got.Actor.User != "operator" || got.Actor.UserID != "" {
 		t.Fatalf("actor = %#v", got.Actor)
 	}
 	if got.Process != nil {
@@ -215,7 +215,7 @@ func TestBuildCanonicalEventEmitsSourceOnlyWhenConfigured(t *testing.T) {
 }
 
 func TestBuildCanonicalAuthenticationEvent(t *testing.T) {
-	record := mustParseRecord(t, `type=USER_AUTH msg=audit(1721721700.000:90): user pid=300 uid=0 auid=1000 AUID="mario" UID="root" msg='op=PAM:authentication acct="alice" exe="/usr/bin/sudo" hostname=? addr=192.0.2.10 terminal=/dev/pts/0 res=failed'`)
+	record := mustParseRecord(t, `type=USER_AUTH msg=audit(1721721700.000:90): user pid=300 uid=0 auid=1000 AUID="operator" UID="root" msg='op=PAM:authentication acct="alice" exe="/usr/bin/sudo" hostname=? addr=192.0.2.10 terminal=/dev/pts/0 res=failed'`)
 	got := WithHumanMessage(BuildCanonicalEvent(AssembledEvent{
 		ID: record.ID, Records: []Record{record}, Complete: true, Completion: CompletionSingleRecord,
 	}, CanonicalOptions{}))
@@ -231,7 +231,7 @@ func TestBuildCanonicalAuthenticationEvent(t *testing.T) {
 	if got.Security != nil {
 		t.Fatalf("irrelevant security context = %#v", got.Security)
 	}
-	want := "mario failed to authenticate for account alice from 192.0.2.10 via /dev/pts/0 during PAM:authentication"
+	want := "operator failed to authenticate for account alice from 192.0.2.10 via /dev/pts/0 during PAM:authentication"
 	if got.Message != want {
 		t.Fatalf("message = %q, want %q", got.Message, want)
 	}
@@ -239,7 +239,7 @@ func TestBuildCanonicalAuthenticationEvent(t *testing.T) {
 
 func TestBuildCanonicalAVCEventPreservesDecisionContext(t *testing.T) {
 	avc := mustParseRecord(t, `type=AVC msg=audit(1721721700.000:91): avc: denied { read write } for pid=3912 comm="cat" name="shadow" scontext=staff_u:staff_r:staff_t:s0 tcontext=system_u:object_r:shadow_t:s0 tclass=file permissive=0`)
-	syscall := mustParseRecord(t, `type=SYSCALL msg=audit(1721721700.000:91): arch=c000003e syscall=257 success=no exit=-13 auid=1000 AUID="mario" SYSCALL="openat"`)
+	syscall := mustParseRecord(t, `type=SYSCALL msg=audit(1721721700.000:91): arch=c000003e syscall=257 success=no exit=-13 auid=1000 AUID="operator" SYSCALL="openat"`)
 	got := WithHumanMessage(BuildCanonicalEvent(AssembledEvent{
 		ID: avc.ID, Records: []Record{syscall, avc}, Complete: true, Completion: CompletionEOE,
 	}, CanonicalOptions{}))
@@ -255,7 +255,7 @@ func TestBuildCanonicalAVCEventPreservesDecisionContext(t *testing.T) {
 	if len(got.Event.Issues) != 0 {
 		t.Fatalf("issues = %#v", got.Event.Issues)
 	}
-	want := "mario was denied access by mandatory access-control policy for read, write on shadow"
+	want := "operator was denied access by mandatory access-control policy for read, write on shadow"
 	if got.Message != want {
 		t.Fatalf("message = %q, want %q", got.Message, want)
 	}

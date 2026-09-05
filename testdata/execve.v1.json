@@ -14,7 +14,7 @@
     "keys": ["privileged"]
   },
   "actor": {
-    "user": "mario"
+    "user": "operator"
   },
   "process": {
     "pid": "200",
@@ -24,7 +24,7 @@
     "name": "sudo",
     "executable": "/usr/bin/sudo",
     "argv": ["sudo", "cat", "--", "/etc/shadow"],
-    "cwd": "/home/mario",
+    "cwd": "/home/operator",
     "tty": "pts0",
     "syscall": "execve",
     "return_value": "0"
@@ -47,6 +47,6 @@
       }
     }
   ],
-  "message": "mario executed /usr/bin/sudo as root with arguments: cat -- /etc/shadow",
+  "message": "operator executed /usr/bin/sudo as root with arguments: cat -- /etc/shadow",
   "renderer_version": "3"
 }
