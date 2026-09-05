@@ -33,4 +33,4 @@ For compound events, a mapped security record such as `AVC` becomes the primary 
 
 `SOCKADDR` binary address decoding, packet-level Netfilter records, IPC/message queues, virtualization, cryptographic/IPsec lifecycle, and TTY keystroke payloads are not normalized in this pass. They need dedicated typed objects and privacy/volume decisions; treating them as generic names or copying their raw fields would create a misleading contract.
 
-These mappings are based on upstream Linux Audit record definitions and synthetic regression fixtures. Empirical RAW and ENRICHED validation on Debian, Ubuntu, RHEL, and Oracle Linux remains milestone v0.8B and is not claimed by this document.
+These mappings are based on upstream Linux Audit record definitions and synthetic regression fixtures. Empirical RAW and ENRICHED validation on Debian, Ubuntu, RHEL, and Oracle Linux has not yet been completed and is not claimed by this document.

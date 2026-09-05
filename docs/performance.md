@@ -2,7 +2,7 @@
 
 ## Scope
 
-Milestone v0.8A measures and stresses the in-process parser, assembler, canonical normalizer, optional renderer, JSON encoding, sinks, checkpoints, and rotating follower. It is designed to expose correctness failures before optimization.
+The automated regression suite measures and stresses the in-process parser, assembler, canonical normalizer, optional renderer, JSON encoding, sinks, checkpoints, and rotating follower. It is designed to expose correctness failures before optimization.
 
 The benchmark is not a capacity promise for a production host. Filesystem, kernel, audit backlog, pipe consumer, storage durability, and SIEM ingestion behavior remain deployment variables.
 
@@ -40,4 +40,4 @@ Generated profiles are local artifacts and must not be committed.
 
 ## Deliberate limitation
 
-Synthetic records cannot prove that a distribution emits the assumed field names, record families, ordering, or ENRICHED interpretations. Milestone v0.8B requires sanitized captures from the exact supported distribution, kernel, auditd, and CIS rule versions. Its completion remains explicitly pending.
+Synthetic records cannot prove that a distribution emits the assumed field names, record families, ordering, or ENRICHED interpretations. Compatibility validation therefore requires controlled local tests against the exact target distribution, kernel, auditd, and CIS rule versions. That empirical testing has not yet been completed.

@@ -15,7 +15,7 @@ This is the authoritative operational gate for making the repository public and 
 
 ## Mandatory before visibility change or v1.0 tag
 
-- [ ] Complete empirical milestone 8B using sanitized real RAW and ENRICHED events for every distribution in `docs/compatibility.md`.
+- [ ] Complete controlled local testing with real RAW and ENRICHED events for every distribution in `docs/compatibility.md`.
 - [ ] Record tested distribution, kernel, auditd, audit rules, and rotation behavior without committing identifying data.
 - [ ] Convert confirmed variations into sanitized regression fixtures and rerun the full CI suite.
 - [ ] Review all remaining GitHub Actions logs and downloadable artifacts for sensitive data immediately before publication.

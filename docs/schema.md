@@ -77,7 +77,7 @@ Unknown result values and unsupported record families are reported explicitly wi
 
 ## Identity handling
 
-Audit `log_format=ENRICHED` is required for the guaranteed CIS renderer coverage. ENRICHED names are preferred because they represent the account resolution performed when auditd wrote the event.
+Audit `log_format=ENRICHED` is required for the targeted CIS renderer behavior. ENRICHED names are preferred because they represent the account resolution performed when auditd wrote the event. Distribution-specific compatibility has not yet been empirically validated.
 
 RAW input remains accepted. When an interpreted name is unavailable, the raw numeric identifier is emitted in a separate `*_id` field. A numeric value is never placed in a name field. Classification may be less specific when RAW input exposes only architecture-dependent syscall numbers.
 

@@ -62,13 +62,13 @@ The assembler must use bounded state and report incomplete events explicitly.
 
 ### Normalizer and classifier
 
-Decodes Linux-specific values and produces a stable canonical event. Examples include architecture, syscall, errno, result, permissions, capabilities, socket families, and event-family classification.
+Decodes supported Linux-specific values and produces a stable canonical event. Current examples include named syscalls from ENRICHED records, numeric syscall and architecture fallbacks for RAW records, results, file capabilities, identities, mandatory access-control evidence, and event-family classification.
 
 The canonical model is SIEM-agnostic. A local audit rule key is preserved as metadata and must not become the portable event type.
 
 ### Human renderer
 
-Optionally derives a deterministic analyst-readable message from normalized fields. Renderer version 3 covers the supported CIS Linux Audit families and the explicitly mapped security-event families. The message is not authoritative, must not replace structured fields, and may be disabled to minimize output volume.
+Optionally derives a deterministic analyst-readable message from normalized fields. Renderer version 3 covers the targeted CIS Linux Audit families and the explicitly mapped security-event families. Distribution-specific behavior remains subject to empirical validation. The message is not authoritative, must not replace structured fields, and may be disabled to minimize output volume.
 
 Security conclusions such as privilege escalation or credential theft belong to backend detections, not to this renderer.
 

@@ -17,5 +17,5 @@ All notable changes will be documented in this file. The project has not yet pub
 
 ### Release gates
 
-- Empirical milestone 8B validation on sanitized real Audit output remains pending.
+- Empirical validation against controlled real RAW and ENRICHED Audit output on the documented distribution matrix remains pending.
 - The repository remains private and no v1.0 tag has been created pending explicit maintainer approval.

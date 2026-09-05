@@ -3,7 +3,7 @@
 ## Prepare
 
 1. Confirm that CI passes on `main` and that the documented compatibility claims match completed validation.
-2. Update release notes and the roadmap without promoting milestone 8B synthetic fixtures to empirical support.
+2. Update release notes and the roadmap without presenting synthetic fixtures as empirical distribution support.
 3. Run `go test ./...`, `go test -race ./...`, `go vet ./...`, and formatting checks.
 4. Complete every mandatory pre-tag item in `docs/public-release-checklist.md`.
 5. Create an annotated semantic-version tag from the reviewed `main` commit.

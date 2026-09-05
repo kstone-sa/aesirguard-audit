@@ -20,7 +20,7 @@ Inspect additional files only when an observed dependency requires them.
 
 ## Status guardrail
 
-The v1.0 implementation is feature-complete but not released. Empirical validation against real audit output from every supported distribution is milestone v0.8B and remains incomplete. Never describe synthetic fixtures as verified distro coverage, and do not create a stable tag or change repository visibility without explicit maintainer approval.
+The v1.0 implementation is feature-complete but not released. Compatibility with real RAW and ENRICHED Audit output on each listed distribution has not yet been empirically validated. Never describe synthetic fixtures as verified distribution coverage, and do not create a stable tag or change repository visibility without explicit maintainer approval.
 
 ## Design rules
 

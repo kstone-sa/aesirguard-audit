@@ -10,10 +10,10 @@ The parser accepts Linux Audit RAW and ENRICHED records. ENRICHED input is recom
 
 | Distribution | Intended scope | Empirical status |
 |---|---|---|
-| Debian 12 and 13 | CIS Server Level 1 and 2 | Pending milestone 8B |
-| Ubuntu 22.04 and 24.04 | CIS Server Level 1 and 2 | Pending milestone 8B |
-| RHEL 8 and 9 | CIS Server Level 1 and 2 | Pending milestone 8B |
-| Oracle Linux 8 and 9 | CIS Server Level 1 and 2 | Pending milestone 8B |
+| Debian 12 and 13 | CIS Server Level 1 and 2 | Not yet empirically validated |
+| Ubuntu 22.04 and 24.04 | CIS Server Level 1 and 2 | Not yet empirically validated |
+| RHEL 8 and 9 | CIS Server Level 1 and 2 | Not yet empirically validated |
+| Oracle Linux 8 and 9 | CIS Server Level 1 and 2 | Not yet empirically validated |
 
 The distro-labelled fixtures are synthetic representatives. They verify deterministic parser and renderer behavior, not compatibility with every auditd and kernel combination.
 
