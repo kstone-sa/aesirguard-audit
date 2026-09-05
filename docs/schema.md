@@ -127,7 +127,7 @@ The renderer:
 - quotes ambiguous arguments;
 - omits itself for unsupported event families.
 
-Renderer version `3` covers the Linux Audit activity families selected by the supported CIS Server L1+L2 baselines plus the security-event families in `security-event-coverage.md`. Process execution messages require a named `execve`/`execveat` syscall or reconstructed `argv`; merely having an executable path is not treated as execution evidence.
+Renderer version `3` covers the Linux Audit activity families selected by the targeted CIS Server L1+L2 profiles plus the security-event families in `security-event-coverage.md`. Process execution messages require a named `execve`/`execveat` syscall or reconstructed `argv`; merely having an executable path is not treated as execution evidence.
 
 Classification uses reconstructed execution evidence, normalized syscall and outcome, normalized rule keys, and conservatively matched paths. Rule keys are locally configurable and therefore are not the sole contract. A security-relevant path is accepted without a recognized key only when the syscall itself proves a mutation. See `cis-coverage.md` for the supported baseline and family matrix.
 
