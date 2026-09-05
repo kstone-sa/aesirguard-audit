@@ -47,6 +47,14 @@ for arch in amd64 arm64; do
   test -f "${output_directory}/${standalone}/schema/audit2json-v1.schema.json"
   test -f "${output_directory}/${systemd}/packaging/systemd/audit2json.service"
 
+  find "${output_directory}/${standalone}" "${output_directory}/${systemd}" \
+    -type d -exec chmod 0755 {} +
+  find "${output_directory}/${standalone}" "${output_directory}/${systemd}" \
+    -type f -exec chmod 0644 {} +
+  chmod 0755 \
+    "${output_directory}/${standalone}/audit2json" \
+    "${output_directory}/${systemd}/audit2json"
+
   tar --sort=name --mtime="@${source_date_epoch}" --owner=0 --group=0 --numeric-owner \
     -C "$output_directory" -cf - "$standalone" | gzip -n > "${output_directory}/${standalone}.tar.gz"
   tar --sort=name --mtime="@${source_date_epoch}" --owner=0 --group=0 --numeric-owner \
