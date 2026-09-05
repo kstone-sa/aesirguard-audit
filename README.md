@@ -1,8 +1,10 @@
 # audit2json
 
-audit2json converts Linux Audit records into compact, canonical newline-delimited JSON.
+audit2json turns raw Linux Audit data into compact, security-oriented events for detection engineering, threat hunting, incident investigation, and compliance monitoring.
 
-It is a persistent, low-latency collector that follows the audit log, assembles multi-record audit events, normalizes Linux-specific values, and writes events to stdout or an append-only file. Its output schema is independent from Splunk CIM, Microsoft Sentinel ASIM, Elastic ECS, and other backend models.
+Linux Audit provides rich forensic evidence, but emits fragmented, kernel-centric records whose security meaning is expensive to reconstruct downstream. audit2json follows the audit stream, correlates multi-record events, preserves relevant evidence, and normalizes process execution, file activity, authentication, account and session changes, privilege use, audit tampering, mandatory access-control decisions, integrity events, and selected kernel-security activity into a stable canonical JSON schema.
+
+The project is deliberately backend-agnostic. Splunk, Microsoft Sentinel, Elastic, and other analytics platforms are consumers of its output; their data models do not define audit2json's security semantics.
 
 ## AI-assisted development
 
