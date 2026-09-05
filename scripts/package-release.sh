@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 set -euo pipefail
+umask 022
 
 if [ "$#" -ne 4 ]; then
   echo "usage: $0 VERSION COMMIT SOURCE_DATE_EPOCH OUTPUT_DIRECTORY" >&2

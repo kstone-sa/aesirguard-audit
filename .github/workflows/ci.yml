@@ -34,8 +34,11 @@ jobs:
         run: |
           set -euo pipefail
           dist="${RUNNER_TEMP}/audit2json-dist"
+          restrictive_dist="${RUNNER_TEMP}/audit2json-dist-restrictive-umask"
           source_date_epoch="$(git show -s --format=%ct "${GITHUB_SHA}")"
           ./scripts/package-release.sh ci "${GITHUB_SHA}" "${source_date_epoch}" "$dist"
+          (umask 077 && ./scripts/package-release.sh ci "${GITHUB_SHA}" "${source_date_epoch}" "$restrictive_dist")
+          cmp "$dist/SHA256SUMS" "$restrictive_dist/SHA256SUMS"
           test "$(find "$dist" -maxdepth 1 -name '*_standalone.tar.gz' | wc -l)" -eq 2
           test "$(find "$dist" -maxdepth 1 -name '*_systemd.tar.gz' | wc -l)" -eq 2
           tar -tzf "$dist/audit2json_ci_linux_amd64_standalone.tar.gz" | grep '/audit2json$' >/dev/null
