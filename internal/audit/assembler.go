@@ -315,5 +315,9 @@ func auditTimeFromID(id string) (time.Time, bool) {
 			return time.Time{}, false
 		}
 	}
-	return time.Unix(seconds, nanoseconds).UTC(), true
+	timestampValue := time.Unix(seconds, nanoseconds).UTC()
+	if year := timestampValue.Year(); year < 0 || year > 9999 {
+		return time.Time{}, false
+	}
+	return timestampValue, true
 }

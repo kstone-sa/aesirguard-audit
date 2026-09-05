@@ -1,0 +1,173 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/kstone-sa/audit2json/main/schema/audit2json-v1.schema.json",
+  "title": "audit2json canonical event v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "audit", "event"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "audit": {"$ref": "#/$defs/audit"},
+    "source": {"$ref": "#/$defs/source"},
+    "event": {"$ref": "#/$defs/event"},
+    "rule": {"$ref": "#/$defs/rule"},
+    "actor": {"$ref": "#/$defs/identity"},
+    "process": {"$ref": "#/$defs/process"},
+    "target": {"$ref": "#/$defs/target"},
+    "origin": {"$ref": "#/$defs/origin"},
+    "security": {"$ref": "#/$defs/security"},
+    "paths": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/path"}
+    },
+    "message": {"type": "string"},
+    "renderer_version": {"type": "string"}
+  },
+  "$defs": {
+    "audit": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string"},
+        "time": {"type": "string", "format": "date-time"},
+        "raw": {"type": "string"}
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["host"],
+      "properties": {"host": {"type": "string"}}
+    },
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": {"type": "string"},
+        "category": {"type": "string"},
+        "action": {"type": "string"},
+        "original_action": {"type": "string"},
+        "success": {"type": "boolean"},
+        "integrity": {"$ref": "#/$defs/integrity"},
+        "issues": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/$defs/issue"}
+        }
+      }
+    },
+    "integrity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "reason"],
+      "properties": {
+        "state": {"const": "incomplete"},
+        "reason": {"enum": ["watermark", "timeout", "eof", "shutdown"]}
+      }
+    },
+    "issue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code"],
+      "properties": {
+        "code": {"type": "string"},
+        "record_type": {"type": "string"},
+        "field": {"type": "string"},
+        "value": {"type": "string"}
+      }
+    },
+    "rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["keys"],
+      "properties": {
+        "keys": {"type": "array", "minItems": 1, "items": {"type": "string"}}
+      }
+    },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "user": {"type": "string"},
+        "user_id": {"type": "string"}
+      }
+    },
+    "process": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "pid": {"type": "string"},
+        "ppid": {"type": "string"},
+        "user": {"type": "string"},
+        "user_id": {"type": "string"},
+        "real_user": {"type": "string"},
+        "real_user_id": {"type": "string"},
+        "name": {"type": "string"},
+        "executable": {"type": "string"},
+        "argv": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "cwd": {"type": "string"},
+        "tty": {"type": "string"},
+        "architecture_code": {"type": "string"},
+        "syscall": {"type": "string"},
+        "syscall_number": {"type": "string"},
+        "return_value": {"type": "string"}
+      }
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "user": {"type": "string"},
+        "user_id": {"type": "string"},
+        "service": {"type": "string"},
+        "name": {"type": "string"}
+      }
+    },
+    "origin": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "address": {"type": "string"},
+        "host": {"type": "string"},
+        "terminal": {"type": "string"}
+      }
+    },
+    "security": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "decision": {"type": "string"},
+        "permissions": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "subject_context": {"type": "string"},
+        "target_context": {"type": "string"},
+        "target_class": {"type": "string"},
+        "profile": {"type": "string"},
+        "permissive": {"type": "boolean"}
+      }
+    },
+    "path": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {"type": "string"},
+        "name_type": {"type": "string"},
+        "owner": {"type": "string"},
+        "owner_id": {"type": "string"},
+        "group": {"type": "string"},
+        "group_id": {"type": "string"},
+        "capabilities": {"$ref": "#/$defs/capabilities"}
+      }
+    },
+    "capabilities": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "permitted": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "inheritable": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "effective": {"type": "boolean"}
+      }
+    }
+  }
+}

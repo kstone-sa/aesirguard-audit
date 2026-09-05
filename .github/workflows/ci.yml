@@ -30,13 +30,17 @@ jobs:
         run: go test -race ./...
       - name: Run vet
         run: go vet ./...
-      - name: Build release targets
+      - name: Build and inspect release packages
         run: |
-          for arch in amd64 arm64; do
-            CGO_ENABLED=0 GOOS=linux GOARCH="${arch}" go build -trimpath \
-              -ldflags="-s -w -X main.version=ci -X main.commit=${GITHUB_SHA} -X main.buildDate=ci" \
-              -o "${RUNNER_TEMP}/audit2json-${arch}" ./cmd/audit2json
-          done
+          set -euo pipefail
+          dist="${RUNNER_TEMP}/audit2json-dist"
+          restrictive_dist="${RUNNER_TEMP}/audit2json-dist-restrictive-umask"
+          source_date_epoch="$(git show -s --format=%ct "${GITHUB_SHA}")"
+          ./scripts/package-release.sh ci "${GITHUB_SHA}" "${source_date_epoch}" "$dist"
+          chmod -R go-rwx LICENSE README.md configs docs packaging schema
+          (umask 077 && ./scripts/package-release.sh ci "${GITHUB_SHA}" "${source_date_epoch}" "$restrictive_dist")
+          cmp "$dist/SHA256SUMS" "$restrictive_dist/SHA256SUMS"
+          ./scripts/verify-release.sh "$dist" ci
 
   synthetic:
     runs-on: ubuntu-latest

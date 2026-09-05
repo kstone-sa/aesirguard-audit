@@ -11,7 +11,7 @@ import (
 )
 
 // CanonicalSchemaVersion identifies the emitted canonical contract.
-const CanonicalSchemaVersion = "0.3"
+const CanonicalSchemaVersion = "1.0"
 
 // CanonicalOptions supplies optional source identity. Source metadata is
 // emitted only when explicitly configured by the caller.
@@ -19,7 +19,7 @@ type CanonicalOptions struct {
 	Host string
 }
 
-// CanonicalEvent is the SIEM-agnostic v0.3 event representation.
+// CanonicalEvent is the SIEM-agnostic v1 event representation.
 type CanonicalEvent struct {
 	SchemaVersion string             `json:"schema_version"`
 	Audit         CanonicalAudit     `json:"audit"`
@@ -167,7 +167,7 @@ type sourceIdentity struct {
 	id   string
 }
 
-// BuildCanonicalEvent converts one assembled logical event into schema v0.3.
+// BuildCanonicalEvent converts one assembled logical event into schema v1.
 func BuildCanonicalEvent(assembled AssembledEvent, options CanonicalOptions) CanonicalEvent {
 	event := CanonicalEvent{
 		SchemaVersion: CanonicalSchemaVersion,

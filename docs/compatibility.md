@@ -2,7 +2,7 @@
 
 ## Runtime
 
-audit2json is a Linux-only Go program. Tagged releases contain static `linux/amd64` and `linux/arm64` binaries. The source has no CGO or external runtime dependency.
+audit2json is a Linux-only Go program. Tagged releases contain static `linux/amd64` and `linux/arm64` binaries in standalone and systemd package variants. The standalone package has no service-manager assumption. The source has no CGO or external runtime dependency.
 
 The parser accepts Linux Audit RAW and ENRICHED records. ENRICHED input is recommended because user names and architecture-dependent syscall names are then available without host-local lookup.
 

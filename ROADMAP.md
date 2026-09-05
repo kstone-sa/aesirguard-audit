@@ -134,11 +134,11 @@ Deliverables:
 
 Rename-based rotation is required for the strongest lossless guarantee. Copytruncate support is best effort.
 
-The development branch implements retained uncompressed generation discovery, live rename/create drain and switch, cross-generation pending state, explicit fail-closed truncation detection, managed output reopen, and focused rotation tests. Automatic continuation after copytruncate is not presented as lossless and remains disabled.
+The implementation includes retained uncompressed generation discovery, live rename/create drain and switch, cross-generation pending state, explicit fail-closed truncation detection, managed output reopen, and focused rotation tests. Automatic continuation after copytruncate is not presented as lossless and remains disabled.
 
 ## v0.7 - Configuration and operations
 
-**Status: implemented on the development branch**
+**Status: implemented**
 
 Deliverables:
 
@@ -225,6 +225,8 @@ Implemented:
 
 ## v1.0 - Stable release
 
+**Status: implementation complete; release blocked on empirical milestone 8B and final maintainer approval**
+
 Requirements:
 
 - documented stable canonical schema;
@@ -233,6 +235,8 @@ Requirements:
 - bounded resource use under sustained load;
 - production packaging and operating guidance;
 - no backend-specific data model in the core.
+
+Implemented release preparation includes the frozen canonical v1 contract and JSON Schema, reproducible standalone and systemd packages, open-source contribution and security policies, and a public-release audit checklist. No v1.0 tag or stable distribution-support claim is made until the remaining gate is complete.
 
 ### Public release preparation
 
@@ -245,3 +249,5 @@ Before changing repository visibility to public:
 - review the entire Git history, issues, pull requests, workflow logs, artifacts, fixtures, and documentation for credentials, internal names, private infrastructure, customer data, and unsanitized audit records;
 - sanitize or remove sensitive material before publication;
 - require explicit maintainer approval before any history rewrite or repository visibility change.
+
+The tracked execution state for these checks is maintained in `docs/public-release-checklist.md`; this roadmap records policy rather than a second checklist.

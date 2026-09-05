@@ -30,7 +30,7 @@ func TestBuildCanonicalEventGolden(t *testing.T) {
 	}
 
 	got := WithHumanMessage(BuildCanonicalEvent(events[0], CanonicalOptions{}))
-	wantJSON, err := os.ReadFile("../../testdata/execve.v0.3.json")
+	wantJSON, err := os.ReadFile("../../testdata/execve.v1.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -41,6 +41,26 @@ func TestBuildCanonicalEventGolden(t *testing.T) {
 	if !reflect.DeepEqual(got, want) {
 		gotJSON, _ := json.MarshalIndent(got, "", "  ")
 		t.Fatalf("canonical event mismatch\n got: %s\nwant: %s", gotJSON, wantJSON)
+	}
+}
+
+func TestPublishedSchemaMatchesCanonicalVersion(t *testing.T) {
+	contents, err := os.ReadFile("../../schema/audit2json-v1.schema.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var document struct {
+		Properties struct {
+			SchemaVersion struct {
+				Const string `json:"const"`
+			} `json:"schema_version"`
+		} `json:"properties"`
+	}
+	if err := json.Unmarshal(contents, &document); err != nil {
+		t.Fatal(err)
+	}
+	if document.Properties.SchemaVersion.Const != CanonicalSchemaVersion {
+		t.Fatalf("published schema version = %q, canonical version = %q", document.Properties.SchemaVersion.Const, CanonicalSchemaVersion)
 	}
 }
 
@@ -102,6 +122,20 @@ func TestBuildCanonicalEventReportsInvalidAndUnsupportedInput(t *testing.T) {
 	}
 	if got.Source == nil || got.Source.Host != "override" {
 		t.Fatalf("source = %#v", got.Source)
+	}
+}
+
+func TestBuildCanonicalEventRejectsTimeOutsideRFC3339YearRange(t *testing.T) {
+	record := mustParseRecord(t, `type=SYSCALL msg=audit(253402300800.000:103): syscall=1`)
+	assembled := AssembledEvent{ID: record.ID, Records: []Record{record}, Complete: true, Completion: CompletionEOE}
+
+	got := BuildCanonicalEvent(assembled, CanonicalOptions{})
+	if got.Audit.Time != "" {
+		t.Fatalf("out-of-range audit time = %q", got.Audit.Time)
+	}
+	want := CanonicalIssue{Code: "invalid_audit_id", Field: "audit.id", Value: "253402300800.000:103"}
+	if len(got.Event.Issues) == 0 || !reflect.DeepEqual(got.Event.Issues[0], want) {
+		t.Fatalf("issues = %#v, want first issue %#v", got.Event.Issues, want)
 	}
 }
 

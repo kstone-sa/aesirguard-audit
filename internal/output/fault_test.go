@@ -21,7 +21,7 @@ func (writer *failingWriter) Write([]byte) (int, error) {
 func TestWriterSinkPropagatesConsumerFailure(t *testing.T) {
 	writer := &failingWriter{}
 	sink := NewWriterSink(writer)
-	err := sink.Write(audit.CanonicalEvent{SchemaVersion: "0.3"})
+	err := sink.Write(audit.CanonicalEvent{SchemaVersion: "1.0"})
 	if !errors.Is(err, errInjectedWriter) || writer.writes != 1 {
 		t.Fatalf("error=%v writes=%d", err, writer.writes)
 	}
