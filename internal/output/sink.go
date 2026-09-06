@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"syscall"
 
 	"github.com/kstone-sa/audit2json/internal/audit"
 	"github.com/kstone-sa/audit2json/internal/securefile"
@@ -24,6 +25,7 @@ type NDJSONSink struct {
 	file    *os.File
 	path    string
 	sync    bool
+	failed  error
 }
 
 // NewWriterSink creates a synchronous sink over a caller-owned writer.
@@ -48,7 +50,15 @@ func OpenFileSink(path string, syncEachWrite bool) (*NDJSONSink, error) {
 }
 
 // Write encodes and synchronously writes one complete NDJSON line.
-func (sink *NDJSONSink) Write(event audit.CanonicalEvent) error {
+func (sink *NDJSONSink) Write(event audit.CanonicalEvent) (err error) {
+	if sink.failed != nil {
+		return sink.failed
+	}
+	defer func() {
+		if err != nil {
+			sink.failed = err
+		}
+	}()
 	if err := sink.reopenIfRotated(); err != nil {
 		return err
 	}
@@ -64,6 +74,9 @@ func (sink *NDJSONSink) Write(event audit.CanonicalEvent) error {
 // Commit establishes the sink durability boundary used by checkpoints. A
 // stdout write has no stronger local operation; managed files are synced.
 func (sink *NDJSONSink) Commit() error {
+	if sink.failed != nil {
+		return sink.failed
+	}
 	if err := sink.reopenIfRotated(); err != nil {
 		return err
 	}
@@ -107,7 +120,29 @@ func (sink *NDJSONSink) reopenIfRotated() error {
 }
 
 func openManagedFile(path string) (*os.File, error) {
-	return securefile.OpenAppend(path, "output", 0o600)
+	file, err := securefile.OpenAppend(path, "output", 0o600)
+	if err != nil {
+		return nil, err
+	}
+	reject := func(err error) (*os.File, error) { return nil, errors.Join(err, file.Close()) }
+	// Each managed inode has one cooperating writer, including batch invocations.
+	if err := syscall.Flock(int(file.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
+		return reject(fmt.Errorf("lock managed output %s: %w", path, err))
+	}
+	info, err := file.Stat()
+	if err != nil {
+		return reject(err)
+	}
+	if info.Size() != 0 {
+		var last [1]byte
+		if _, err := file.ReadAt(last[:], info.Size()-1); err != nil {
+			return reject(err)
+		}
+		if last[0] != '\n' {
+			return reject(fmt.Errorf("managed output %s has an incomplete NDJSON tail; preserve and repair or quarantine it before restarting", path))
+		}
+	}
+	return file, nil
 }
 
 // Close releases a managed file. Caller-owned writers are not closed.

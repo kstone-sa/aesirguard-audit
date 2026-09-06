@@ -160,3 +160,9 @@ Input-log rotation and output-file rotation are independent state machines. Chec
 Parser failures, unsupported records, checkpoint corruption, source gaps, sink failures, truncation, and state-limit violations are reported explicitly.
 
 Diagnostics go to stderr. When safe and bounded, malformed source data is preserved in a structured fallback event so a poison record does not permanently block checkpoint progress.
+
+### Managed output crash boundaries
+
+A managed output inode permits one cooperating writer, enforced with an advisory lock. Other programs must not append to or truncate that inode. Rename/create rotation remains supported. Opening either an existing output or a rotation replacement checks its last physical byte: a nonempty file must end with a newline. The encoder writes that newline only after the complete JSON object. A positive partial write poisons the sink, so subsequent writes and checkpoint commits fail.
+
+An incomplete tail fails closed without changing any output bytes or advancing source progress. This includes a complete-looking JSON object whose terminating newline was not written. Preserve the output and checkpoint, then deliberately repair the final incomplete line or quarantine the affected output before restarting; source events after the last checkpoint may replay. The collector never silently truncates evidence. This boundary check assumes previously completed lines were written by audit2json; it is not a validator for arbitrary preexisting JSON or storage corruption. Newly opened managed files and their pinned containing directories are synced so file creation is durable before checkpoint commitment.

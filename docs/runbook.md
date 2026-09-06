@@ -49,7 +49,7 @@ Do not delete or edit a checkpoint to conceal a startup error. First preserve th
 
 - Missing checkpoint generation: restore the matching uncompressed rotation or explicitly accept a gap before starting a new state lineage.
 - Corrupt or unsupported checkpoint: restore the last known-good checkpoint or roll back to the compatible binary. The collector fails closed.
-- Output failure: restore space and permissions, then restart. Events after the last durable checkpoint may replay.
+- Output failure: preserve the output and checkpoint, restore space and permissions, and inspect the final physical line. An incomplete tail deliberately blocks restart. Repair that incomplete line or quarantine the affected file only after preserving it; do not append a newline to an incomplete JSON object. Then restart. Events after the last durable checkpoint may replay.
 - Same-inode truncation: investigate the rotation policy. Do not treat an automatic restart at offset zero as lossless recovery.
 
 ## Upgrade and rollback

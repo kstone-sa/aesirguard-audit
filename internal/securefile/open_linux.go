@@ -22,7 +22,7 @@ func OpenReadOnly(path, kind string, allowRootOwner bool) (*os.File, error) {
 // OpenAppend opens or creates a trusted regular file owned by the effective
 // user for append-only writes.
 func OpenAppend(path, kind string, mode uint32) (*os.File, error) {
-	return openRegular(path, kind, syscall.O_CREAT|syscall.O_APPEND|syscall.O_WRONLY, mode, false)
+	return openRegular(path, kind, syscall.O_CREAT|syscall.O_APPEND|syscall.O_RDWR, mode, false)
 }
 
 func openRegular(path, kind string, flags int, mode uint32, allowRootOwner bool) (*os.File, error) {
@@ -70,6 +70,16 @@ func openRegular(path, kind string, flags int, mode uint32, allowRootOwner bool)
 	file := os.NewFile(uintptr(fileFD), absolute)
 	if err := validateRegularFile(file, kind, allowRootOwner); err != nil {
 		return nil, errors.Join(err, file.Close())
+	}
+	// Persist the directory entry through the same pinned descriptor used to
+	// create/open it. Later file Sync calls establish the data boundary.
+	if flags&syscall.O_CREAT != 0 {
+		if err := file.Sync(); err != nil {
+			return nil, errors.Join(err, file.Close())
+		}
+		if err := directory.Sync(); err != nil {
+			return nil, errors.Join(err, file.Close())
+		}
 	}
 	return file, nil
 }
