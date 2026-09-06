@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	"errors"
 	"flag"
@@ -82,6 +81,9 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 }
 
 func runContext(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.Writer) (returnErr error) {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	options, err := parseOptions(args, stderr)
 	if err != nil {
 		if errors.Is(err, flag.ErrHelp) {
@@ -157,7 +159,7 @@ func runContext(ctx context.Context, args []string, stdin io.Reader, stdout, std
 	if options.follow {
 		return runFollower(ctx, options, processor)
 	}
-	return runBatch(options, stdin, processor)
+	return runBatch(ctx, options, stdin, processor)
 }
 
 func parseOptions(args []string, _ io.Writer) (commandOptions, error) {
@@ -282,32 +284,6 @@ func sinkName(options commandOptions) string {
 		return "stdout"
 	}
 	return "file"
-}
-
-func runBatch(options commandOptions, stdin io.Reader, processor *eventProcessor) error {
-	input := stdin
-	var file *os.File
-	if options.inputPath != "" {
-		var err error
-		file, err = os.Open(options.inputPath)
-		if err != nil {
-			return err
-		}
-		defer file.Close()
-		input = file
-	}
-
-	scanner := bufio.NewScanner(input)
-	scanner.Buffer(make([]byte, 64*1024), options.maxLineBytes)
-	for scanner.Scan() {
-		if err := processor.addLine(scanner.Text()); err != nil {
-			return err
-		}
-	}
-	if err := scanner.Err(); err != nil {
-		return err
-	}
-	return processor.flushAll(audit.CompletionEOF)
 }
 
 func runFollower(ctx context.Context, options commandOptions, processor *eventProcessor) error {
