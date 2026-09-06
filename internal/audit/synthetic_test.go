@@ -138,7 +138,7 @@ func assembleSynthetic(t *testing.T, records []Record) []AssembledEvent {
 
 func TestCanonicalEventReconstructsLargeFragmentedExecve(t *testing.T) {
 	var line strings.Builder
-	line.WriteString(`type=EXECVE msg=audit(1721723200.000:1): argc=257 a0="tool"`)
+	line.WriteString(`type=EXECVE msg=audit(1721723200.000:1): argc=2 a0="tool" a1_len=512`)
 	for index := 0; index < 256; index++ {
 		fmt.Fprintf(&line, ` a1[%d]="%02x"`, index, index)
 	}

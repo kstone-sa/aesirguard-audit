@@ -71,11 +71,11 @@ func TestParseRecordNormalizesAVCProse(t *testing.T) {
 	}
 }
 
-func TestParseRecordUnescapesQuotedDelimiters(t *testing.T) {
-	line := `type=TEST msg=audit(1721721602.000:44): note="say \"hello\" and \\ continue"`
+func TestParseRecordPreservesLiteralBackslashes(t *testing.T) {
+	line := `type=TEST msg=audit(1721721602.000:44): note="literal \\ and trailing\"`
 
 	record := mustParseRecord(t, line)
-	if got, want := record.Fields["note"], `say "hello" and \ continue`; got != want {
+	if got, want := record.Fields["note"], `literal \\ and trailing\`; got != want {
 		t.Fatalf("note = %q, want %q", got, want)
 	}
 }

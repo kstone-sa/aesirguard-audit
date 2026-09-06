@@ -2,7 +2,7 @@
 
 ## Status
 
-Canonical schema v1.0 is the stable event contract and the only event output. There is no legacy schema mode.
+Canonical schema v1.0 is the pre-release event contract and the only event output. There is no legacy schema mode.
 
 Output is newline-delimited JSON: one logical Linux Audit event per line. Empty optional objects, fields, and arrays are omitted. Fields documented as arrays never change to scalars.
 
@@ -95,7 +95,8 @@ The process object may contain:
 
 - `pid` and `ppid`, retained for process correlation and tree reconstruction;
 - `name`, `executable`, `cwd`, and `tty`;
-- `argv`, always an array preserving EXECVE argument boundaries;
+- `argv`, always an array preserving validated argument boundaries;
+- `argv_source` (`execve` or `proctitle`), retaining the distinction between execution evidence and process context, including when invalid arguments are withheld;
 - `syscall` when an ENRICHED name is available;
 - `syscall_number` and `architecture_code` together as the RAW fallback, because a syscall number is architecture-dependent;
 - `return_value`, derived from the Audit `exit` field.
@@ -149,3 +150,15 @@ Ordinary events are smaller because equal identities, empty capabilities, integr
 ## Backend boundary
 
 Splunk CIM, Sentinel ASIM, Elastic ECS, aliases, calculated command lines, tags, detections, and risk classifications remain backend responsibilities.
+
+## Pre-1.0 byte and argument integrity decision
+
+Before the first stable release, v1 gains `process.argv_source`, `audit.raw_encoding`, and the optional issue properties `value_encoding`, `record_index`, `quoted`, and `source`. Existing ordinary text fields and array types remain unchanged. These additions preserve materially useful execution provenance and exceptional byte evidence without adding copies of normal raw records.
+
+The parser recognizes the real ENRICHED separator (byte `0x1d`) outside quoted text and retains raw/interpreted and embedded field provenance. Audit quoted strings are literal: backslashes are not C or JSON escapes. Known untrusted-string fields are hex-decoded when unquoted; quoted hex-looking text stays literal. Nonhex userspace spellings remain text for compatibility. EXECVE and PROCTITLE use strict quoted-or-hex decoding.
+
+A text value that cannot be represented as UTF-8 is withheld from its ordinary canonical field and reported as `invalid_utf8`. Its issue preserves the exact original field value bytes as hex in `value`, with `value_encoding: "hex"`, original field name in `field`, `record_type`, zero-based event `record_index`, Boolean `quoted`, and `source` (`raw`, `interpreted`, or `embedded`). Decode the issue value to recover the source token, then use its quoting and field semantics to interpret it. An omitted value with hex encoding denotes empty source bytes. No U+FFFD replacement is used as a substitute for the original evidence.
+
+EXECVE argv is emitted only when argc, argument indexes, fragment indexes, duplicate values, encoded lengths and UTF-8 consistency establish a complete sequence. Length validation counts raw hex characters for hex fragments and literal bytes excluding quotes for quoted fragments, matching the kernel's `aN_len` convention. Fragments are joined as bytes before UTF-8 validation. No allocation is based on an untrusted argc/index. Incomplete, conflicting or invalid argv is withheld as a whole, retaining every available argc/length/argument/fragment in `incomplete_argv` issues with the same source provenance. Empty arguments remain valid array elements. PROCTITLE never conceals an incomplete EXECVE sequence; it is a fallback only when no EXECVE record exists.
+
+Malformed physical lines remain in `audit.raw`. If the line itself is not UTF-8, that field contains hex bytes and `audit.raw_encoding` is `hex`; otherwise the original text behavior is unchanged. Consumers must check this marker when extracting malformed-line evidence.

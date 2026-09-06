@@ -1,11 +1,13 @@
 package audit
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	mappingdata "github.com/kstone-sa/audit2json/data"
 )
@@ -37,9 +39,10 @@ type CanonicalEvent struct {
 }
 
 type CanonicalAudit struct {
-	ID   string `json:"id,omitempty"`
-	Time string `json:"time,omitempty"`
-	Raw  string `json:"raw,omitempty"`
+	ID          string `json:"id,omitempty"`
+	Time        string `json:"time,omitempty"`
+	Raw         string `json:"raw,omitempty"`
+	RawEncoding string `json:"raw_encoding,omitempty"`
 }
 
 // BuildParseFailureEvent preserves one malformed physical input line in the
@@ -61,6 +64,10 @@ func BuildParseFailureEvent(line string, parseErr error, options CanonicalOption
 	if id := auditIDFromMessage(line); id != "" {
 		event.Audit = canonicalAudit(id)
 		event.Audit.Raw = line
+	}
+	if !utf8.ValidString(line) {
+		event.Audit.Raw = hex.EncodeToString([]byte(line))
+		event.Audit.RawEncoding = "hex"
 	}
 	if options.Host != "" {
 		event.Source = &CanonicalSource{Host: options.Host}
@@ -88,10 +95,14 @@ type CanonicalIntegrity struct {
 }
 
 type CanonicalIssue struct {
-	Code       string `json:"code"`
-	RecordType string `json:"record_type,omitempty"`
-	Field      string `json:"field,omitempty"`
-	Value      string `json:"value,omitempty"`
+	Code          string `json:"code"`
+	RecordType    string `json:"record_type,omitempty"`
+	Field         string `json:"field,omitempty"`
+	Value         string `json:"value,omitempty"`
+	ValueEncoding string `json:"value_encoding,omitempty"`
+	RecordIndex   *int   `json:"record_index,omitempty"`
+	Quoted        *bool  `json:"quoted,omitempty"`
+	Source        string `json:"source,omitempty"`
 }
 
 type CanonicalRule struct {
@@ -136,6 +147,7 @@ type CanonicalProcess struct {
 	Name             string   `json:"name,omitempty"`
 	Executable       string   `json:"executable,omitempty"`
 	Argv             []string `json:"argv,omitempty"`
+	ArgvSource       string   `json:"argv_source,omitempty"`
 	CWD              string   `json:"cwd,omitempty"`
 	TTY              string   `json:"tty,omitempty"`
 	ArchitectureCode string   `json:"architecture_code,omitempty"`
@@ -169,11 +181,14 @@ type sourceIdentity struct {
 
 // BuildCanonicalEvent converts one assembled logical event into schema v1.
 func BuildCanonicalEvent(assembled AssembledEvent, options CanonicalOptions) CanonicalEvent {
+	var decodingIssues []CanonicalIssue
+	assembled.Records, decodingIssues = decodedRecords(assembled.Records)
 	event := CanonicalEvent{
 		SchemaVersion: CanonicalSchemaVersion,
 		Audit:         canonicalAudit(assembled.ID),
 		Event: CanonicalEventMeta{
-			Type: primaryRecordType(assembled.Records),
+			Type:   primaryRecordType(assembled.Records),
+			Issues: decodingIssues,
 		},
 	}
 	if recordType := preferredSecurityRecordType(assembled.Records); recordType != "" {
@@ -240,7 +255,8 @@ func BuildCanonicalEvent(assembled AssembledEvent, options CanonicalOptions) Can
 		event.Actor = &actor
 	}
 
-	process := buildCanonicalProcess(assembled.Records)
+	process, argumentIssues := buildCanonicalProcess(assembled.Records)
+	event.Event.Issues = append(event.Event.Issues, argumentIssues...)
 	if !identityEmpty(effective) && !sameIdentity(effective, login) {
 		setProcessIdentity(&process, effective)
 	}
@@ -280,7 +296,7 @@ func canonicalSuccess(records []Record) (bool, bool) {
 	}
 }
 
-func buildCanonicalProcess(records []Record) CanonicalProcess {
+func buildCanonicalProcess(records []Record) (CanonicalProcess, []CanonicalIssue) {
 	process := CanonicalProcess{
 		PID:         firstSemanticRecordValue(records, "pid"),
 		PPID:        firstSemanticRecordValue(records, "ppid"),
@@ -297,36 +313,9 @@ func buildCanonicalProcess(records []Record) CanonicalProcess {
 		process.ArchitectureCode = firstRecordValue(records, "arch")
 	}
 
-	argv := map[int]*execArg{}
-	for _, record := range records {
-		if record.Type == "EXECVE" {
-			collectExecArgs(argv, record.AllFields)
-		}
-	}
-	if len(argv) > 0 {
-		indexes := make([]int, 0, len(argv))
-		for index := range argv {
-			indexes = append(indexes, index)
-		}
-		sort.Ints(indexes)
-		for _, index := range indexes {
-			if value, ok := argv[index].value(); ok {
-				process.Argv = append(process.Argv, value)
-			}
-		}
-	}
-	if len(process.Argv) == 0 {
-		for _, record := range records {
-			if record.Type != "PROCTITLE" {
-				continue
-			}
-			if decoded, ok := decodeProctitleArgs(recordValue(record, "proctitle")); ok {
-				process.Argv = decoded
-				break
-			}
-		}
-	}
-	return process
+	var issues []CanonicalIssue
+	process.Argv, process.ArgvSource, issues = buildArguments(records)
+	return process, issues
 }
 
 func buildCanonicalTarget(records []Record, primaryType string) *CanonicalTarget {
@@ -401,7 +390,7 @@ func meaningfulAuditValue(value string) string {
 func hasCanonicalProcess(process CanonicalProcess) bool {
 	return process.PID != "" || process.PPID != "" || process.User != "" ||
 		process.UserID != "" || process.RealUser != "" || process.RealUserID != "" ||
-		process.Name != "" || process.Executable != "" || len(process.Argv) > 0 ||
+		process.Name != "" || process.Executable != "" || len(process.Argv) > 0 || process.ArgvSource != "" ||
 		process.CWD != "" || process.TTY != "" || process.ArchitectureCode != "" ||
 		process.Syscall != "" ||
 		process.SyscallNumber != "" || process.ReturnValue != ""

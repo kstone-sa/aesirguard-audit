@@ -24,6 +24,7 @@
     "name": "sudo",
     "executable": "/usr/bin/sudo",
     "argv": ["sudo", "cat", "--", "/etc/shadow"],
+    "argv_source": "execve",
     "cwd": "/home/operator",
     "tty": "pts0",
     "syscall": "execve",

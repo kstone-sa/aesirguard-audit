@@ -1,11 +1,11 @@
 package audit
 
 import (
-	"encoding/hex"
 	"fmt"
 	"sort"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 )
 
 // Field is one parsed key/value pair. Fields remain ordered so repeated keys
@@ -69,6 +69,9 @@ func ParseRecord(line string) (Record, error) {
 	}
 	if r.Type == "" {
 		return Record{}, fmt.Errorf("record type not found for audit id %s", r.ID)
+	}
+	if !utf8.ValidString(r.Type) || !utf8.ValidString(r.ID) {
+		return Record{}, fmt.Errorf("invalid UTF-8 in Audit envelope")
 	}
 	r.EmbeddedAllFields, r.EmbeddedFields, r.EmbeddedValues, r.EmbeddedParseError = parseEmbeddedMessages(values["msg"])
 	return r, nil
@@ -186,19 +189,14 @@ func parseFields(line string) ([]Field, map[string]string, map[string][]string, 
 					closed = true
 					break
 				}
-				if line[i] == '\\' && i+1 < len(line) {
-					next := line[i+1]
-					if next == quote || next == '\\' {
-						builder.WriteByte(next)
-						i += 2
-						continue
-					}
-				}
 				builder.WriteByte(line[i])
 				i++
 			}
 			if !closed {
 				return nil, nil, nil, fmt.Errorf("unterminated quoted value for field %q", key)
+			}
+			if i < len(line) && !fieldBoundary(line[i]) {
+				return nil, nil, nil, fmt.Errorf("missing boundary after quoted field %q", key)
 			}
 			value = builder.String()
 		} else {
@@ -261,58 +259,6 @@ func semanticRecordValue(record Record, key string) string {
 	return record.EmbeddedFields[key]
 }
 
-type execArg struct {
-	whole     *Field
-	fragments map[int]Field
-}
-
-func (arg *execArg) value() (string, bool) {
-	if len(arg.fragments) > 0 {
-		parts := make([]int, 0, len(arg.fragments))
-		for part := range arg.fragments {
-			parts = append(parts, part)
-		}
-		sort.Ints(parts)
-		var builder strings.Builder
-		for _, part := range parts {
-			builder.WriteString(decodeExecValue(arg.fragments[part]))
-		}
-		return builder.String(), true
-	}
-	if arg.whole != nil {
-		return decodeExecValue(*arg.whole), true
-	}
-	return "", false
-}
-
-func collectExecArgs(argv map[int]*execArg, fields []Field) {
-	for _, field := range fields {
-		argIndex, partIndex, kind, ok := parseExecArgKey(field.Key)
-		if !ok || kind == execArgLength {
-			continue
-		}
-		arg := argv[argIndex]
-		if arg == nil {
-			arg = &execArg{}
-			argv[argIndex] = arg
-		}
-		switch kind {
-		case execArgWhole:
-			if arg.whole == nil {
-				copy := field
-				arg.whole = &copy
-			}
-		case execArgFragment:
-			if arg.fragments == nil {
-				arg.fragments = map[int]Field{}
-			}
-			if _, exists := arg.fragments[partIndex]; !exists {
-				arg.fragments[partIndex] = field
-			}
-		}
-	}
-}
-
 type execArgKind int
 
 const (
@@ -347,35 +293,6 @@ func parseExecArgKey(key string) (argIndex, partIndex int, kind execArgKind, ok 
 		return 0, 0, 0, false
 	}
 	return argIndex, partIndex, execArgFragment, true
-}
-
-func decodeExecValue(field Field) string {
-	if field.Quoted || len(field.Value)%2 != 0 {
-		return field.Value
-	}
-	decoded, err := hex.DecodeString(field.Value)
-	if err != nil {
-		return field.Value
-	}
-	return string(decoded)
-}
-
-func decodeProctitleArgs(value string) ([]string, bool) {
-	if value == "" || len(value)%2 != 0 {
-		return nil, false
-	}
-	decoded, err := hex.DecodeString(value)
-	if err != nil {
-		return nil, false
-	}
-	parts := strings.Split(string(decoded), "\x00")
-	if len(parts) > 0 && parts[len(parts)-1] == "" {
-		parts = parts[:len(parts)-1]
-	}
-	if len(parts) == 0 {
-		return nil, false
-	}
-	return parts, true
 }
 
 func primaryRecordType(records []Record) string {

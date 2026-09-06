@@ -31,7 +31,8 @@
       "properties": {
         "id": {"type": "string"},
         "time": {"type": "string", "format": "date-time"},
-        "raw": {"type": "string"}
+        "raw": {"type": "string"},
+        "raw_encoding": {"const": "hex"}
       }
     },
     "source": {
@@ -75,7 +76,11 @@
         "code": {"type": "string"},
         "record_type": {"type": "string"},
         "field": {"type": "string"},
-        "value": {"type": "string"}
+        "value": {"type": "string"},
+        "value_encoding": {"const": "hex"},
+        "record_index": {"type": "integer", "minimum": 0},
+        "quoted": {"type": "boolean"},
+        "source": {"enum": ["raw", "interpreted", "embedded"]}
       }
     },
     "rule": {
@@ -107,6 +112,7 @@
         "name": {"type": "string"},
         "executable": {"type": "string"},
         "argv": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "argv_source": {"enum": ["execve", "proctitle"]},
         "cwd": {"type": "string"},
         "tty": {"type": "string"},
         "architecture_code": {"type": "string"},
