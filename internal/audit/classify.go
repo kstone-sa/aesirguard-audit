@@ -51,7 +51,7 @@ func classifyCanonicalEvent(event *CanonicalEvent) {
 		return
 	}
 
-	if event.Process != nil && (event.Process.Syscall == "execve" || event.Process.Syscall == "execveat" || len(event.Process.Argv) > 0) {
+	if event.Process != nil && (event.Process.Syscall == "execve" || event.Process.Syscall == "execveat" || event.Process.ArgvSource == "execve") {
 		event.Event.Category = "process"
 		event.Event.Action = "execute"
 		return

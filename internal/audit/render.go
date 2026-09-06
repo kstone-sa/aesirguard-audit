@@ -210,7 +210,7 @@ func renderProcessMessage(event CanonicalEvent) (string, bool) {
 		return "", false
 	}
 	process := event.Process
-	if process.Syscall != "execve" && process.Syscall != "execveat" && len(process.Argv) == 0 {
+	if process.Syscall != "execve" && process.Syscall != "execveat" && process.ArgvSource != "execve" && event.Event.Action != "execute" {
 		return "", false
 	}
 	executable := process.Executable

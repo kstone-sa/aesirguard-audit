@@ -11,6 +11,7 @@ func TestWithHumanMessageRendersProcessExecution(t *testing.T) {
 			User:       "root",
 			Executable: "/usr/bin/sudo",
 			Argv:       []string{"sudo", "cat", "file with spaces"},
+			ArgvSource: "execve",
 		},
 	}
 
