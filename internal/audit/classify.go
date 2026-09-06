@@ -86,13 +86,31 @@ func isKnownSingleRecordType(recordType string) bool {
 	return containsString(securityEventFamilies.SingleRecordTypes, recordType)
 }
 
+// Prefer security decisions, then integrity/anomaly evidence, then other
+// mapped families. Lexical type order breaks ties, never arrival order.
+func securityRecordRank(recordType string) int {
+	family, _ := securityEventFamilyForType(recordType)
+	switch family.Category {
+	case "access_control":
+		return 0
+	case "security", "integrity":
+		return 1
+	default:
+		return 2
+	}
+}
+
 func preferredSecurityRecordType(records []Record) string {
+	selected := ""
 	for _, record := range records {
-		if _, ok := securityEventFamilyForType(record.Type); ok {
-			return record.Type
+		if _, ok := securityEventFamilyForType(record.Type); !ok {
+			continue
+		}
+		if selected == "" || securityRecordRank(record.Type) < securityRecordRank(selected) || (securityRecordRank(record.Type) == securityRecordRank(selected) && record.Type < selected) {
+			selected = record.Type
 		}
 	}
-	return ""
+	return selected
 }
 
 func classificationRuleMatches(event CanonicalEvent, rule canonicalClassificationRule) bool {

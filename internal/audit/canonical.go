@@ -269,7 +269,9 @@ func BuildCanonicalEvent(assembled AssembledEvent, options CanonicalOptions) Can
 	event.Event.OriginalAction = meaningfulAuditValue(firstNonemptySemanticRecordValue(assembled.Records, "op", "operation"))
 	event.Target = buildCanonicalTarget(assembled.Records, event.Event.Type)
 	event.Origin = buildCanonicalOrigin(assembled.Records)
-	event.Security = buildCanonicalSecurity(assembled.Records, event.Event.Type)
+	var securityIssues []CanonicalIssue
+	event.Security, securityIssues = buildCanonicalSecurity(assembled.Records)
+	event.Event.Issues = append(event.Event.Issues, securityIssues...)
 	var pathIssues []CanonicalIssue
 	event.Paths, pathIssues = buildCanonicalPaths(assembled.Records)
 	event.Event.Issues = append(event.Event.Issues, pathIssues...)
@@ -350,8 +352,9 @@ func buildCanonicalOrigin(records []Record) *CanonicalOrigin {
 	return &origin
 }
 
-func buildCanonicalSecurity(records []Record, recordType string) *CanonicalSecurity {
-	family, mapped := securityEventFamilyForType(recordType)
+func buildCanonicalSecurityRecord(record Record) *CanonicalSecurity {
+	records := []Record{record}
+	family, mapped := securityEventFamilyForType(record.Type)
 	if !mapped || (family.Category != "access_control" && family.Category != "security" && family.Category != "integrity") {
 		return nil
 	}
