@@ -29,7 +29,7 @@ Unsupported record families are reported through `event.issues`; arbitrary sourc
 | `process` | object | Effective process identity and execution data |
 | `target` | object | Account, service, or named object affected by the event |
 | `origin` | object | Remote address, host, and terminal supplied by the producer |
-| `security` | object | Mandatory access-control decision and policy context |
+| `security` | object | Mandatory access-control decisions, policy context, and seccomp evidence |
 | `paths` | array | Ordered file objects with associated metadata |
 | `message` | string | Optional deterministic analyst-readable message |
 | `renderer_version` | string | Renderer template version, present only with `message` |
@@ -54,7 +54,7 @@ An invalid ID remains in `audit.id`; `audit.time` is omitted and `event.issues` 
 | `event.original_action` | string | Optional source operation such as a PAM operation; never used instead of the stable action |
 | `event.success` | boolean | Normalized source result when recognized |
 | `event.integrity` | object | Present only for incomplete events |
-| `event.issues` | array | Present only for invalid or unsupported input |
+| `event.issues` | array | Conversion limitations, invalid/unsupported input, and additional or conflicting evidence |
 
 Normal EOE and known single-record completions add no assembly metadata. Timeout, watermark, shutdown, or EOF flushes produce:
 
