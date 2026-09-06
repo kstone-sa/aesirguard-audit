@@ -149,3 +149,19 @@ func TestEmbeddedQuotedApostropheAndEncodedAVCName(t *testing.T) {
 		t.Fatalf("lost encoded userspace AVC name: %#v", e)
 	}
 }
+
+func TestMalformedEnvelopeDoesNotEmitReplacementIdentity(t *testing.T) {
+	line := "type=PATH msg=audit(100.0:" + string([]byte{0xff}) + "): name=FF"
+	_, err := ParseRecord(line)
+	if err == nil {
+		t.Fatal("accepted non-UTF-8 envelope")
+	}
+	e := BuildParseFailureEvent(line, err, CanonicalOptions{})
+	if e.Audit.ID != "" || e.Audit.RawEncoding != "hex" {
+		t.Fatalf("invented identity: %#v", e.Audit)
+	}
+	raw, decodeErr := hex.DecodeString(e.Audit.Raw)
+	if decodeErr != nil || string(raw) != line {
+		t.Fatal("lost original envelope bytes")
+	}
+}

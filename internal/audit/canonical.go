@@ -61,7 +61,7 @@ func BuildParseFailureEvent(line string, parseErr error, options CanonicalOption
 			}},
 		},
 	}
-	if id := auditIDFromMessage(line); id != "" {
+	if id := auditIDFromMessage(line); id != "" && utf8.ValidString(id) {
 		event.Audit = canonicalAudit(id)
 		event.Audit.Raw = line
 	}
