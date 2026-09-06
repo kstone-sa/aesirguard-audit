@@ -1,64 +1,11 @@
 name: CI
-
 on:
   push:
   pull_request:
-
 permissions:
   contents: read
-
 jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-          cache: false
-      - name: Check formatting
-        run: |
-          unformatted_files="$(gofmt -l .)"
-          if [ -n "$unformatted_files" ]; then
-            printf '%s\n' "$unformatted_files"
-            gofmt -d $unformatted_files
-            exit 1
-          fi
-      - name: Run tests
-        run: go test ./...
-      - name: Validate emitted JSON Schema contracts
-        run: |
-          python3 -m venv "${RUNNER_TEMP}/schema-validation"
-          "${RUNNER_TEMP}/schema-validation/bin/pip" install 'jsonschema==4.26.0'
-          go build -o "${RUNNER_TEMP}/audit2json-schema-check" ./cmd/audit2json
-          "${RUNNER_TEMP}/schema-validation/bin/python" scripts/validate-schema.py "${RUNNER_TEMP}/audit2json-schema-check"
-      - name: Run race detector
-        run: go test -race ./...
-      - name: Run vet
-        run: go vet ./...
-      - name: Build and inspect release packages
-        run: |
-          set -euo pipefail
-          dist="${RUNNER_TEMP}/audit2json-dist"
-          restrictive_dist="${RUNNER_TEMP}/audit2json-dist-restrictive-umask"
-          source_date_epoch="$(git show -s --format=%ct "${GITHUB_SHA}")"
-          ./scripts/package-release.sh ci "${GITHUB_SHA}" "${source_date_epoch}" "$dist"
-          chmod -R go-rwx LICENSE README.md configs docs packaging schema
-          (umask 077 && ./scripts/package-release.sh ci "${GITHUB_SHA}" "${source_date_epoch}" "$restrictive_dist")
-          cmp "$dist/SHA256SUMS" "$restrictive_dist/SHA256SUMS"
-          ./scripts/verify-release.sh "$dist" ci
-
-  synthetic:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-          cache: false
-      - name: Fuzz record parser
-        run: go test ./internal/audit -run '^$' -fuzz '^FuzzParseRecordDoesNotPanic$' -fuzztime=5s
-      - name: Fuzz event assembler
-        run: go test ./internal/audit -run '^$' -fuzz '^FuzzAssemblerPreservesAcceptedRecords$' -fuzztime=5s
-      - name: Exercise pipeline benchmark
-        run: go test ./internal/audit -run '^$' -bench '^BenchmarkAuditPipeline$' -benchtime=200ms -benchmem
+  verify:
+    uses: ./.github/workflows/verify.yml
+    with:
+      version: ci
