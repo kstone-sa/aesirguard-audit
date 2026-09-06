@@ -115,3 +115,9 @@ Use one conceptual change per commit. Documentation-only planning should not con
 ## Schema validation tooling
 
 The collector runtime remains Go and standard-library-only. CI uses Python's `jsonschema==4.26.0` exclusively as an independent development validator in a disposable virtual environment. Build the binary, then run `python3 scripts/validate-schema.py /absolute/path/to/audit2json` from an environment with that validator installed. It validates all emitted fixture events against Draft 2020-12, exercises the exceptional byte and seccomp fields, and checks negative contracts. It is not part of runtime deployment or release archives.
+
+## Source compatibility and release toolchain
+
+`go.mod` retains `go 1.22` as minimum source language compatibility: this pass introduced no newer language/library requirement and the suite also passed on Go 1.22.12. This is not a recommendation to deploy binaries built with that unsupported toolchain, nor a promise to qualify every old compiler.
+
+`.go-version` pins **1.26.8** for CI and release builds. It is a supported, patched release listed by [Go downloads](https://go.dev/dl/) and the [release history](https://go.dev/doc/devel/release). Updating the pin is a deliberate reviewed maintenance change; recheck support and security advisories before every stable tag. Package builds reject other toolchains and disable automatic toolchain selection, workspace overrides, custom GOFLAGS/GOEXPERIMENT and CPU tuning. Archive metadata is normalized. `BUILD-INFO.json` records the actual toolchain, source commit, version, build date, architecture and binary digest; the binary's `--version` exposes the same release identity. No toolchain is bundled at runtime.

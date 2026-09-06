@@ -20,6 +20,21 @@ case "$source_date_epoch" in
     ;;
 esac
 
+if [[ ! "$version" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || [[ ! "$commit" =~ ^[0-9a-f]{40}$ ]]; then
+  echo "invalid version or full commit hash" >&2
+  exit 2
+fi
+export GOTOOLCHAIN=local GOENV=off GOWORK=off GOFLAGS= GOEXPERIMENT= GOAMD64=v1 GOARM64=v8.0
+expected_go="go$(cat .go-version)"
+if [ "$(go env GOVERSION)" != "$expected_go" ]; then
+  echo "release builds require $expected_go from .go-version" >&2
+  exit 1
+fi
+# Never mix stale archives or directory payloads into a release.
+if [ -d "$output_directory" ] && [ -n "$(find "$output_directory" -mindepth 1 -print -quit)" ]; then
+  echo "output directory must be empty" >&2
+  exit 1
+fi
 build_date=$(date -u -d "@${source_date_epoch}" +%Y-%m-%dT%H:%M:%SZ)
 mkdir -p "$output_directory"
 
@@ -31,8 +46,12 @@ for arch in amd64 arm64; do
   mkdir -p "${output_directory}/${standalone}/configs"
 
   CGO_ENABLED=0 GOOS=linux GOARCH="$arch" go build -trimpath -buildvcs=false \
-    -ldflags="-s -w -X main.version=${version} -X main.commit=${commit} -X main.buildDate=${build_date}" \
+    -ldflags="-s -w -X 'main.releaseIdentity=audit2json ${version} commit=${commit} built=${build_date} go=${expected_go}'" \
     -o "${output_directory}/${standalone}/audit2json" ./cmd/audit2json
+
+  binary_sha=$(sha256sum "${output_directory}/${standalone}/audit2json" | cut -d ' ' -f 1)
+  printf '{"version":"%s","commit":"%s","build_date":"%s","go":"%s","arch":"%s","binary_sha256":"%s"}\n' \
+    "$version" "$commit" "$build_date" "$expected_go" "$arch" "$binary_sha" > "${output_directory}/${standalone}/BUILD-INFO.json"
 
   cp LICENSE README.md CHANGELOG.md CONTRIBUTING.md SECURITY.md "${output_directory}/${standalone}/"
   cp configs/audit2json.example.json "${output_directory}/${standalone}/configs/"

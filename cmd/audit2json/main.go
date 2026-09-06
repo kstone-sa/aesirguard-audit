@@ -33,6 +33,8 @@ var (
 	version   = "dev"
 	commit    = "unknown"
 	buildDate = "unknown"
+	// One verifiable release identity is shared by --version and package inspection.
+	releaseIdentity = ""
 )
 
 type commandOptions struct {
@@ -94,7 +96,11 @@ func runContext(ctx context.Context, args []string, stdin io.Reader, stdout, std
 	}
 	diagnostics := newOperationalDiagnostics(stderr, options.heartbeatInterval)
 	if options.showVersion {
-		fmt.Fprintf(stdout, "audit2json %s commit=%s built=%s\n", version, commit, buildDate)
+		if releaseIdentity != "" {
+			fmt.Fprintln(stdout, releaseIdentity)
+		} else {
+			fmt.Fprintf(stdout, "audit2json %s commit=%s built=%s\n", version, commit, buildDate)
+		}
 		return nil
 	}
 	if options.checkConfig {
