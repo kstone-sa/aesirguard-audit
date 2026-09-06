@@ -132,7 +132,7 @@ Renderer version `3` covers the Linux Audit activity families selected by the ta
 
 Classification uses typed EXECVE or named execution-syscall evidence, normalized syscall and outcome, normalized rule keys, and conservatively matched paths. Rule keys are locally configurable and therefore are not the sole contract. A security-relevant path is accepted without a recognized key only when the syscall itself proves a mutation. See `cis-coverage.md` for the supported baseline and family matrix.
 
-Some user-space Audit records embed a second key/value payload inside `msg`. The parser extracts that payload without copying it wholesale. Recognized standalone user-space, lifecycle, and audit-daemon records complete immediately; kernel security records such as `AVC`, `SECCOMP`, and `BPF` continue to wait for `EOE` or the normal assembler boundary because they may be part of a compound event.
+Some user-space Audit records embed a second key/value payload inside `msg`. The parser extracts that payload without copying it wholesale. Recognized standalone user-space, lifecycle, and audit-daemon records complete immediately; kernel security and configuration records such as `CONFIG_CHANGE`, `FEATURE_CHANGE`, `MAC_STATUS`, `MAC_POLICY_LOAD`, `AVC`, `SECCOMP`, and `BPF` continue to wait for `EOE` or the normal assembler boundary because they may be part of a compound event.
 
 ## Example and validation
 
