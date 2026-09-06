@@ -45,7 +45,7 @@ func encodedTextField(recordType, key string) bool {
 	case "cwd":
 		return recordType == "CWD"
 	case "name":
-		return recordType == "PATH" || recordType == "AVC" || strings.HasPrefix(recordType, "APPARMOR_") || recordType == "KERN_MODULE"
+		return recordType == "PATH" || recordType == "AVC" || recordType == "USER_AVC" || recordType == "SELINUX_ERR" || recordType == "USER_SELINUX_ERR" || strings.HasPrefix(recordType, "APPARMOR_") || recordType == "KERN_MODULE"
 	case "acct":
 		return strings.HasPrefix(recordType, "USER_") || strings.HasPrefix(recordType, "CRED_") || recordType == "ADD_USER" || recordType == "DEL_USER"
 	}

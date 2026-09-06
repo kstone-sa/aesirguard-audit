@@ -138,3 +138,14 @@ func TestMalformedNonUTF8LineIsReversible(t *testing.T) {
 		t.Fatalf("lost malformed bytes: %#v", e)
 	}
 }
+
+func TestEmbeddedQuotedApostropheAndEncodedAVCName(t *testing.T) {
+	e := canonicalLines(t, `type=USER_AUTH msg=audit(100.0:1): msg='acct="O'Reilly" exe="/bin/tool" res=success'`)
+	if e.Target == nil || e.Target.User != "O'Reilly" || len(e.Event.Issues) != 0 {
+		t.Fatalf("lost nested quoted account: %#v", e)
+	}
+	e = canonicalLines(t, `type=USER_AVC msg=audit(100.0:1): msg='avc: denied { read } for name=612062 scontext=a tcontext=b permissive=0'`)
+	if e.Target == nil || e.Target.Name != "a b" {
+		t.Fatalf("lost encoded userspace AVC name: %#v", e)
+	}
+}

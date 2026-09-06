@@ -183,8 +183,14 @@ func parseFields(line string) ([]Field, map[string]string, map[string][]string, 
 			i++
 			var builder strings.Builder
 			closed := false
+			nestedDouble := false
 			for i < len(line) {
-				if line[i] == quote {
+				// Userspace msg='...' can contain double-quoted values with
+				// literal apostrophes. Those apostrophes do not end msg.
+				if quote == '\'' && line[i] == '"' {
+					nestedDouble = !nestedDouble
+				}
+				if line[i] == quote && !nestedDouble {
 					i++
 					closed = true
 					break
