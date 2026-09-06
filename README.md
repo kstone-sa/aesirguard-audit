@@ -85,6 +85,14 @@ audit.log
 
 Stdout is the default sink for consumers such as a Splunk scripted input. An append-only managed file sink is available for file-monitoring agents and other SIEMs. Backend-specific parsing, data-model mapping, tags, aliases, and dashboards are outside this repository.
 
+## Related projects
+
+[LAUREL](https://github.com/threathunters-io/laurel) addresses a closely related problem: it correlates Linux Audit records and emits structured JSON suitable for security analytics. Its normal deployment model integrates with the Linux Audit pipeline as an auditd/audisp-style processor and provides rich process-oriented enrichment.
+
+audit2json deliberately takes a different operational approach. It can consume existing `audit.log` files without replacing `auditd`, installing an Audit plugin, or changing the host's Audit pipeline, which allows it to live in an existing collection layer such as a Splunk deployment. It also projects Audit evidence into a compact, backend-agnostic security schema rather than primarily preserving Audit's native record structure.
+
+The projects therefore overlap in the problem they address, but optimize for different deployment and normalization models.
+
 ## Installation
 
 Tagged releases will provide two independent archives per Linux architecture:
