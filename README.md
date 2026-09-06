@@ -6,7 +6,7 @@ audit2json turns raw Linux Audit data into compact, canonical JSON events for de
 
 It is deliberately non-invasive: audit2json can process existing `audit.log` files without replacing `auditd`, installing an audit plugin, or modifying the host's audit pipeline. It can run entirely within the collection layer—for example as part of a Splunk deployment—so security teams can add Linux Audit normalization without introducing another host-level service.
 
-Linux Audit provides rich forensic evidence, but emits fragmented, kernel-centric records whose security meaning is expensive to reconstruct downstream. audit2json follows the audit stream, correlates multi-record events, preserves relevant evidence, and normalizes process execution, file activity, authentication, account and session changes, privilege use, audit tampering, mandatory access-control decisions, integrity events, and selected kernel-security activity into a stable canonical JSON schema.
+Linux Audit provides rich forensic evidence, but emits fragmented, kernel-centric records whose security meaning is expensive to reconstruct downstream. audit2json follows the audit stream, correlates multi-record events, preserves relevant evidence, and normalizes supported process, file, identity and access-control evidence into a stable canonical JSON schema. Additional audit, integrity and kernel-security families receive stable classifications; their field-level normalization varies, as documented in the [coverage matrix](docs/security-event-coverage.md).
 
 The project is deliberately backend-agnostic. Splunk, Microsoft Sentinel, Elastic, and other analytics platforms are consumers of its output; their data models do not define audit2json's security semantics.
 
@@ -25,7 +25,7 @@ The current `main` branch provides:
 - group interleaved records by audit ID with explicit completion metadata;
 - reconstruct EXECVE arguments and structured PATH records;
 - emit the stable, security-oriented canonical v1.0 schema;
-- normalize authentication, account, session, service, audit-daemon, mandatory access-control, anomaly, integrity, and selected kernel-security records;
+- classify authentication, account, session, service, audit-daemon, mandatory access-control, anomaly, integrity, and selected kernel-security records, with typed evidence as specified in the coverage matrix;
 - prefer names supplied by Audit ENRICHED records and fall back to explicit ID fields;
 - collapse identical login, real, and effective identities;
 - decode non-empty file capability masks to Linux capability names;
