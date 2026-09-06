@@ -11,9 +11,10 @@ import (
 // Field is one parsed key/value pair. Fields remain ordered so repeated keys
 // and their quoting state are not lost.
 type Field struct {
-	Key    string
-	Value  string
-	Quoted bool
+	Key         string
+	Value       string
+	Quoted      bool
+	Interpreted bool
 }
 
 // Record is one raw auditd record parsed into key/value fields.
@@ -23,6 +24,7 @@ type Record struct {
 	Fields             map[string]string
 	Values             map[string][]string
 	AllFields          []Field
+	EmbeddedAllFields  []Field
 	EmbeddedFields     map[string]string
 	EmbeddedValues     map[string][]string
 	EmbeddedParseError string
@@ -68,7 +70,7 @@ func ParseRecord(line string) (Record, error) {
 	if r.Type == "" {
 		return Record{}, fmt.Errorf("record type not found for audit id %s", r.ID)
 	}
-	r.EmbeddedFields, r.EmbeddedValues, r.EmbeddedParseError = parseEmbeddedMessages(values["msg"])
+	r.EmbeddedAllFields, r.EmbeddedFields, r.EmbeddedValues, r.EmbeddedParseError = parseEmbeddedMessages(values["msg"])
 	return r, nil
 }
 
@@ -111,17 +113,19 @@ func normalizeAuditPayload(payload string) string {
 	return "decision=" + strconv.Quote(decision) + " permissions=" + strconv.Quote(permissions) + " " + remainder
 }
 
-func parseEmbeddedMessages(messages []string) (map[string]string, map[string][]string, string) {
+func parseEmbeddedMessages(messages []string) ([]Field, map[string]string, map[string][]string, string) {
+	var all []Field
 	first := map[string]string{}
 	values := map[string][]string{}
 	for _, message := range messages {
 		if auditIDFromMessage(message) != "" || !strings.Contains(message, "=") {
 			continue
 		}
-		_, parsedFirst, parsedValues, err := parseFields(normalizeAuditPayload(message))
+		parsedAll, parsedFirst, parsedValues, err := parseFields(normalizeAuditPayload(message))
 		if err != nil {
-			return first, values, err.Error()
+			return all, first, values, err.Error()
 		}
+		all = append(all, parsedAll...)
 		for key, value := range parsedFirst {
 			if _, exists := first[key]; !exists {
 				first[key] = value
@@ -131,7 +135,7 @@ func parseEmbeddedMessages(messages []string) (map[string]string, map[string][]s
 			values[key] = append(values[key], entries...)
 		}
 	}
-	return first, values, ""
+	return all, first, values, ""
 }
 
 func parseFields(line string) ([]Field, map[string]string, map[string][]string, error) {
@@ -139,8 +143,12 @@ func parseFields(line string) ([]Field, map[string]string, map[string][]string, 
 	first := map[string]string{}
 	values := map[string][]string{}
 
+	interpreted := false
 	for i := 0; i < len(line); {
-		for i < len(line) && line[i] == ' ' {
+		for i < len(line) && fieldBoundary(line[i]) {
+			if line[i] == 0x1d {
+				interpreted = true
+			}
 			i++
 		}
 		if i >= len(line) {
@@ -148,7 +156,7 @@ func parseFields(line string) ([]Field, map[string]string, map[string][]string, 
 		}
 
 		keyStart := i
-		for i < len(line) && line[i] != '=' && line[i] != ' ' {
+		for i < len(line) && line[i] != '=' && !fieldBoundary(line[i]) {
 			i++
 		}
 		if i == keyStart {
@@ -156,7 +164,7 @@ func parseFields(line string) ([]Field, map[string]string, map[string][]string, 
 		}
 		if i >= len(line) || line[i] != '=' {
 			end := i
-			for end < len(line) && line[end] != ' ' {
+			for end < len(line) && !fieldBoundary(line[end]) {
 				end++
 			}
 			return nil, nil, nil, fmt.Errorf("malformed field %q at byte %d", line[keyStart:end], keyStart)
@@ -195,13 +203,13 @@ func parseFields(line string) ([]Field, map[string]string, map[string][]string, 
 			value = builder.String()
 		} else {
 			valueStart := i
-			for i < len(line) && line[i] != ' ' {
+			for i < len(line) && !fieldBoundary(line[i]) {
 				i++
 			}
 			value = line[valueStart:i]
 		}
 
-		field := Field{Key: key, Value: value, Quoted: quoted}
+		field := Field{Key: key, Value: value, Quoted: quoted, Interpreted: interpreted}
 		all = append(all, field)
 		values[key] = append(values[key], value)
 		if _, exists := first[key]; !exists {
@@ -211,6 +219,8 @@ func parseFields(line string) ([]Field, map[string]string, map[string][]string, 
 
 	return all, first, values, nil
 }
+
+func fieldBoundary(b byte) bool { return b == ' ' || b == 0x1d }
 
 func auditIDFromMessage(msg string) string {
 	start := strings.Index(msg, "audit(")
