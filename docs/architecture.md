@@ -37,7 +37,7 @@ Each stage has one responsibility and can be tested independently.
 
 Owns file descriptors, polling, partial lines, EOF waiting, checkpoints, and input rotation. It does not parse Audit fields.
 
-Without a checkpoint, the follower opens at offset zero. With `--checkpoint-file`, it locates the device and inode at the current path or among retained uncompressed siblings, validates a complete-line offset, and drains later generations in modification-time order. During live rename/create rotation it remains attached to the old inode until EOF is stable for the configured drain interval, then switches to the replacement. The assembler is not reset, and a physical partial line can span the transition.
+Without a checkpoint, the follower opens at offset zero. With `--checkpoint-file`, it locates the device and inode at the current path or among retained uncompressed siblings, validates a complete-line offset, and drains later generations in descending numeric suffix order (`.2` before `.1`, then the active file). During live rename/create rotation it remains attached to the old inode until EOF is stable for the configured drain interval, then switches to the replacement. The assembler is not reset, and a physical partial line can span the transition.
 
 A file descriptor remains attached to its inode after rename. On rotation, the collector drains the old descriptor before opening the new file and preserves the assembler across the transition.
 

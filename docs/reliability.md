@@ -85,10 +85,10 @@ On startup:
 2. read and validate the checkpoint;
 3. locate its device and inode at the current path or among uncompressed numeric rotations such as `audit.log.1`;
 4. seek to the validated complete-line offset;
-5. drain retained generations in modification-time order;
+5. drain retained generations in descending numeric suffix order (`.2` before `.1`, then the active file);
 6. switch to and follow the current input path.
 
-If the checkpoint inode cannot be found, recovery fails closed with an explicit source-gap error. Compressed and non-numeric basename-prefixed files are not treated as input generations. Numeric rotations with larger suffixes are treated as older when timestamps are equal.
+If the checkpoint inode cannot be found, recovery fails closed with an explicit source-gap error. Compressed and non-numeric basename-prefixed files are not treated as input generations. Numeric suffixes establish generation order; modification times never do. Missing intermediate generations, duplicate suffix numbers, and inode aliases fail closed as ambiguous or gapped histories.
 
 ## Rotation handling
 

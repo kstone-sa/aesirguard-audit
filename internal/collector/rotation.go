@@ -49,12 +49,11 @@ func (err *SourceTruncatedError) Error() string {
 }
 
 type sourceCandidate struct {
-	path       string
-	identity   FileIdentity
-	modifiedAt time.Time
-	current    bool
-	number     uint64
-	numbered   bool
+	path     string
+	identity FileIdentity
+	current  bool
+	number   uint64
+	numbered bool
 }
 
 // RotatingFollower drains retained and live rename/create generations in
@@ -107,6 +106,9 @@ func OpenRotatingFollower(inputPath string, options RotationOptions, checkpoint 
 	}
 	if index < 0 {
 		return nil, &SourceGapError{Identity: expected}
+	}
+	if err := validateGenerationChain(candidates[index:]); err != nil {
+		return nil, err
 	}
 	first := candidates[index]
 	followerOptions := options.FollowerOptions
@@ -238,6 +240,9 @@ func (follower *RotatingFollower) refreshQueue() error {
 		if !found {
 			return &SourceGapError{Identity: known.identity}
 		}
+	}
+	if err := validateGenerationChain(candidates[currentIndex:]); err != nil {
+		return err
 	}
 	follower.queued = refreshed
 	return nil
@@ -421,12 +426,9 @@ func discoverCandidates(inputPath string, excludes []string) ([]sourceCandidate,
 		if err != nil {
 			return nil, err
 		}
-		candidate := sourceCandidate{path: path, identity: identity, modifiedAt: info.ModTime(), current: path == inputPath, number: number, numbered: numbered}
+		candidate := sourceCandidate{path: path, identity: identity, current: path == inputPath, number: number, numbered: numbered}
 		if index, exists := identities[identity]; exists {
-			if candidate.current {
-				candidates[index] = candidate
-			}
-			continue
+			return nil, fmt.Errorf("ambiguous generation aliases: %s and %s", candidates[index].path, path)
 		}
 		identities[identity] = len(candidates)
 		candidates = append(candidates, candidate)
@@ -436,7 +438,7 @@ func discoverCandidates(inputPath string, excludes []string) ([]sourceCandidate,
 	}
 	for i := 0; i < len(candidates); i++ {
 		for j := i + 1; j < len(candidates); j++ {
-			if candidates[i].current || candidates[j].current || !candidates[i].modifiedAt.Equal(candidates[j].modifiedAt) {
+			if candidates[i].current || candidates[j].current {
 				continue
 			}
 			if !candidates[i].numbered || !candidates[j].numbered || candidates[i].number == candidates[j].number {
@@ -448,10 +450,7 @@ func discoverCandidates(inputPath string, excludes []string) ([]sourceCandidate,
 		if candidates[i].current != candidates[j].current {
 			return !candidates[i].current
 		}
-		if candidates[i].modifiedAt.Equal(candidates[j].modifiedAt) {
-			return candidates[i].number > candidates[j].number
-		}
-		return candidates[i].modifiedAt.Before(candidates[j].modifiedAt)
+		return candidates[i].number > candidates[j].number
 	})
 	currentFound := false
 	for _, candidate := range candidates {
@@ -461,6 +460,22 @@ func discoverCandidates(inputPath string, excludes []string) ([]sourceCandidate,
 		return nil, errInputPathPending
 	}
 	return candidates, nil
+}
+
+// validateGenerationChain requires the conventional .N, ... .2, .1, active
+// sequence. Missing intermediate generations are gaps, regardless of mtimes.
+func validateGenerationChain(candidates []sourceCandidate) error {
+	for i := 0; i+1 < len(candidates); i++ {
+		older, newer := candidates[i], candidates[i+1]
+		expected := uint64(0)
+		if !newer.current {
+			expected = newer.number
+		}
+		if older.current || older.number == 0 || older.number-1 != expected {
+			return fmt.Errorf("source generation gap between %s and %s: %w", older.path, newer.path, &SourceGapError{Identity: older.identity})
+		}
+	}
+	return nil
 }
 
 func isExcludedPath(path string, excluded []string) bool {
