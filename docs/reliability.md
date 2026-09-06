@@ -77,7 +77,7 @@ Checkpoint and lock paths are traversed component by component without symlinks;
 
 A corrupted, unsupported, or mismatched checkpoint causes an explicit startup error. It never causes an implicit jump to the current EOF. Recovery policies other than fail-closed remain planned.
 
-Checkpoint schema version 1 is the only durable format released so far. It is not rewritten into a different version implicitly. Interrupted temporary checkpoint files are ignored; the last atomically renamed checkpoint remains authoritative. Upgrade and rollback steps are documented in `runbook.md`.
+Checkpoint schema version 1 is the only currently implemented durable format. It is not rewritten into a different version implicitly. Interrupted temporary checkpoint files are ignored; the last atomically renamed checkpoint remains authoritative. Upgrade and rollback steps are documented in `runbook.md`.
 
 ## Startup recovery
 

@@ -10,6 +10,8 @@ import sys
 import tarfile
 import tempfile
 
+sys.dont_write_bytecode = True
+
 spec = importlib.util.spec_from_file_location("verifier", Path(__file__).with_name("verify-release.py"))
 v = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(v)

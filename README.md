@@ -111,6 +111,8 @@ See `docs/runbook.md` for standalone and systemd installation instructions and l
 
 ## Build from source
 
+Use the supported release toolchain pinned in `.go-version`. The `go 1.22` directive in `go.mod` is minimum source compatibility, not the official build toolchain. See [Release verification](docs/release.md) for the full shared quality gate.
+
 ```bash
 go test ./...
 go vet ./...

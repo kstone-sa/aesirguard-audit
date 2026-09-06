@@ -7,11 +7,12 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/kstone-sa/audit2json/internal/securefile"
 	"os"
 	"path/filepath"
 	"syscall"
 	"time"
+
+	"github.com/kstone-sa/audit2json/internal/securefile"
 )
 
 // FileLock owns a kernel-managed advisory lock. The lock file remains on disk

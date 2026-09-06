@@ -7,6 +7,7 @@ Choose the standalone archive for a scheduler, container, custom supervisor, or 
 Verify and extract it without installing host-service assets:
 
 ```bash
+set -euo pipefail
 archive=audit2json_VERSION_linux_ARCH_standalone.tar.gz
 # Select exactly one manifest entry; do not require the three unselected files.
 awk -v file="./$archive" '$2 == file { print; n++ } END { if (n != 1) exit 1 }' SHA256SUMS > selected.sha256 &&

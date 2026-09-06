@@ -6,11 +6,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/kstone-sa/audit2json/internal/securefile"
 	"io"
 	"path/filepath"
 	"syscall"
 	"time"
+
+	"github.com/kstone-sa/audit2json/internal/securefile"
 )
 
 const CheckpointVersion = 1
