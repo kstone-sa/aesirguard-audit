@@ -127,9 +127,7 @@ func (assembler *Assembler) addAt(record Record, observedAt time.Time) ([]Assemb
 			if auditTime, ok := auditTimeFromID(record.ID); ok {
 				pending.auditTime = auditTime
 				pending.hasAuditTS = true
-				if auditTime.After(assembler.latestAuditTime) {
-					assembler.latestAuditTime = auditTime
-				}
+				assembler.observeAuditTime(auditTime)
 			}
 			assembler.pending[record.ID] = pending
 		}
@@ -234,6 +232,33 @@ func (assembler *Assembler) checkLimits(record Record, pending *pendingEvent, ex
 	return nil
 }
 
+// observeAuditTime confines watermark expiry to a continuous clock epoch.
+// A large forward jump is not proof that pending events are old; a rollback
+// outside the reorder window must not leave a permanent future watermark.
+func (assembler *Assembler) observeAuditTime(timestamp time.Time) {
+	if !assembler.latestAuditTime.IsZero() && assembler.timeout > 0 {
+		forwardWindow := time.Minute
+		if assembler.timeout > forwardWindow/2 {
+			forwardWindow = assembler.timeout
+			// Avoid duration overflow for extreme but valid configuration values.
+			if assembler.timeout <= time.Duration(1<<63-1)/2 {
+				forwardWindow *= 2
+			}
+		}
+		delta := timestamp.Sub(assembler.latestAuditTime)
+		if delta > forwardWindow || delta <= -assembler.timeout {
+			for _, pending := range assembler.pending {
+				pending.hasAuditTS = false
+			}
+			assembler.latestAuditTime = timestamp
+			return
+		}
+	}
+	if timestamp.After(assembler.latestAuditTime) {
+		assembler.latestAuditTime = timestamp
+	}
+}
+
 func (assembler *Assembler) expired(now time.Time) []readyEvent {
 	if assembler.timeout <= 0 {
 		return nil
@@ -297,6 +322,16 @@ func auditTimeFromID(id string) (time.Time, bool) {
 	if dot >= 0 {
 		secondsText = timestamp[:dot]
 		fractionText = timestamp[dot+1:]
+	}
+	if secondsText == "" || dot >= 0 && fractionText == "" {
+		return time.Time{}, false
+	}
+	for _, part := range []string{secondsText, fractionText} {
+		for _, char := range part {
+			if char < '0' || char > '9' {
+				return time.Time{}, false
+			}
+		}
 	}
 	seconds, err := strconv.ParseInt(secondsText, 10, 64)
 	if err != nil {

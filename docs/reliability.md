@@ -116,7 +116,9 @@ For ambiguous events, use:
 - an event-time watermark while newer records are arriving;
 - a monotonic inactivity timeout when the stream is idle.
 
-This avoids unnecessary delay while reading historical backlog and bounds live-event latency when an explicit terminator is absent.
+Watermarks operate within a continuous Audit-clock epoch. A forward jump exceeding the greater of one minute or twice the event timeout, or a rollback of at least the event timeout, starts a new epoch. Pending events from the previous epoch retain all records and expire only by inactivity or an explicit boundary. Invalid timestamp syntax cannot advance the watermark. Small out-of-order arrivals within the timeout retain the current watermark. This conservative heuristic cannot distinguish every legitimate clock change from bad source time; it prevents a large jump from permanently poisoning subsequent event assembly.
+
+This avoids unnecessary delay during continuous historical backlog and bounds live-event latency when an explicit terminator is absent. Inactivity uses observation time (monotonic in the running process), independently of source timestamps.
 
 Pending events, records, and bytes have configured upper bounds. Reaching a bound produces a visible operational error; it never causes silent eviction.
 
