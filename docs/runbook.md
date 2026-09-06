@@ -7,8 +7,11 @@ Choose the standalone archive for a scheduler, container, custom supervisor, or 
 Verify and extract it without installing host-service assets:
 
 ```bash
-sha256sum -c SHA256SUMS
-tar -xzf audit2json_VERSION_linux_ARCH_standalone.tar.gz
+archive=audit2json_VERSION_linux_ARCH_standalone.tar.gz
+# Select exactly one manifest entry; do not require the three unselected files.
+awk -v file="./$archive" '$2 == file { print; n++ } END { if (n != 1) exit 1 }' SHA256SUMS > selected.sha256 &&
+  sha256sum -c selected.sha256 &&
+  tar -xzf "$archive"
 cd audit2json_VERSION_linux_ARCH_standalone
 ./audit2json --version
 ./audit2json --config configs/audit2json.example.json --check-config
