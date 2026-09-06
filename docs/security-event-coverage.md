@@ -4,7 +4,7 @@
 
 CIS Server Level 1 and Level 2 remain a validation profile, not the renderer boundary. The generic mapping in `data/security_event_families.json` classifies portable Linux Audit record types without introducing Splunk CIM, Sentinel ASIM, Elastic ECS, or another backend contract.
 
-The canonical event keeps only fields with a stable security or forensic meaning. It does not expose an arbitrary source-field map. `event.type` preserves the primary Audit record type, `event.category` and `event.action` provide a stable semantic classification, and renderer version 3 derives an optional analyst-readable sentence from those canonical fields.
+The canonical event keeps only fields with a stable security or forensic meaning. It does not expose an arbitrary source-field map. `event.type` preserves the primary Audit record type, `event.category` and `event.action` provide a stable semantic classification, and renderer version 4 derives an optional analyst-readable sentence from those canonical fields.
 
 ## Mapped families
 
