@@ -8,13 +8,13 @@ Output is newline-delimited JSON: one logical Linux Audit event per line. Empty 
 
 Within schema major version 1, field types and documented semantics are stable. Compatible revisions may add optional fields; consumers must ignore fields they do not use. Removing a field, changing its type or meaning, or making an optional field required needs a new schema major version and migration documentation.
 
-The machine-readable contract is `schema/audit2json-v1.schema.json`. The Go model and the published schema version are checked together by the test suite.
+The machine-readable contract is `schema/audit2json-v1.schema.json`. CI checks the version constant and independently validates emitted fixture events against Draft 2020-12, including negative contracts.
 
 ## Security-oriented boundary
 
 The parser retains source records while assembling an event, but the canonical output is not a JSON copy of auditd. It emits fields with defined security or forensic meaning.
 
-Unsupported record families are reported through `event.issues`; arbitrary source fields are not copied into normal events. A malformed physical line is the sole exception: it is emitted as a `parse_failure` event with the original line in `audit.raw`, preventing silent loss while keeping raw auditd noise out of valid events.
+Unsupported record families are reported through `event.issues`; arbitrary source fields are not copied into normal events. A malformed physical line is emitted as a `parse_failure` event with reversible source content in `audit.raw`. Exceptional decoding, argument-completeness, and conflicting-evidence issues retain the affected source fields explicitly; ordinary events do not copy arbitrary raw auditd payloads.
 
 ## Top-level contract
 

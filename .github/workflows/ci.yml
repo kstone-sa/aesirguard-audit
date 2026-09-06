@@ -26,6 +26,12 @@ jobs:
           fi
       - name: Run tests
         run: go test ./...
+      - name: Validate emitted JSON Schema contracts
+        run: |
+          python3 -m venv "${RUNNER_TEMP}/schema-validation"
+          "${RUNNER_TEMP}/schema-validation/bin/pip" install 'jsonschema==4.26.0'
+          go build -o "${RUNNER_TEMP}/audit2json-schema-check" ./cmd/audit2json
+          "${RUNNER_TEMP}/schema-validation/bin/python" scripts/validate-schema.py "${RUNNER_TEMP}/audit2json-schema-check"
       - name: Run race detector
         run: go test -race ./...
       - name: Run vet

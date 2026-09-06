@@ -78,7 +78,7 @@ Prefer small fixtures that demonstrate one behavior, plus golden events for comp
 Coverage priorities:
 
 - repeated and nested fields;
-- quoted, escaped, hexadecimal, and malformed values;
+- quoted values, literal backslashes, hexadecimal encodings, and malformed values;
 - interleaved and out-of-order records;
 - EOE, terminal, single-record, watermark, and timeout completion;
 - long and fragmented EXECVE;
@@ -111,3 +111,7 @@ Do not copy the same detailed invariant into multiple files. Use:
 ## Commit discipline
 
 Use one conceptual change per commit. Documentation-only planning should not contain code changes. Functional commits should name the affected boundary, such as parser, assembler, collector, checkpoint, rotation, mapping, renderer, or sink.
+
+## Schema validation tooling
+
+The collector runtime remains Go and standard-library-only. CI uses Python's `jsonschema==4.26.0` exclusively as an independent development validator in a disposable virtual environment. Build the binary, then run `python3 scripts/validate-schema.py /absolute/path/to/audit2json` from an environment with that validator installed. It validates all emitted fixture events against Draft 2020-12, exercises the exceptional byte and seccomp fields, and checks negative contracts. It is not part of runtime deployment or release archives.
