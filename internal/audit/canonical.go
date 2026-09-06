@@ -128,13 +128,14 @@ type CanonicalOrigin struct {
 }
 
 type CanonicalSecurity struct {
-	Decision       string   `json:"decision,omitempty"`
-	Permissions    []string `json:"permissions,omitempty"`
-	SubjectContext string   `json:"subject_context,omitempty"`
-	TargetContext  string   `json:"target_context,omitempty"`
-	TargetClass    string   `json:"target_class,omitempty"`
-	Profile        string   `json:"profile,omitempty"`
-	Permissive     *bool    `json:"permissive,omitempty"`
+	Seccomp        *CanonicalSeccomp `json:"seccomp,omitempty"`
+	Decision       string            `json:"decision,omitempty"`
+	Permissions    []string          `json:"permissions,omitempty"`
+	SubjectContext string            `json:"subject_context,omitempty"`
+	TargetContext  string            `json:"target_context,omitempty"`
+	TargetClass    string            `json:"target_class,omitempty"`
+	Profile        string            `json:"profile,omitempty"`
+	Permissive     *bool             `json:"permissive,omitempty"`
 }
 
 type CanonicalProcess struct {
@@ -268,6 +269,14 @@ func BuildCanonicalEvent(assembled AssembledEvent, options CanonicalOptions) Can
 	var securityIssues []CanonicalIssue
 	event.Security, securityIssues = buildCanonicalSecurity(assembled.Records)
 	event.Event.Issues = append(event.Event.Issues, securityIssues...)
+	seccomp, seccompIssues := buildCanonicalSeccomp(assembled.Records)
+	if seccomp != nil {
+		if event.Security == nil {
+			event.Security = &CanonicalSecurity{}
+		}
+		event.Security.Seccomp = seccomp
+	}
+	event.Event.Issues = append(event.Event.Issues, seccompIssues...)
 	var pathIssues []CanonicalIssue
 	event.Paths, pathIssues = buildCanonicalPaths(assembled.Records)
 	event.Event.Issues = append(event.Event.Issues, pathIssues...)
@@ -326,6 +335,16 @@ func buildCanonicalTarget(records []Record, primaryType string) *CanonicalTarget
 }
 
 func buildCanonicalOrigin(records []Record) *CanonicalOrigin {
+	var producers []Record
+	for _, r := range records {
+		// Connection origins come from userspace authentication/account
+		// producers. Kernel fields named ip may instead be instruction pointers.
+		family, mapped := securityEventFamilyForType(r.Type)
+		if mapped && (strings.HasPrefix(r.Type, "USER_") || family.Category == "authentication" || family.Category == "identity" || family.Category == "session") {
+			producers = append(producers, r)
+		}
+	}
+	records = producers
 	origin := CanonicalOrigin{
 		Address:  meaningfulAuditValue(firstNonemptySemanticRecordValue(records, "addr", "ip")),
 		Host:     meaningfulAuditValue(firstNonemptySemanticRecordValue(records, "hostname", "host")),

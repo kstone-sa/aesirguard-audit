@@ -1,0 +1,25 @@
+type=SECCOMP msg=audit(100.0:10): arch=c000003e syscall=39 ip=0x123 code=0x00000000 sig=0
+type=EOE msg=audit(100.0:10):
+type=SECCOMP msg=audit(100.0:11): arch=c000003e syscall=39 ip=0x123 code=0x80000000 sig=0
+type=EOE msg=audit(100.0:11):
+type=SECCOMP msg=audit(100.0:12): arch=c000003e syscall=39 ip=0x123 code=0x00030000 sig=0
+type=EOE msg=audit(100.0:12):
+type=SECCOMP msg=audit(100.0:13): arch=c000003e syscall=39 ip=0x123 code=0x0005000d sig=0
+type=EOE msg=audit(100.0:13):
+type=SECCOMP msg=audit(100.0:14): arch=c000003e syscall=39 ip=0x123 code=0x7fc00000 sig=0
+type=EOE msg=audit(100.0:14):
+type=SECCOMP msg=audit(100.0:15): arch=c000003e syscall=39 ip=0x123 code=0x7ff00000 sig=0
+type=EOE msg=audit(100.0:15):
+type=SECCOMP msg=audit(100.0:16): arch=c000003e syscall=39 ip=0x123 code=0x7ffc0000 sig=0
+type=EOE msg=audit(100.0:16):
+type=SECCOMP msg=audit(100.0:17): arch=c000003e syscall=39 ip=0x123 code=0x7fff0000 sig=0
+type=EOE msg=audit(100.0:17):
+type=SECCOMP msg=audit(100.0:18): arch=c000003e syscall=39 ip=0x123 code=0x12340000 sig=0
+type=EOE msg=audit(100.0:18):
+type=BPRM_FCAPS msg=audit(100.0:20): fp=0000000000002000
+type=AVC msg=audit(100.0:20): avc: denied { read } for scontext=a tcontext=b permissive=1
+type=AVC msg=audit(100.0:20): avc: denied { write } for scontext=c tcontext=d permissive=0
+type=EOE msg=audit(100.0:20):
+type=CONFIG_CHANGE msg=audit(100.0:21): res=0 op=add_rule
+type=SYSCALL msg=audit(100.0:21): success=yes pid=12 exe="/bin/auditctl"
+type=EOE msg=audit(100.0:21):

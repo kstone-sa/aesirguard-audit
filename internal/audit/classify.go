@@ -26,6 +26,7 @@ type securityEventFamilyDocument struct {
 	Version           string                          `json:"version"`
 	RecordTypes       map[string]securityEventFamily  `json:"record_types"`
 	RecordPrefixes    []securityEventFamilyPrefixRule `json:"record_prefixes"`
+	SeccompActions    map[string]seccompAction        `json:"seccomp_actions"`
 	SingleRecordTypes []string                        `json:"single_record_types"`
 }
 
@@ -48,6 +49,14 @@ func classifyCanonicalEvent(event *CanonicalEvent) {
 	if hasSecurityFamily && event.Event.Type != "KERN_MODULE" {
 		event.Event.Category = family.Category
 		event.Event.Action = family.Action
+		if event.Event.Type == "SECCOMP" && event.Security != nil && event.Security.Seccomp != nil {
+			for _, action := range securityEventFamilies.SeccompActions {
+				if action.Action == event.Security.Seccomp.Action {
+					event.Event.Action = action.EventAction
+					break
+				}
+			}
+		}
 		return
 	}
 

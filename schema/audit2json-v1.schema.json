@@ -150,7 +150,19 @@
         "target_context": {"type": "string"},
         "target_class": {"type": "string"},
         "profile": {"type": "string"},
-        "permissive": {"type": "boolean"}
+        "permissive": {"type": "boolean"},
+        "seccomp": {"$ref": "#/$defs/seccomp"}
+      }
+    },
+    "seccomp": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["action"],
+      "properties": {
+        "action": {"enum": ["kill_thread", "kill_process", "trap", "errno", "user_notif", "trace", "log", "allow", "unknown"]},
+        "code": {"type": "string"},
+        "signal": {"type": "string"},
+        "instruction_pointer": {"type": "string"}
       }
     },
     "path": {

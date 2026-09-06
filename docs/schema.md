@@ -174,3 +174,11 @@ The existing flat `security` object represents one deterministic decision (famil
 The primary action's own result takes precedence over a correlated syscall result: successful netlink transport does not establish a successful audit-configuration change. CONFIG_CHANGE, FEATURE_CHANGE, MAC_STATUS and MAC_POLICY_LOAD accept their kernel `res=0/1` convention; unrelated userspace families do not inherit that convention. Contradictory result evidence within the selected family remains unknown with explicit source-field issues.
 
 Renderer version 4 distinguishes a policy denial that was not enforced in permissive mode from an enforced denial. Permissive mode does not itself imply that the underlying syscall succeeded; its outcome remains independently represented by `event.success`.
+
+### SECCOMP evidence (pre-1.0 addition)
+
+`security.seccomp` retains `action`, the full original `code` (including action data), optional `signal`, and `instruction_pointer`. Actions are `kill_thread`, `kill_process`, `trap`, `errno`, `user_notif`, `trace`, `log`, `allow`, or `unknown`. This is a deliberate pre-release v1 addition: filter actions and instruction pointers are materially useful security evidence, and neither can be represented truthfully as a generic block or remote address.
+
+Canonical actions distinguish termination, trapping, rejection, notification, tracing, logging, and allowance. LOG permits execution after logging; TRACE and USER_NOTIF leave the eventual decision to another participant and do not imply a block or successful syscall. Unknown or conflicting codes remain `filter_syscall` with explicit issues. Secondary distinct seccomp records are retained in `additional_seccomp_evidence` issues. The renderer describes the filter observation without attributing a user's intent to block their own syscall.
+
+Origin extraction is limited to mapped userspace/account/authentication/session producers. A SECCOMP `ip` is only an instruction pointer; it never populates `origin.address`, even in a compound event with a genuine connection origin. SECCOMP and access-control decision evidence may coexist in `security` independently of the chosen primary event type.

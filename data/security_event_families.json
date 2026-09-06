@@ -51,7 +51,7 @@
     "MAC_STATUS": {"category": "access_control", "action": "change_policy_status"},
     "MAC_POLICY_LOAD": {"category": "access_control", "action": "load_mac_policy"},
 
-    "SECCOMP": {"category": "access_control", "action": "block_syscall"},
+    "SECCOMP": {"category": "access_control", "action": "filter_syscall"},
     "BPF": {"category": "kernel", "action": "bpf_operation"},
     "CAPSET": {"category": "process", "action": "change_capabilities"},
     "BPRM_FCAPS": {"category": "process", "action": "apply_file_capabilities"},
@@ -61,6 +61,16 @@
     {"prefix": "ANOM_", "category": "security", "action": "detect_anomaly"},
     {"prefix": "INTEGRITY_", "category": "integrity", "action": "check_integrity"}
   ],
+  "seccomp_actions": {
+    "00000000": {"action": "kill_thread", "event_action": "terminate_by_seccomp"},
+    "80000000": {"action": "kill_process", "event_action": "terminate_by_seccomp"},
+    "00030000": {"action": "trap", "event_action": "trap_syscall"},
+    "00050000": {"action": "errno", "event_action": "block_syscall"},
+    "7fc00000": {"action": "user_notif", "event_action": "notify_syscall"},
+    "7ff00000": {"action": "trace", "event_action": "trace_syscall"},
+    "7ffc0000": {"action": "log", "event_action": "log_syscall"},
+    "7fff0000": {"action": "allow", "event_action": "allow_syscall"}
+  },
   "single_record_types": [
     "USER_AUTH", "USER_ACCT", "USER_LOGIN", "USER_LOGOUT", "USER_START", "USER_END",
     "CRED_ACQ", "CRED_DISP", "CRED_REFR", "USER_CHAUTHTOK", "GRP_CHAUTHTOK",

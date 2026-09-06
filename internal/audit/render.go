@@ -76,6 +76,22 @@ func WithHumanMessage(event CanonicalEvent) CanonicalEvent {
 }
 
 func renderCanonicalMessage(event CanonicalEvent) (string, bool) {
+	if event.Event.Type == "SECCOMP" {
+		message := renderedActor(event) + " triggered seccomp filtering"
+		if event.Security != nil && event.Security.Seccomp != nil && event.Security.Seccomp.Action != "unknown" {
+			message += " with action " + event.Security.Seccomp.Action
+		}
+		if event.Process != nil {
+			syscall := event.Process.Syscall
+			if syscall == "" {
+				syscall = event.Process.SyscallNumber
+			}
+			if syscall != "" {
+				message += " for syscall " + syscall
+			}
+		}
+		return message, true
+	}
 	switch event.Event.Action {
 	case "execute":
 		return renderProcessMessage(event)
