@@ -1,6 +1,10 @@
 # audit2json
 
-audit2json turns raw Linux Audit data into compact, security-oriented events for detection engineering, threat hunting, incident investigation, and compliance monitoring.
+**Security-oriented Linux Audit normalization without changing the Linux Audit stack.**
+
+audit2json turns raw Linux Audit data into compact, canonical JSON events for detection engineering, threat hunting, incident investigation, and compliance monitoring.
+
+It is deliberately non-invasive: audit2json can process existing `audit.log` files without replacing `auditd`, installing an audit plugin, or modifying the host's audit pipeline. It can run entirely within the collection layer—for example as part of a Splunk deployment—so security teams can add Linux Audit normalization without introducing another host-level service.
 
 Linux Audit provides rich forensic evidence, but emits fragmented, kernel-centric records whose security meaning is expensive to reconstruct downstream. audit2json follows the audit stream, correlates multi-record events, preserves relevant evidence, and normalizes process execution, file activity, authentication, account and session changes, privilege use, audit tampering, mandatory access-control decisions, integrity events, and selected kernel-security activity into a stable canonical JSON schema.
 
