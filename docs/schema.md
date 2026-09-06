@@ -128,7 +128,7 @@ The renderer:
 - quotes ambiguous arguments;
 - omits itself for unsupported event families.
 
-Renderer version `3` covers the Linux Audit activity families selected by the targeted CIS Server L1+L2 profiles plus the security-event families in `security-event-coverage.md`. Process execution messages require a named `execve`/`execveat` syscall, EXECVE provenance, or an execution action already established by the classifier. An executable path or PROCTITLE-derived argv alone never establishes execution.
+Renderer version `4` covers the Linux Audit activity families selected by the targeted CIS Server L1+L2 profiles plus the security-event families in `security-event-coverage.md`. Process execution messages require a named `execve`/`execveat` syscall, EXECVE provenance, or an execution action already established by the classifier. An executable path or PROCTITLE-derived argv alone never establishes execution.
 
 Classification uses typed EXECVE or named execution-syscall evidence, normalized syscall and outcome, normalized rule keys, and conservatively matched paths. Rule keys are locally configurable and therefore are not the sole contract. A security-relevant path is accepted without a recognized key only when the syscall itself proves a mutation. See `cis-coverage.md` for the supported baseline and family matrix.
 
@@ -168,3 +168,9 @@ Malformed physical lines remain in `audit.raw`. If the line itself is not UTF-8,
 Primary mapped record selection is deterministic: access-control families precede integrity/anomaly families, which precede other mapped families; record type names break ties lexically. Evidence extraction is independent of that primary type. Each access-control context is decoded from its own record, so an unrelated SYSCALL `subj` never supplies the subject of an AVC decision.
 
 The existing flat `security` object represents one deterministic decision (family precedence, type name, then canonical decision fields). Additional distinct decisions are preserved in `additional_security_evidence` issues, including their original decision, permissions, subject/target context, class, profile, and permissive fields with the source provenance described above. These are multiple observed decisions, not automatically malicious input or incomplete assembly. Consumers must inspect issues before assuming the flat object exhausts the event's security evidence.
+
+### Result and renderer semantics
+
+The primary action's own result takes precedence over a correlated syscall result: successful netlink transport does not establish a successful audit-configuration change. CONFIG_CHANGE, FEATURE_CHANGE, MAC_STATUS and MAC_POLICY_LOAD accept their kernel `res=0/1` convention; unrelated userspace families do not inherit that convention. Contradictory result evidence within the selected family remains unknown with explicit source-field issues.
+
+Renderer version 4 distinguishes a policy denial that was not enforced in permissive mode from an enforced denial. Permissive mode does not itself imply that the underlying syscall succeeded; its outcome remains independently represented by `event.success`.

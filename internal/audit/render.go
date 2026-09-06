@@ -7,7 +7,7 @@ import (
 )
 
 // HumanRendererVersion identifies the deterministic message template set.
-const HumanRendererVersion = "3"
+const HumanRendererVersion = "4"
 
 type actionWording struct {
 	success string
@@ -149,6 +149,9 @@ func renderAccessControlMessage(event CanonicalEvent) (string, bool) {
 		switch strings.ToLower(event.Security.Decision) {
 		case "denied", "deny":
 			decision = "was denied access by mandatory access-control policy"
+			if event.Security.Permissive != nil && *event.Security.Permissive {
+				decision = "triggered a policy denial that was not enforced in permissive mode"
+			}
 		case "allowed", "allow", "granted":
 			decision = "was allowed access by mandatory access-control policy"
 		}

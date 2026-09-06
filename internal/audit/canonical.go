@@ -208,14 +208,10 @@ func BuildCanonicalEvent(assembled AssembledEvent, options CanonicalOptions) Can
 			Reason: assembled.Completion,
 		}
 	}
-	if success, ok := canonicalSuccess(assembled.Records); ok {
+	if success, ok, resultIssues := canonicalSuccess(assembled.Records, event.Event.Type); ok {
 		event.Event.Success = &success
-	} else if raw := firstNonemptySemanticRecordValue(assembled.Records, "success", "res"); raw != "" {
-		event.Event.Issues = append(event.Event.Issues, CanonicalIssue{
-			Code:  "unknown_result",
-			Field: "event.success",
-			Value: raw,
-		})
+	} else {
+		event.Event.Issues = append(event.Event.Issues, resultIssues...)
 	}
 	for _, recordType := range unsupportedRecordTypes(assembled.Records) {
 		event.Event.Issues = append(event.Event.Issues, CanonicalIssue{
@@ -285,17 +281,6 @@ func canonicalAudit(id string) CanonicalAudit {
 		audit.Time = timestamp.Format(time.RFC3339Nano)
 	}
 	return audit
-}
-
-func canonicalSuccess(records []Record) (bool, bool) {
-	switch strings.ToLower(firstNonemptySemanticRecordValue(records, "success", "res")) {
-	case "yes", "success", "succeeded":
-		return true, true
-	case "no", "failed", "failure":
-		return false, true
-	default:
-		return false, false
-	}
 }
 
 func buildCanonicalProcess(records []Record) (CanonicalProcess, []CanonicalIssue) {
