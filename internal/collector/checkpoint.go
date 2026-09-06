@@ -1,11 +1,13 @@
 package collector
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/kstone-sa/audit2json/internal/securefile"
 	"io"
-	"os"
 	"path/filepath"
 	"syscall"
 	"time"
@@ -34,32 +36,32 @@ func CanonicalPath(path string) (string, error) {
 
 // LoadCheckpoint reads and validates a checkpoint. A missing file returns nil.
 func LoadCheckpoint(path string) (*Checkpoint, error) {
-	fd, err := syscall.Open(path, syscall.O_RDONLY|syscall.O_CLOEXEC|syscall.O_NOFOLLOW, 0)
+	directory, err := openStateDirectory(filepath.Dir(path), "checkpoint", false)
 	if errors.Is(err, syscall.ENOENT) {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, err
 	}
-	file := os.NewFile(uintptr(fd), path)
+	defer directory.Close()
+	file, err := securefile.OpenRegularAt(directory, filepath.Base(path), "checkpoint", syscall.O_RDONLY, 0, false)
+	if errors.Is(err, syscall.ENOENT) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
 	defer file.Close()
-	if err := validateLockDirectory(filepath.Dir(path)); err != nil {
-		return nil, fmt.Errorf("checkpoint directory: %w", err)
-	}
-	if err := validateLockFile(file); err != nil {
-		return nil, fmt.Errorf("checkpoint file: %w", err)
-	}
 	info, err := file.Stat()
 	if err != nil {
 		return nil, err
 	}
-	if !info.Mode().IsRegular() {
-		return nil, fmt.Errorf("checkpoint %s is not a regular file", path)
+	// Checkpoint v1 is a small state document, never an unbounded input stream.
+	const maxCheckpointBytes = 64 * 1024
+	if info.Size() > maxCheckpointBytes {
+		return nil, fmt.Errorf("checkpoint exceeds %d bytes", maxCheckpointBytes)
 	}
-	if info.Mode().Perm()&0o022 != 0 {
-		return nil, fmt.Errorf("checkpoint %s is group- or world-writable", path)
-	}
-	decoder := json.NewDecoder(file)
+	decoder := json.NewDecoder(io.LimitReader(file, maxCheckpointBytes+1))
 	decoder.DisallowUnknownFields()
 	var checkpoint Checkpoint
 	if err := decoder.Decode(&checkpoint); err != nil {
@@ -97,29 +99,39 @@ func SaveCheckpoint(path string, checkpoint Checkpoint) (returnErr error) {
 	if err := checkpoint.Validate(); err != nil {
 		return err
 	}
-	directory := filepath.Dir(path)
-	if err := os.MkdirAll(directory, 0o700); err != nil {
-		return err
-	}
-	if err := validateLockDirectory(directory); err != nil {
-		return fmt.Errorf("checkpoint directory: %w", err)
-	}
-	temporary, err := os.CreateTemp(directory, ".audit2json-checkpoint-*")
+	directory, err := openStateDirectory(filepath.Dir(path), "checkpoint", true)
 	if err != nil {
 		return err
 	}
-	temporaryPath := temporary.Name()
+	defer func() { returnErr = errors.Join(returnErr, directory.Close()) }()
+	name := filepath.Base(path)
+	// Reject unsafe existing targets before replacement. All subsequent mutations
+	// use the pinned directory, even if its pathname is renamed concurrently.
+	existing, err := securefile.OpenRegularAt(directory, name, "checkpoint", syscall.O_RDONLY, 0, false)
+	if err == nil {
+		if err := existing.Close(); err != nil {
+			return err
+		}
+	} else if !errors.Is(err, syscall.ENOENT) {
+		return err
+	}
+	var random [16]byte
+	if _, err := rand.Read(random[:]); err != nil {
+		return err
+	}
+	temporaryName := ".audit2json-checkpoint-" + hex.EncodeToString(random[:])
+	temporary, err := securefile.OpenRegularAt(directory, temporaryName, "checkpoint temporary", syscall.O_CREAT|syscall.O_EXCL|syscall.O_WRONLY, 0o600, false)
+	if err != nil {
+		return err
+	}
 	defer func() {
 		if temporary != nil {
 			returnErr = errors.Join(returnErr, temporary.Close())
 		}
-		if temporaryPath != "" {
-			returnErr = errors.Join(returnErr, os.Remove(temporaryPath))
+		if temporaryName != "" {
+			returnErr = errors.Join(returnErr, syscall.Unlinkat(int(directory.Fd()), temporaryName))
 		}
 	}()
-	if err := temporary.Chmod(0o600); err != nil {
-		return err
-	}
 	encoder := json.NewEncoder(temporary)
 	encoder.SetEscapeHTML(false)
 	if err := encoder.Encode(checkpoint); err != nil {
@@ -128,20 +140,14 @@ func SaveCheckpoint(path string, checkpoint Checkpoint) (returnErr error) {
 	if err := temporary.Sync(); err != nil {
 		return err
 	}
-	if err := temporary.Close(); err != nil {
-		temporary = nil
-		return err
-	}
+	err = temporary.Close()
 	temporary = nil
-	if err := os.Rename(temporaryPath, path); err != nil {
-		return err
-	}
-	temporaryPath = ""
-	directoryFile, err := os.Open(directory)
 	if err != nil {
 		return err
 	}
-	syncErr := directoryFile.Sync()
-	closeErr := directoryFile.Close()
-	return errors.Join(syncErr, closeErr)
+	if err := syscall.Renameat(int(directory.Fd()), temporaryName, int(directory.Fd()), name); err != nil {
+		return err
+	}
+	temporaryName = ""
+	return directory.Sync()
 }

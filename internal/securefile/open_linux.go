@@ -29,32 +29,53 @@ func openRegular(path, kind string, flags int, mode uint32, allowRootOwner bool)
 	if path == "" {
 		return nil, fmt.Errorf("%s path is empty", kind)
 	}
+	directory, err := OpenDirectory(filepath.Dir(path), kind, false)
+	if err != nil {
+		return nil, err
+	}
+	defer directory.Close()
+	return OpenRegularAt(directory, filepath.Base(path), kind, flags, mode, allowRootOwner)
+}
+
+// OpenDirectory pins a trusted directory by traversing every ancestor without
+// symlinks. Missing directories may be created relative to validated parents.
+func OpenDirectory(path, kind string, create bool) (*os.File, error) {
 	absolute, err := filepath.Abs(path)
 	if err != nil {
 		return nil, err
 	}
-	absolute = filepath.Clean(absolute)
-	components := strings.Split(strings.TrimPrefix(absolute, string(os.PathSeparator)), string(os.PathSeparator))
-	if len(components) == 0 || components[0] == "" {
-		return nil, fmt.Errorf("%s %s has no file name", kind, path)
-	}
-
-	directoryFD, err := syscall.Open(string(os.PathSeparator), syscall.O_RDONLY|syscall.O_DIRECTORY|syscall.O_CLOEXEC|syscall.O_NOFOLLOW, 0)
+	fd, err := syscall.Open("/", syscall.O_RDONLY|syscall.O_DIRECTORY|syscall.O_CLOEXEC|syscall.O_NOFOLLOW, 0)
 	if err != nil {
 		return nil, err
 	}
-	directory := os.NewFile(uintptr(directoryFD), string(os.PathSeparator))
-	defer func() { _ = directory.Close() }()
+	directory := os.NewFile(uintptr(fd), "/")
 	if err := validateDirectory(directory, kind); err != nil {
+		directory.Close()
 		return nil, err
 	}
-	for _, component := range components[:len(components)-1] {
-		nextFD, err := syscall.Openat(int(directory.Fd()), component, syscall.O_RDONLY|syscall.O_DIRECTORY|syscall.O_CLOEXEC|syscall.O_NOFOLLOW, 0)
+	for _, component := range strings.Split(strings.TrimPrefix(filepath.Clean(absolute), "/"), "/") {
+		if component == "" {
+			continue
+		}
+		nextFD, err := syscall.Openat(int(directory.Fd()), component, syscall.O_RDONLY|syscall.O_DIRECTORY|syscall.O_CLOEXEC|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
+		if errors.Is(err, syscall.ENOENT) && create {
+			if err = syscall.Mkdirat(int(directory.Fd()), component, 0o700); err != nil && !errors.Is(err, syscall.EEXIST) {
+				directory.Close()
+				return nil, err
+			}
+			if err = directory.Sync(); err != nil {
+				directory.Close()
+				return nil, err
+			}
+			nextFD, err = syscall.Openat(int(directory.Fd()), component, syscall.O_RDONLY|syscall.O_DIRECTORY|syscall.O_CLOEXEC|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
+		}
 		if err != nil {
+			directory.Close()
 			return nil, err
 		}
 		next := os.NewFile(uintptr(nextFD), filepath.Join(directory.Name(), component))
 		if err := validateDirectory(next, kind); err != nil {
+			directory.Close()
 			return nil, errors.Join(err, next.Close())
 		}
 		if err := directory.Close(); err != nil {
@@ -62,12 +83,19 @@ func openRegular(path, kind string, flags int, mode uint32, allowRootOwner bool)
 		}
 		directory = next
 	}
+	return directory, nil
+}
 
-	fileFD, err := syscall.Openat(int(directory.Fd()), components[len(components)-1], flags|syscall.O_CLOEXEC|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, mode)
+// OpenRegularAt opens a basename relative to a pinned trusted directory.
+func OpenRegularAt(directory *os.File, name, kind string, flags int, mode uint32, allowRootOwner bool) (*os.File, error) {
+	if name == "" || name == "." || name == ".." || filepath.Base(name) != name {
+		return nil, fmt.Errorf("invalid %s basename", kind)
+	}
+	fileFD, err := syscall.Openat(int(directory.Fd()), name, flags|syscall.O_CLOEXEC|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, mode)
 	if err != nil {
 		return nil, err
 	}
-	file := os.NewFile(uintptr(fileFD), absolute)
+	file := os.NewFile(uintptr(fileFD), filepath.Join(directory.Name(), name))
 	if err := validateRegularFile(file, kind, allowRootOwner); err != nil {
 		return nil, errors.Join(err, file.Close())
 	}

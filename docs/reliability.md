@@ -73,6 +73,8 @@ Checkpoint updates use:
 
 Updates are batched by a configurable time or progress interval. Per-event sync is not required and may conflict with throughput goals.
 
+Checkpoint and lock paths are traversed component by component without symlinks; trusted ancestor directories are pinned by file descriptor. A root-owned sticky ancestor such as `/tmp` is permitted, but the final state directory must not be group- or world-writable. Missing state directories are created relative to validated descriptors. Checkpoint opens are nonblocking and accept only trusted regular files, at most 64 KiB. Temporary creation, rename, cleanup and directory sync use the same pinned directory. FIFOs, devices, unsafe ancestors and symlink targets fail promptly without being replaced.
+
 A corrupted, unsupported, or mismatched checkpoint causes an explicit startup error. It never causes an implicit jump to the current EOF. Recovery policies other than fail-closed remain planned.
 
 Checkpoint schema version 1 is the only durable format released so far. It is not rewritten into a different version implicitly. Interrupted temporary checkpoint files are ignored; the last atomically renamed checkpoint remains authoritative. Upgrade and rollback steps are documented in `runbook.md`.
