@@ -226,6 +226,21 @@ func BuildCanonicalEvent(assembled AssembledEvent, options CanonicalOptions) Can
 		}
 	}
 
+	if assembled.MixedNode {
+		event.Event.Issues = append(event.Event.Issues, CanonicalIssue{Code: "ambiguous_node_presence", Field: "node"})
+	}
+	for index, record := range assembled.Records {
+		if record.NodePresent {
+			if event.Source == nil {
+				event.Source = &CanonicalSource{Host: record.Node}
+			}
+			for _, field := range record.AllFields {
+				if field.Key == "node" && !field.Interpreted {
+					event.Event.Issues = append(event.Event.Issues, sourceFieldIssue("audit_node", record, index, field, false))
+				}
+			}
+		}
+	}
 	if options.Host != "" {
 		event.Source = &CanonicalSource{Host: options.Host}
 	}

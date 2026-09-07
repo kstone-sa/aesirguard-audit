@@ -8,10 +8,74 @@
     "type": "SYSCALL",
     "category": "process",
     "action": "execute",
-    "success": true
+    "success": true,
+    "issues": [
+      {
+        "code": "audit_node",
+        "record_type": "SYSCALL",
+        "field": "node",
+        "value": "776f726b73746174696f6e2d3031",
+        "value_encoding": "hex",
+        "record_index": 0,
+        "quoted": false,
+        "source": "raw"
+      },
+      {
+        "code": "audit_node",
+        "record_type": "EXECVE",
+        "field": "node",
+        "value": "776f726b73746174696f6e2d3031",
+        "value_encoding": "hex",
+        "record_index": 1,
+        "quoted": false,
+        "source": "raw"
+      },
+      {
+        "code": "audit_node",
+        "record_type": "CWD",
+        "field": "node",
+        "value": "776f726b73746174696f6e2d3031",
+        "value_encoding": "hex",
+        "record_index": 2,
+        "quoted": false,
+        "source": "raw"
+      },
+      {
+        "code": "audit_node",
+        "record_type": "PATH",
+        "field": "node",
+        "value": "776f726b73746174696f6e2d3031",
+        "value_encoding": "hex",
+        "record_index": 3,
+        "quoted": false,
+        "source": "raw"
+      },
+      {
+        "code": "audit_node",
+        "record_type": "PATH",
+        "field": "node",
+        "value": "776f726b73746174696f6e2d3031",
+        "value_encoding": "hex",
+        "record_index": 4,
+        "quoted": false,
+        "source": "raw"
+      },
+      {
+        "code": "audit_node",
+        "record_type": "EOE",
+        "field": "node",
+        "value": "776f726b73746174696f6e2d3031",
+        "value_encoding": "hex",
+        "record_index": 5,
+        "quoted": false,
+        "source": "raw"
+      }
+    ]
   },
   "rule": {
-    "keys": ["privileged"]
+    "keys": [
+      "privileged"
+    ]
   },
   "actor": {
     "user": "operator"
@@ -23,7 +87,12 @@
     "real_user": "svc_backup",
     "name": "sudo",
     "executable": "/usr/bin/sudo",
-    "argv": ["sudo", "cat", "--", "/etc/shadow"],
+    "argv": [
+      "sudo",
+      "cat",
+      "--",
+      "/etc/shadow"
+    ],
     "argv_source": "execve",
     "cwd": "/home/operator",
     "tty": "pts0",
@@ -43,11 +112,16 @@
       "owner": "root",
       "group": "shadow",
       "capabilities": {
-        "permitted": ["CAP_NET_RAW"],
+        "permitted": [
+          "CAP_NET_RAW"
+        ],
         "effective": true
       }
     }
   ],
   "message": "operator executed /usr/bin/sudo as root with arguments: cat -- /etc/shadow",
-  "renderer_version": "4"
+  "renderer_version": "4",
+  "source": {
+    "host": "workstation-01"
+  }
 }

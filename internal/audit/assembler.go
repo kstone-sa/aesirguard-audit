@@ -12,13 +12,19 @@ import (
 type Assembler struct {
 	timeout         time.Duration
 	limits          AssemblerLimits
-	pending         map[string]*pendingEvent
+	pending         map[correlationKey]*pendingEvent
 	pendingBytes    int
 	nextSequence    uint64
 	latestAuditTime time.Time
 }
 
+type correlationKey struct {
+	ID, Node    string
+	NodePresent bool
+}
+
 type pendingEvent struct {
+	mixedNode  bool
 	records    []Record
 	sequence   uint64
 	lastSeen   time.Time
@@ -60,6 +66,7 @@ const (
 // AssembledEvent retains the physical records and their event boundary.
 // Normalizers decide how those records are represented in an output schema.
 type AssembledEvent struct {
+	MixedNode  bool
 	ID         string
 	Records    []Record
 	Complete   bool
@@ -75,7 +82,7 @@ type readyEvent struct {
 func NewAssembler(timeout time.Duration) *Assembler {
 	return &Assembler{
 		timeout: timeout,
-		pending: make(map[string]*pendingEvent),
+		pending: make(map[correlationKey]*pendingEvent),
 	}
 }
 
@@ -114,7 +121,15 @@ func (assembler *Assembler) AddCheckedAt(record Record, observedAt time.Time) ([
 
 func (assembler *Assembler) addAt(record Record, observedAt time.Time) ([]AssembledEvent, error) {
 	ready := make([]readyEvent, 0, 2)
-	pending, exists := assembler.pending[record.ID]
+	key := correlationKey{record.ID, record.Node, record.NodePresent}
+	pending, exists := assembler.pending[key]
+	mixed := false
+	for otherKey, other := range assembler.pending {
+		if otherKey.ID == key.ID && otherKey.NodePresent != key.NodePresent {
+			other.mixedNode = true
+			mixed = true
+		}
+	}
 
 	// An EOE without cached records contains no event data.
 	if record.Type != "EOE" || exists {
@@ -122,21 +137,21 @@ func (assembler *Assembler) addAt(record Record, observedAt time.Time) ([]Assemb
 			return nil, err
 		}
 		if !exists {
-			pending = &pendingEvent{sequence: assembler.nextSequence}
+			pending = &pendingEvent{sequence: assembler.nextSequence, mixedNode: mixed}
 			assembler.nextSequence++
 			if auditTime, ok := auditTimeFromID(record.ID); ok {
 				pending.auditTime = auditTime
 				pending.hasAuditTS = true
 				assembler.observeAuditTime(auditTime)
 			}
-			assembler.pending[record.ID] = pending
+			assembler.pending[key] = pending
 		}
 		pending.records = append(pending.records, record)
 		assembler.pendingBytes += record.SourceBytes
 		pending.lastSeen = observedAt
 
 		if isTerminalRecord(record.Type) {
-			ready = append(ready, assembler.finish(record.ID, terminalCompletion(record.Type), true))
+			ready = append(ready, assembler.finish(key, terminalCompletion(record.Type), true))
 		}
 	}
 
@@ -199,7 +214,7 @@ func sourcePositionBefore(left, right SourcePosition) bool {
 	return left.Start < right.Start
 }
 
-func (assembler *Assembler) finish(id string, completion Completion, complete bool) readyEvent {
+func (assembler *Assembler) finish(id correlationKey, completion Completion, complete bool) readyEvent {
 	pending := assembler.pending[id]
 	delete(assembler.pending, id)
 	for _, record := range pending.records {
@@ -208,7 +223,8 @@ func (assembler *Assembler) finish(id string, completion Completion, complete bo
 	return readyEvent{
 		sequence: pending.sequence,
 		event: AssembledEvent{
-			ID:         id,
+			ID:         id.ID,
+			MixedNode:  pending.mixedNode,
 			Records:    pending.records,
 			Complete:   complete,
 			Completion: completion,
@@ -263,7 +279,7 @@ func (assembler *Assembler) expired(now time.Time) []readyEvent {
 	if assembler.timeout <= 0 {
 		return nil
 	}
-	ids := make([]string, 0)
+	ids := make([]correlationKey, 0)
 	for id, pending := range assembler.pending {
 		wallExpired := !pending.lastSeen.IsZero() && !now.Before(pending.lastSeen.Add(assembler.timeout))
 		watermarkExpired := pending.hasAuditTS && !assembler.latestAuditTime.Before(pending.auditTime.Add(assembler.timeout))

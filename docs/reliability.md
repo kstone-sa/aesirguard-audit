@@ -198,3 +198,16 @@ distinguished. Retained source generations must remain append-only and trusted;
 arbitrary in-place rewriting is outside the recovery contract. Version 1 has no
 safe automatic migration because it lacks historical content evidence; see the
 runbook for explicit replay during upgrade.
+
+### Audit node correlation
+
+Correlation uses `(node presence, node value, audit ID)`. Node values use the
+parsed literal spelling (quotes removed), remain case-sensitive, and are not
+DNS-canonicalized; arbitrary node labels must not be collapsed. Empty,
+non-UTF-8 or conflicting repeated raw node identifiers fail parsing with raw
+line preservation. Missing nodes form a separate namespace and never attach
+to named nodes. If both namespaces overlap while an ID remains pending, both
+pending events receive `ambiguous_node_presence`; orphan unnamed EOE also marks
+matching named pending events. No unbounded history is retained after emission.
+Each named node is preserved as reversible `audit_node` evidence, and supplies
+`source.host` unless the explicit host option overrides that display value.

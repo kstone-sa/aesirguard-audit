@@ -200,12 +200,12 @@ func TestBuildCanonicalEventKeepsArchitectureOnlyForRawSyscall(t *testing.T) {
 	}
 }
 
-func TestBuildCanonicalEventEmitsSourceOnlyWhenConfigured(t *testing.T) {
+func TestBuildCanonicalEventNodeSourceAndExplicitOverride(t *testing.T) {
 	record := mustParseRecord(t, `node=workstation-01 type=SYSCALL msg=audit(1721721607.000:49): syscall=1`)
 	assembled := AssembledEvent{ID: record.ID, Records: []Record{record}, Complete: true, Completion: CompletionEOE}
 
 	withoutSource := BuildCanonicalEvent(assembled, CanonicalOptions{})
-	if withoutSource.Source != nil {
+	if withoutSource.Source == nil || withoutSource.Source.Host != "workstation-01" {
 		t.Fatalf("implicit source = %#v", withoutSource.Source)
 	}
 	withSource := BuildCanonicalEvent(assembled, CanonicalOptions{Host: "configured-host"})

@@ -191,3 +191,5 @@ entire payload value, with record index, source section and quoting. No partial
 semantic interpretation of a malformed payload is trusted; subsequent valid
 payloads still parse. Evidence size is bounded by the existing physical-line
 and event-state limits. This uses the existing issue schema.
+
+`source.host` uses the Audit node when present, with an explicit configured host taking precedence. The original node remains in reversible `audit_node` issues even when overridden.

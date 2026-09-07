@@ -19,6 +19,8 @@ type Field struct {
 
 // Record is one raw auditd record parsed into key/value fields.
 type Record struct {
+	Node               string
+	NodePresent        bool
 	Type               string
 	ID                 string
 	Fields             map[string]string
@@ -69,6 +71,18 @@ func ParseRecord(line string) (Record, error) {
 				break
 			}
 		}
+	}
+	for _, f := range allFields {
+		if f.Key != "node" || f.Interpreted {
+			continue
+		}
+		if f.Value == "" || !utf8.ValidString(f.Value) {
+			return Record{}, fmt.Errorf("invalid Audit node")
+		}
+		if r.NodePresent && r.Node != f.Value {
+			return Record{}, fmt.Errorf("conflicting Audit nodes")
+		}
+		r.Node, r.NodePresent = f.Value, true
 	}
 	if r.ID == "" {
 		return Record{}, fmt.Errorf("audit id not found")
