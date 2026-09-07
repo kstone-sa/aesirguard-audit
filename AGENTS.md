@@ -20,7 +20,7 @@ Inspect additional files only when an observed dependency requires them.
 
 ## Status guardrail
 
-The v1.0 implementation is feature-complete but not released. Compatibility with real RAW and ENRICHED Audit output on each listed distribution has not yet been empirically validated. Never describe synthetic fixtures as verified distribution coverage, and do not create a stable tag or change repository visibility without explicit maintainer approval.
+The 0.9.x series is the public qualification pre-release for the v1.0 implementation. Compatibility with real RAW and ENRICHED Audit output on each listed distribution is still being empirically validated. Never describe synthetic fixtures or pre-release availability as verified distribution or production compatibility. Do not create a stable v1.0 tag until the documented empirical validation and release gates are complete and explicit maintainer approval is given.
 
 ## Design rules
 
