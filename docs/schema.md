@@ -203,3 +203,5 @@ interpreted identity/syscall pairs are withheld together on conflict. Rule
 keys, permission lists and argv fragments are not singleton fields. Result
 conflicts retain the existing `conflicting_result` handling. All conflict
 evidence uses bounded, reversible hex values with record and section provenance.
+
+Audit `key` values are decoded before splitting the Linux 0x01 multi-key separator. `rule.keys` preserves first occurrence order and removes empty/duplicate keys; classification matches individual keys.

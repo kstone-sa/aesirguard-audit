@@ -245,7 +245,13 @@ func BuildCanonicalEvent(assembled AssembledEvent, options CanonicalOptions) Can
 		event.Source = &CanonicalSource{Host: options.Host}
 	}
 
-	keys := uniqueRecordValues(assembled.Records, "key")
+	var keyParts []string
+	for _, record := range assembled.Records {
+		for _, encoded := range record.Values["key"] {
+			keyParts = append(keyParts, strings.Split(encoded, "\x01")...)
+		}
+	}
+	keys := uniqueNonempty(keyParts)
 	if len(keys) > 0 {
 		event.Rule = &CanonicalRule{Keys: keys}
 	}
