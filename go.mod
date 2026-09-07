@@ -1,3 +1,3 @@
 module github.com/kstone-sa/audit2json
 
-go 1.22
+go 1.26
