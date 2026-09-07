@@ -2,7 +2,7 @@
 
 All notable changes will be documented in this file. The project has not yet published a stable release.
 
-## Unreleased — v0.9.1 correction line
+## Unreleased â€” v0.9.1 correction line
 
 - Support confirmed kernel LOGIN attribution transitions separately from USER_LOGIN,
   retaining correlated syscall context, old/new loginuid/session evidence and source result.
