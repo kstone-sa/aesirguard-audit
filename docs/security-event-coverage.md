@@ -16,6 +16,7 @@ All rows below recognize/classify the listed types. Typed values are conditional
 |---|---|---|
 | Authentication: `USER_AUTH`, `USER_ACCT`, `USER_LOGIN`, `USER_LOGOUT`, `CRED_ACQ`, `CRED_DISP`, `CRED_REFR`, `USER_ERR` | `event.success` for recognized results; `target.user/user_id` from acct; `origin.address/host/terminal` | Authentication mechanism-specific metadata and credential contents |
 | Account lifecycle: `USER_CHAUTHTOK`, `GRP_CHAUTHTOK`, `USER_MGMT`, `GRP_MGMT`, `ADD_USER`, `DEL_USER`, `ADD_GROUP`, `DEL_GROUP`, `ACCT_LOCK`, `ACCT_UNLOCK` | Result; acct target; eligible userspace origin; source operation | No typed group membership delta, changed-account attribute set, or before/after credential state |
+| Kernel Audit attribution: `LOGIN` | `session` / `set_audit_attribution`; `process.audit_attribution.old/new` retains loginuid, enriched user, session ID and explicit unset flags; own numeric result (0/1) | Sets or attempts to set kernel loginuid/session attribution; never equivalent to `USER_LOGIN`. Remains correlated with SYSCALL/PROCTITLE until EOE or an incomplete boundary; new values are applied only on success |
 | Sessions: `USER_START`, `USER_END` | Result, acct target, userspace origin | No dedicated session lifecycle object or normalized session duration |
 | System: `SYSTEM_BOOT`, `SYSTEM_SHUTDOWN`, `SYSTEM_RUNLEVEL` | Common projection and recognized result | Boot metadata and old/new runlevels are not normalized |
 | Services/software: `SERVICE_START`, `SERVICE_STOP`, `SOFTWARE_UPDATE` | `target.service` from unit/service, `target.name` when supplied; result | Package version transitions, package identity beyond supplied name, dependency/install detail |
@@ -35,6 +36,8 @@ All rows below recognize/classify the listed types. Typed values are conditional
 For compound events, mapped security evidence takes deterministic priority over ordinary syscall classification. AVC contexts remain separate from unrelated subjects. Additional distinct supported security decisions are retained in explicit issues; this does not extend preservation to all unmodeled fields in the table. Unknown/conflicting results and exceptional byte/argv evidence also remain explicit issues.
 
 Renderer version 5 summarizes only the available canonical fields. It cannot reconstruct omitted transitions or provide richer semantics than the structured event. SECCOMP LOG, ALLOW, TRACE and USER_NOTIF are distinct from blocking; permissive denials do not imply enforcement or syscall success.
+
+`USER_ACCT` validates a PAM account; `CRED_ACQ` acquires credentials; `USER_START` starts a PAM session; `USER_LOGIN` records a user login. `LOGIN` separately records the kernel Audit attribution transition and takes primary meaning over a correlated SYSCALL write. `testdata/login_transition.audit` preserves the sanitized real group with the actual ENRICHED 0x1d separators.
 
 ## Contract tests
 

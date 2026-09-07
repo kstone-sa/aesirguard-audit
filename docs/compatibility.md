@@ -44,7 +44,7 @@ This is an initial empirical exercise, not full Ubuntu 24.04 qualification.
 Controlled event-family qualification is incomplete; RAW validation and platform
 recovery/rotation qualification remain pending. No unobserved duration, workload,
 family or architecture is certified by this run. The run also exposed USER_CMD,
-null rule-key and unset-AUID semantic gaps addressed in the v0.9.1 correction
+null rule-key, unset-AUID and kernel LOGIN attribution semantic gaps addressed in the v0.9.1 correction
 line; the published v0.9.0 artifact is unchanged. Local regression tests of those
 corrections do not substitute for a new native platform qualification run.
 

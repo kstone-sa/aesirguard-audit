@@ -4,6 +4,8 @@ All notable changes will be documented in this file. The project has not yet pub
 
 ## Unreleased — v0.9.1 correction line
 
+- Support confirmed kernel LOGIN attribution transitions separately from USER_LOGIN,
+  retaining correlated syscall context, old/new loginuid/session evidence and source result.
 - Support USER_CMD with literal command text, explicit provenance, safe decoding,
   standalone completion and renderer wording scoped to the recorded operation.
 - Omit the Audit null rule-key sentinel; preserve real and multi-key handling.

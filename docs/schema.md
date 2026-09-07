@@ -229,7 +229,42 @@ AUID `4294967295` (and signed `-1`) denotes an unset login identity in RAW as we
 as ENRICHED data; explicit `AUID="unset"` also suppresses actor identity. Ordinary
 UID, EUID, PID and other numeric fields do not inherit this interpretation.
 `unset_audit_id` issues preserve original auid/AUID and ses/SES sentinel tokens
-with reversible byte and record/section provenance. There is no canonical session
-ID field in v1; normal session projection is unchanged. Renderer fallback for an
+with reversible byte and record/section provenance. There is no generic canonical session
+ID field in v1; LOGIN-specific attribution is documented below. Renderer fallback for an
 unset actor is `A process`, never a fabricated user identity. Event schema 1.0 and
 checkpoint schema 2 remain unchanged.
+
+
+### LOGIN kernel Audit attribution
+
+`LOGIN` is distinct from `USER_LOGIN`: `session` / `set_audit_attribution`
+represents the kernel loginuid/session assignment operation, not authentication.
+The [6.17 kernel implementation](https://kernel.googlesource.com/pub/scm/linux/kernel/git/torvalds/linux.git/+/refs/tags/v6.17-rc7/kernel/audit.c)
+uses the syscall Audit context and records old/new IDs plus `res=!rc`.
+LOGIN stays in its correlated event with SYSCALL/PROCTITLE until EOE or the
+existing timeout/watermark/EOF/shutdown boundary. No standalone completion is
+inferred. A supplied group without EOE therefore remains explicitly incomplete.
+
+The compatible optional `process.audit_attribution` object contains `old` and
+`new` sides, each with optional `loginuid`, `user`, `loginuid_unset`, `session_id`
+and `session_unset`. Numeric IDs are strings preserving the source spelling,
+including raw sentinels; explicit true unset flags distinguish those sentinels
+from real identities. Enriched OLD-AUID/AUID names accompany numeric loginuids.
+Absent sides/fields remain absent rather than implying unset. RAW unsigned
+4294967295 and signed -1 denote unset, as do explicit enriched unset names.
+This object comes only from LOGIN fields; correlated current SYSCALL identities
+cannot replace the requested transition. It adds no generic session lifecycle model.
+
+`new` records requested attribution, applied only when LOGIN's own result is
+successful. Numeric res=0 means failure, res=1 success; unknown/missing/conflicting
+results remain unknown and never borrow SYSCALL write success. The requested
+AUID does not become `actor` when the transition is failed or unknown. Rendering
+uses the process PID and describes a change, failed change or attempted change;
+it never claims that the newly attributed user initiated an authentication event.
+
+Malformed, contradictory or conflicting attribution tokens withhold the typed
+transition and preserve all available LOGIN attribution tokens in reversible
+`invalid_audit_attribution` issues with record index, quoting and section provenance.
+Matching repeats remain usable. No transition values are borrowed from another
+record family, and no hostname/address is inferred from this kernel family.
+Event schema stays 1.0; checkpoint schema and timing are unchanged.

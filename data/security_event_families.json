@@ -1,6 +1,7 @@
 {
   "version": "1",
   "record_types": {
+    "LOGIN": {"category": "session", "action": "set_audit_attribution"},
     "USER_CMD": {"category": "process", "action": "user_command"},
     "USER_AUTH": {"category": "authentication", "action": "authenticate"},
     "USER_ACCT": {"category": "authentication", "action": "check_account"},

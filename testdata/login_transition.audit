@@ -1,0 +1,3 @@
+type=LOGIN msg=audit(1788768576.891:863): pid=1234 uid=0 subj=unconfined old-auid=4294967295 auid=1000 tty=(none) old-ses=4294967295 ses=42 res=1UID="root" OLD-AUID="unset" AUID="test"
+type=SYSCALL msg=audit(1788768576.891:863): arch=c00000b7 syscall=64 success=yes exit=4 a0=3 a1=ffffd30b3df0 a2=4 a3=1 items=0 ppid=100 pid=1234 auid=1000 uid=0 gid=0 euid=0 suid=0 fsuid=0 egid=0 sgid=0 fsgid=0 tty=(none) ses=42 comm="sshd" exe="/usr/sbin/sshd" subj=unconfined key=(null)ARCH=aarch64 SYSCALL=write AUID="test" UID="root" GID="root" EUID="root" SUID="root" FSUID="root" EGID="root" SGID="root" FSGID="root"
+type=PROCTITLE msg=audit(1788768576.891:863): proctitle=737368643A2074657374205B707269765D

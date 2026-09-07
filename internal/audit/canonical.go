@@ -139,24 +139,25 @@ type CanonicalSecurity struct {
 }
 
 type CanonicalProcess struct {
-	Command          string   `json:"command,omitempty"`
-	CommandSource    string   `json:"command_source,omitempty"`
-	PID              string   `json:"pid,omitempty"`
-	PPID             string   `json:"ppid,omitempty"`
-	User             string   `json:"user,omitempty"`
-	UserID           string   `json:"user_id,omitempty"`
-	RealUser         string   `json:"real_user,omitempty"`
-	RealUserID       string   `json:"real_user_id,omitempty"`
-	Name             string   `json:"name,omitempty"`
-	Executable       string   `json:"executable,omitempty"`
-	Argv             []string `json:"argv,omitempty"`
-	ArgvSource       string   `json:"argv_source,omitempty"`
-	CWD              string   `json:"cwd,omitempty"`
-	TTY              string   `json:"tty,omitempty"`
-	ArchitectureCode string   `json:"architecture_code,omitempty"`
-	Syscall          string   `json:"syscall,omitempty"`
-	SyscallNumber    string   `json:"syscall_number,omitempty"`
-	ReturnValue      string   `json:"return_value,omitempty"`
+	AuditAttribution *CanonicalAuditAttribution `json:"audit_attribution,omitempty"`
+	Command          string                     `json:"command,omitempty"`
+	CommandSource    string                     `json:"command_source,omitempty"`
+	PID              string                     `json:"pid,omitempty"`
+	PPID             string                     `json:"ppid,omitempty"`
+	User             string                     `json:"user,omitempty"`
+	UserID           string                     `json:"user_id,omitempty"`
+	RealUser         string                     `json:"real_user,omitempty"`
+	RealUserID       string                     `json:"real_user_id,omitempty"`
+	Name             string                     `json:"name,omitempty"`
+	Executable       string                     `json:"executable,omitempty"`
+	Argv             []string                   `json:"argv,omitempty"`
+	ArgvSource       string                     `json:"argv_source,omitempty"`
+	CWD              string                     `json:"cwd,omitempty"`
+	TTY              string                     `json:"tty,omitempty"`
+	ArchitectureCode string                     `json:"architecture_code,omitempty"`
+	Syscall          string                     `json:"syscall,omitempty"`
+	SyscallNumber    string                     `json:"syscall_number,omitempty"`
+	ReturnValue      string                     `json:"return_value,omitempty"`
 }
 
 type CanonicalPath struct {
@@ -260,6 +261,11 @@ func BuildCanonicalEvent(assembled AssembledEvent, options CanonicalOptions) Can
 
 	event.Event.Issues = append(event.Event.Issues, unsetAuditEvidence(assembled.Records)...)
 	login := recordIdentity(assembled.Records, "AUID", "auid")
+	// LOGIN auid is requested attribution. Only a successful operation
+	// establishes it as the login identity; old/new evidence remains separate.
+	if event.Event.Type == "LOGIN" && (event.Event.Success == nil || !*event.Event.Success) {
+		login = sourceIdentity{}
+	}
 	real := recordIdentity(assembled.Records, "UID", "uid")
 	effective := recordIdentity(assembled.Records, "EUID", "euid")
 	if identityEmpty(effective) {
@@ -333,6 +339,9 @@ func buildCanonicalProcess(records []Record) (CanonicalProcess, []CanonicalIssue
 	var commandIssues []CanonicalIssue
 	process.Command, process.CommandSource, commandIssues = buildUserCommand(records)
 	issues = append(issues, commandIssues...)
+	var attributionIssues []CanonicalIssue
+	process.AuditAttribution, attributionIssues = buildAuditAttribution(records)
+	issues = append(issues, attributionIssues...)
 	return process, issues
 }
 
@@ -359,6 +368,9 @@ func buildCanonicalTarget(records []Record, primaryType string) *CanonicalTarget
 func buildCanonicalOrigin(records []Record) *CanonicalOrigin {
 	var producers []Record
 	for _, r := range records {
+		if r.Type == "LOGIN" {
+			continue
+		}
 		// Connection origins come from userspace authentication/account
 		// producers. Kernel fields named ip may instead be instruction pointers.
 		family, mapped := securityEventFamilyForType(r.Type)
@@ -417,7 +429,7 @@ func meaningfulAuditValue(value string) string {
 }
 
 func hasCanonicalProcess(process CanonicalProcess) bool {
-	return process.CommandSource != "" || process.PID != "" || process.PPID != "" || process.User != "" ||
+	return process.AuditAttribution != nil || process.CommandSource != "" || process.PID != "" || process.PPID != "" || process.User != "" ||
 		process.UserID != "" || process.RealUser != "" || process.RealUserID != "" ||
 		process.Name != "" || process.Executable != "" || len(process.Argv) > 0 || process.ArgvSource != "" ||
 		process.CWD != "" || process.TTY != "" || process.ArchitectureCode != "" ||

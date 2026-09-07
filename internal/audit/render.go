@@ -76,6 +76,9 @@ func WithHumanMessage(event CanonicalEvent) CanonicalEvent {
 }
 
 func renderCanonicalMessage(event CanonicalEvent) (string, bool) {
+	if event.Event.Type == "LOGIN" {
+		return renderAuditAttribution(event), true
+	}
 	if event.Event.Type == "USER_CMD" {
 		message := renderedActor(event) + " generated a USER_CMD record"
 		if event.Process != nil && event.Process.Command != "" {

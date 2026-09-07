@@ -22,6 +22,11 @@ func canonicalSuccess(records []Record, primary string) (bool, bool, []Canonical
 	}
 	sort.Strings(others)
 	types = append(types, others...)
+	// LOGIN describes an attribution operation; a correlated write cannot
+	// supply a missing transition result.
+	if primary == "LOGIN" {
+		types = types[:1]
+	}
 	for _, kind := range types {
 		found, known, result := false, true, false
 		var evidence []CanonicalIssue
@@ -66,7 +71,7 @@ func decodeResult(recordType, raw string) (bool, bool) {
 		return false, true
 	}
 	switch recordType {
-	case "CONFIG_CHANGE", "FEATURE_CHANGE", "MAC_STATUS", "MAC_POLICY_LOAD":
+	case "LOGIN", "CONFIG_CHANGE", "FEATURE_CHANGE", "MAC_STATUS", "MAC_POLICY_LOAD":
 		switch raw {
 		case "1":
 			return true, true

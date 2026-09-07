@@ -28,6 +28,9 @@ func TestEveryAdvertisedFamilyHasAnExplicitCoverageBoundary(t *testing.T) {
 	for _, typ := range types {
 		t.Run(typ, func(t *testing.T) {
 			record := mustParseRecord(t, "type="+typ+` msg=audit(1700000000.000:1): pid=42 auid=1000 exe="/usr/bin/tool" op=observed`)
+			if typ == "LOGIN" {
+				record = mustParseRecord(t, "type=LOGIN msg=audit(1700000000.000:1): pid=42 auid=1000 exe=\"/usr/bin/tool\" op=observed res=1")
+			}
 			event := BuildCanonicalEvent(AssembledEvent{ID: record.ID, Records: []Record{record}, Complete: true}, CanonicalOptions{})
 			if event.Event.Type != typ || event.Event.Category == "" || event.Event.Action == "" {
 				t.Fatalf("recognition missing: %#v", event.Event)

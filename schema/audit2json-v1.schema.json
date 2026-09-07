@@ -112,6 +112,7 @@
         "name": {"type": "string"},
         "executable": {"type": "string"},
         "argv": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "audit_attribution": {"$ref": "#/$defs/audit_attribution"},
         "command": {"type": "string"},
         "command_source": {"enum": ["user_cmd"]},
         "argv_source": {"enum": ["execve", "proctitle"]},
@@ -121,6 +122,27 @@
         "syscall": {"type": "string"},
         "syscall_number": {"type": "string"},
         "return_value": {"type": "string"}
+      }
+    },
+    "audit_attribution": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "old": {"$ref": "#/$defs/audit_attribution_identity"},
+        "new": {"$ref": "#/$defs/audit_attribution_identity"}
+      }
+    },
+    "audit_attribution_identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "loginuid": {"type": "string"},
+        "user": {"type": "string"},
+        "loginuid_unset": {"const": true},
+        "session_id": {"type": "string"},
+        "session_unset": {"const": true}
       }
     },
     "target": {
