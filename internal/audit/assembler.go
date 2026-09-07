@@ -328,7 +328,16 @@ func orderedEvents(ready []readyEvent) []AssembledEvent {
 
 func auditTimeFromID(id string) (time.Time, bool) {
 	colon := strings.LastIndexByte(id, ':')
-	if colon <= 0 {
+	if colon <= 0 || colon == len(id)-1 {
+		return time.Time{}, false
+	}
+	serial := id[colon+1:]
+	for _, digit := range serial {
+		if digit < '0' || digit > '9' {
+			return time.Time{}, false
+		}
+	}
+	if _, err := strconv.ParseUint(serial, 10, 64); err != nil {
 		return time.Time{}, false
 	}
 	timestamp := id[:colon]

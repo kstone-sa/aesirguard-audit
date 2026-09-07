@@ -218,3 +218,5 @@ Follow-mode source opens are nonblocking and reject non-regular descriptors
 race. Parent directory aliases are not an ownership boundary for read-only
 sources. As with ordinary file I/O, cancellation cannot interrupt a kernel
 filesystem operation stuck in uninterruptible I/O; it does interrupt polling.
+
+Watermarks accept timestamps only from structurally valid Audit IDs, including a nonempty decimal uint64 serial. Malformed IDs remain visible with `invalid_audit_id` and no canonical timestamp; they cannot advance or reset event time. Inactivity expiry still applies normally.
