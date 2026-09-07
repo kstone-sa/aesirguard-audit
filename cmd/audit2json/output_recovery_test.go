@@ -48,7 +48,7 @@ func writeRecoveryCheckpoint(t *testing.T, input, path string) []byte {
 		t.Fatal(err)
 	}
 	stat := info.Sys().(*syscall.Stat_t)
-	if err := collector.SaveCheckpoint(path, collector.Checkpoint{InputPath: input, Device: uint64(stat.Dev), Inode: stat.Ino, Offset: 0}); err != nil {
+	if err := collector.SaveCheckpoint(path, collector.Checkpoint{InputPath: input, Device: uint64(stat.Dev), Inode: stat.Ino, Offset: 0, Anchor: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"}); err != nil {
 		t.Fatal(err)
 	}
 	data, err := os.ReadFile(path)

@@ -305,7 +305,7 @@ func runFollower(ctx context.Context, options commandOptions, processor *eventPr
 	if checkpoint != nil {
 		startPosition = audit.SourcePosition{
 			Device: checkpoint.Device, Inode: checkpoint.Inode,
-			Start: checkpoint.Offset, End: checkpoint.Offset, Valid: true,
+			Start: checkpoint.Offset, End: checkpoint.Offset, Valid: true, Anchor: checkpoint.Anchor,
 		}
 	}
 	follower, err := collector.OpenRotatingFollower(options.inputPath, collector.RotationOptions{
@@ -321,7 +321,7 @@ func runFollower(ctx context.Context, options commandOptions, processor *eventPr
 		position := follower.CompletePosition()
 		startPosition = audit.SourcePosition{
 			Device: position.Identity.Device, Inode: position.Identity.Inode,
-			Generation: position.Generation, Start: position.Offset, End: position.Offset, Valid: true,
+			Generation: position.Generation, Start: position.Offset, End: position.Offset, Valid: true, Anchor: position.Anchor,
 		}
 	}
 	checkpointWriter := newCheckpointWriter(options, inputPath, startPosition, checkpoint != nil, processor.sink)
@@ -351,7 +351,7 @@ func runFollower(ctx context.Context, options commandOptions, processor *eventPr
 			source := audit.SourcePosition{
 				Device: line.StartIdentity.Device, Inode: line.StartIdentity.Inode,
 				Generation: line.StartGeneration, Start: line.Start, End: line.Start,
-				Bytes: line.SourceBytes, Valid: true,
+				Bytes: line.SourceBytes, Valid: true, Anchor: line.StartAnchor,
 			}
 			if err := processor.addSourceLine(line.Text, source); err != nil {
 				return err
@@ -463,7 +463,7 @@ func (writer *checkpointWriter) persist(position audit.SourcePosition, force boo
 	}
 	checkpoint := collector.Checkpoint{
 		InputPath: writer.inputPath, Device: position.Device,
-		Inode: position.Inode, Offset: position.End,
+		Inode: position.Inode, Offset: position.End, Anchor: position.Anchor,
 	}
 	if err := collector.SaveCheckpoint(writer.path, checkpoint); err != nil {
 		return fmt.Errorf("save checkpoint: %w", err)
@@ -476,7 +476,7 @@ func (writer *checkpointWriter) persist(position audit.SourcePosition, force boo
 func sourcePosition(position collector.SourcePosition) audit.SourcePosition {
 	return audit.SourcePosition{
 		Device: position.Identity.Device, Inode: position.Identity.Inode,
-		Generation: position.Generation, Start: position.Offset, End: position.Offset, Valid: true,
+		Generation: position.Generation, Start: position.Offset, End: position.Offset, Valid: true, Anchor: position.Anchor,
 	}
 }
 

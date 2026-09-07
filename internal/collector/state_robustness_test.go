@@ -37,7 +37,7 @@ func TestStateObjectsFailPromptlyWithoutModification(t *testing.T) {
 				t.Fatal("checkpoint open blocked")
 			}
 			if kind != "oversized" {
-				if err := SaveCheckpoint(path, Checkpoint{InputPath: "/audit", Device: 1, Inode: 2}); err == nil {
+				if err := SaveCheckpoint(path, Checkpoint{InputPath: "/audit", Device: 1, Inode: 2, Anchor: emptyAnchor}); err == nil {
 					t.Fatal("unsafe target replaced")
 				}
 				if lock, _, err := AcquireFileLock(path); err == nil {
@@ -89,7 +89,7 @@ func TestStateRejectsUnsafeAncestorsBeforeCreatingChildren(t *testing.T) {
 			if _, err := LoadCheckpoint(path); err == nil {
 				t.Fatal("unsafe ancestor accepted on read")
 			}
-			if err := SaveCheckpoint(path, Checkpoint{InputPath: "/audit", Device: 1, Inode: 2}); err == nil {
+			if err := SaveCheckpoint(path, Checkpoint{InputPath: "/audit", Device: 1, Inode: 2, Anchor: emptyAnchor}); err == nil {
 				t.Fatal("unsafe ancestor accepted on save")
 			}
 			if lock, _, err := AcquireFileLock(path); err == nil {

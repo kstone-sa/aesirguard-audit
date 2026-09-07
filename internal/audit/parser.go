@@ -35,6 +35,7 @@ type Record struct {
 // SourcePosition identifies a complete physical source line. It is internal
 // recovery metadata and is never copied into the canonical event.
 type SourcePosition struct {
+	Anchor     string
 	Device     uint64
 	Inode      uint64
 	Generation uint64

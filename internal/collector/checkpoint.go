@@ -2,11 +2,13 @@ package collector
 
 import (
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"syscall"
 	"time"
@@ -14,7 +16,7 @@ import (
 	"github.com/kstone-sa/audit2json/internal/securefile"
 )
 
-const CheckpointVersion = 1
+const CheckpointVersion = 2
 
 // Checkpoint is the durable replay position for one input generation.
 type Checkpoint struct {
@@ -23,6 +25,7 @@ type Checkpoint struct {
 	Device    uint64    `json:"device"`
 	Inode     uint64    `json:"inode"`
 	Offset    int64     `json:"offset"`
+	Anchor    string    `json:"anchor"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
@@ -57,7 +60,7 @@ func LoadCheckpoint(path string) (*Checkpoint, error) {
 	if err != nil {
 		return nil, err
 	}
-	// Checkpoint v1 is a small state document, never an unbounded input stream.
+	// Checkpoint v2 is a small state document, never an unbounded input stream.
 	const maxCheckpointBytes = 64 * 1024
 	if info.Size() > maxCheckpointBytes {
 		return nil, fmt.Errorf("checkpoint exceeds %d bytes", maxCheckpointBytes)
@@ -88,6 +91,13 @@ func (checkpoint Checkpoint) Validate() error {
 	}
 	if checkpoint.InputPath == "" || checkpoint.Device == 0 || checkpoint.Inode == 0 || checkpoint.Offset < 0 || checkpoint.UpdatedAt.IsZero() {
 		return fmt.Errorf("invalid checkpoint state")
+	}
+	if len(checkpoint.Anchor) != 64 {
+		return fmt.Errorf("checkpoint requires a SHA-256 content anchor")
+	}
+	decoded, err := hex.DecodeString(checkpoint.Anchor)
+	if err != nil || len(decoded) != 32 {
+		return fmt.Errorf("invalid checkpoint anchor")
 	}
 	return nil
 }
@@ -151,4 +161,27 @@ func SaveCheckpoint(path string, checkpoint Checkpoint) (returnErr error) {
 	}
 	temporaryName = ""
 	return directory.Sync()
+}
+
+// ContentAnchor hashes two bounded windows of the consumed prefix. No bytes
+// after offset participate, so appends cannot invalidate a checkpoint.
+func ContentAnchor(file *os.File, offset int64) (string, error) {
+	if offset < 0 {
+		return "", fmt.Errorf("negative anchor offset")
+	}
+	n := offset
+	if n > 4096 {
+		n = 4096
+	}
+	var buf [8192]byte
+	if n > 0 {
+		if _, err := file.ReadAt(buf[:n], 0); err != nil {
+			return "", err
+		}
+		if _, err := file.ReadAt(buf[n:2*n], offset-n); err != nil {
+			return "", err
+		}
+	}
+	sum := sha256.Sum256(buf[:2*n])
+	return hex.EncodeToString(sum[:]), nil
 }

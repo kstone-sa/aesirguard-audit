@@ -36,6 +36,8 @@ type SourceLine struct {
 	StartGeneration uint64
 	Start           int64
 	End             int64
+	StartAnchor     string
+	EndAnchor       string
 	SourceBytes     int
 }
 
@@ -56,6 +58,7 @@ type FileFollower struct {
 	origin       FileIdentity
 	originGen    uint64
 	originOffset int64
+	originAnchor string
 }
 
 // OpenFileFollower opens path at offset zero and prepares to wait at EOF.
@@ -65,7 +68,7 @@ func OpenFileFollower(path string, options FollowerOptions) (*FileFollower, erro
 
 // OpenFileFollowerAt opens path at a complete-line offset. When expected is
 // non-nil the open file must be the checkpointed generation.
-func OpenFileFollowerAt(path string, options FollowerOptions, offset int64, expected *FileIdentity) (*FileFollower, error) {
+func OpenFileFollowerAt(path string, options FollowerOptions, offset int64, expected *FileIdentity, anchors ...string) (*FileFollower, error) {
 	if options.PollInterval <= 0 {
 		return nil, fmt.Errorf("poll interval must be positive")
 	}
@@ -96,6 +99,15 @@ func OpenFileFollowerAt(path string, options FollowerOptions, offset int64, expe
 	if info.Size() < offset {
 		_ = file.Close()
 		return nil, &SourceTruncatedError{Identity: identity, Offset: offset, Size: info.Size()}
+	}
+	anchor, err := ContentAnchor(file, offset)
+	if err != nil {
+		_ = file.Close()
+		return nil, err
+	}
+	if len(anchors) > 0 && anchors[0] != anchor {
+		_ = file.Close()
+		return nil, fmt.Errorf("checkpoint content anchor mismatch: %w", &SourceGapError{Identity: identity})
 	}
 	if offset > 0 {
 		if _, err := file.Seek(offset-1, io.SeekStart); err != nil {
@@ -131,6 +143,7 @@ func OpenFileFollowerAt(path string, options FollowerOptions, offset int64, expe
 		origin:       identity,
 		originGen:    options.Generation,
 		originOffset: offset,
+		originAnchor: anchor,
 	}, nil
 }
 
@@ -160,7 +173,12 @@ func (follower *FileFollower) NextSource(ctx context.Context) (line SourceLine, 
 		case readErr == nil:
 			complete := bytes.TrimSuffix(follower.partial, []byte{'\n'})
 			complete = bytes.TrimSuffix(complete, []byte{'\r'})
+			endAnchor, anchorErr := ContentAnchor(follower.file, follower.readOffset)
+			if anchorErr != nil {
+				return SourceLine{}, false, anchorErr
+			}
 			line = SourceLine{
+				StartAnchor: follower.originAnchor, EndAnchor: endAnchor,
 				Text:            string(complete),
 				Identity:        follower.identity,
 				Generation:      follower.generation,
@@ -175,6 +193,7 @@ func (follower *FileFollower) NextSource(ctx context.Context) (line SourceLine, 
 			follower.origin = follower.identity
 			follower.originGen = follower.generation
 			follower.originOffset = follower.readOffset
+			follower.originAnchor = endAnchor
 			follower.partial = follower.partial[:0]
 			return line, true, nil
 		case errors.Is(readErr, bufio.ErrBufferFull):
@@ -219,6 +238,7 @@ func (follower *FileFollower) transferPartialTo(next *FileFollower) error {
 	next.origin = follower.origin
 	next.originGen = follower.originGen
 	next.originOffset = follower.originOffset
+	next.originAnchor = follower.originAnchor
 	follower.partial = follower.partial[:0]
 	return nil
 }

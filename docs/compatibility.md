@@ -27,6 +27,6 @@ The distro-labelled fixtures are synthetic representatives. They verify determin
 - Retained, uncompressed numeric rotations such as `audit.log.1` are supported during recovery.
 - Compressed rotations are not read.
 - Copytruncate is detected as a source gap and is not claimed lossless.
-- Configuration and checkpoint schema version 1 are supported. State paths reject symlink ancestors and special files; use real trusted directories rather than symlink aliases.
+- Configuration schema version 1 and checkpoint schema version 2 are supported. Checkpoint version 1 is rejected; there is no automatic migration. State paths reject symlink ancestors and special files; use real trusted directories rather than symlink aliases.
 - Batch paths must be regular files; stdin supports streams. Physical-line bounds include terminators in both modes.
 - Stdout and append-only managed-file sinks are supported. Backend-specific protocols and schemas are outside the core.

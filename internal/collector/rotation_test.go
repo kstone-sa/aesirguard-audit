@@ -513,6 +513,31 @@ func TestRotatingFollowerReportsTruncationAfterRename(t *testing.T) {
 
 func mustOpenRotatingFollower(t *testing.T, path string, checkpoint *Checkpoint) *RotatingFollower {
 	t.Helper()
+	if checkpoint != nil && checkpoint.Anchor == "" {
+		paths, err := filepath.Glob(path + "*")
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, candidate := range paths {
+			f, err := os.Open(candidate)
+			if err != nil {
+				continue
+			}
+			info, err := f.Stat()
+			if err != nil {
+				f.Close()
+				continue
+			}
+			id, err := identityFromFileInfo(info)
+			if err == nil && id.Device == checkpoint.Device && id.Inode == checkpoint.Inode {
+				checkpoint.Anchor, err = ContentAnchor(f, checkpoint.Offset)
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+			f.Close()
+		}
+	}
 	follower, err := OpenRotatingFollower(path, testRotationOptions(), checkpoint)
 	if err != nil {
 		t.Fatal(err)

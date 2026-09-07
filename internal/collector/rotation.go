@@ -16,6 +16,7 @@ import (
 type SourcePosition struct {
 	Identity   FileIdentity
 	Generation uint64
+	Anchor     string
 	Offset     int64
 }
 
@@ -88,7 +89,7 @@ func OpenRotatingFollower(inputPath string, options RotationOptions, checkpoint 
 		}
 		return &RotatingFollower{
 			inputPath: canonicalInput, options: options, current: follower, currentAtPath: true,
-			complete: SourcePosition{Identity: follower.Identity(), Offset: 0},
+			complete: SourcePosition{Identity: follower.Identity(), Offset: 0, Anchor: follower.originAnchor},
 		}, nil
 	}
 
@@ -113,14 +114,14 @@ func OpenRotatingFollower(inputPath string, options RotationOptions, checkpoint 
 	first := candidates[index]
 	followerOptions := options.FollowerOptions
 	followerOptions.Generation = 0
-	follower, err := OpenFileFollowerAt(first.path, followerOptions, checkpoint.Offset, &expected)
+	follower, err := OpenFileFollowerAt(first.path, followerOptions, checkpoint.Offset, &expected, checkpoint.Anchor)
 	if err != nil {
 		return nil, err
 	}
 	return &RotatingFollower{
 		inputPath: canonicalInput, options: options, current: follower, currentAtPath: first.current,
 		queued:   candidates[index+1:],
-		complete: SourcePosition{Identity: expected, Offset: checkpoint.Offset},
+		complete: SourcePosition{Identity: expected, Offset: checkpoint.Offset, Anchor: checkpoint.Anchor},
 	}, nil
 }
 
@@ -129,7 +130,7 @@ func (follower *RotatingFollower) Next(ctx context.Context) (SourceLine, bool, e
 	line, ok, err := follower.current.NextSource(ctx)
 	if err != nil || ok {
 		if ok {
-			follower.complete = SourcePosition{Identity: line.Identity, Generation: line.Generation, Offset: line.End}
+			follower.complete = SourcePosition{Identity: line.Identity, Generation: line.Generation, Offset: line.End, Anchor: line.EndAnchor}
 		}
 		return line, ok, err
 	}
@@ -307,7 +308,7 @@ func (follower *RotatingFollower) switchTo(candidate sourceCandidate) error {
 	follower.currentAtPath = candidate.current
 	follower.rotationCount++
 	if !hadPartial {
-		follower.complete = SourcePosition{Identity: candidate.identity, Generation: options.Generation, Offset: 0}
+		follower.complete = SourcePosition{Identity: candidate.identity, Generation: options.Generation, Offset: 0, Anchor: next.originAnchor}
 	}
 	return nil
 }

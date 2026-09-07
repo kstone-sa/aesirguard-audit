@@ -176,3 +176,25 @@ An incomplete tail fails closed without changing any output bytes or advancing s
 `--max-line-bytes` counts physical bytes, including LF or CRLF when present, in both batch and follow modes. Exactly the limit is accepted; one byte more fails explicitly before that line is emitted. Batch accepts a final unterminated line within the same limit; follow retains it until a newline arrives. Buffer capacity does not override the configured bound.
 
 Batch input paths must be regular files; use stdin for pipes and streams. SIGINT/SIGTERM interrupts an idle or partial stdin read, and busy processing checks cancellation between reads/lines. Already assembled records are flushed with a shutdown boundary. Parsing and output remain synchronous; cancellation does not bypass a blocked output consumer or promise interruption of an operating-system storage operation stuck in uninterruptible I/O.
+
+### Checkpoint version 2 source discriminator
+
+Before accepting a saved offset, recovery verifies a required lowercase SHA-256
+`anchor` against the opened descriptor, in addition to device, inode, size and
+physical-line boundary checks. The digest input is the concatenation of the
+first `min(offset, 4096)` bytes and the `min(offset, 4096)` bytes immediately
+preceding the offset. Overlapping windows are deliberately included twice.
+Anchors travel with safe replay positions, including positions held by pending
+events and partial records across rotation. Only consumed bytes participate;
+ordinary appends do not invalidate state. Validation uses at most 8192 bytes
+and constant memory regardless of source size. A mismatch is an explicit source
+gap, before any seek into replacement content. Offset zero hashes the empty
+string and skips no content.
+
+This discriminator detects inode reuse when either sampled window differs. It
+is not authentication or a full-file integrity proof: replacement files with
+identical sampled windows, and modifications outside those windows, cannot be
+distinguished. Retained source generations must remain append-only and trusted;
+arbitrary in-place rewriting is outside the recovery contract. Version 1 has no
+safe automatic migration because it lacks historical content evidence; see the
+runbook for explicit replay during upgrade.

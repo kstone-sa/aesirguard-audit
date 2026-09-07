@@ -56,7 +56,7 @@ func TestCheckpointNeverAdvancesWhenSinkCommitFails(t *testing.T) {
 	directory := t.TempDir()
 	checkpointPath := filepath.Join(directory, "checkpoint")
 	inputPath := filepath.Join(directory, "audit.log")
-	position := audit.SourcePosition{Device: 1, Inode: 2, End: 128, Valid: true}
+	position := audit.SourcePosition{Device: 1, Inode: 2, End: 128, Valid: true, Anchor: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"}
 	sink := &faultSink{commitErr: errInjectedSink}
 	writer := newCheckpointWriter(commandOptions{
 		checkpointPath: checkpointPath, checkpointInterval: time.Nanosecond,
