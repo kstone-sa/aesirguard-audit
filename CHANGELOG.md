@@ -24,5 +24,6 @@ All notable changes will be documented in this file. The project has not yet pub
 
 ### Release gates
 
-- Empirical validation against controlled real RAW and ENRICHED Audit output on the documented distribution matrix remains pending.
-- The repository remains private and no v1.0 tag has been created pending explicit maintainer approval.
+- The 0.9.x line is the public pre-release and qualification series; it is not a stable compatibility certification.
+- Empirical validation against controlled real RAW and ENRICHED Audit output on the documented distribution matrix remains pending before v1.0.
+- No stable v1.0 tag has been created.
