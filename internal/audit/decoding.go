@@ -87,5 +87,6 @@ func decodedRecords(records []Record) ([]Record, []CanonicalIssue) {
 			r.EmbeddedFields, r.EmbeddedValues = decode(r.EmbeddedAllFields, true)
 		}
 	}
+	issues = append(issues, markSingletonConflicts(result)...)
 	return result, issues
 }

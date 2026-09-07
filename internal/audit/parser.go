@@ -19,6 +19,7 @@ type Field struct {
 
 // Record is one raw auditd record parsed into key/value fields.
 type Record struct {
+	Conflicts          map[string]bool
 	Node               string
 	NodePresent        bool
 	Type               string
@@ -279,6 +280,9 @@ func firstValue(values map[string][]string, key string) string {
 }
 
 func recordValue(record Record, key string) string {
+	if record.Conflicts[key] {
+		return ""
+	}
 	if record.Values != nil {
 		return firstValue(record.Values, key)
 	}
@@ -286,6 +290,9 @@ func recordValue(record Record, key string) string {
 }
 
 func semanticRecordValue(record Record, key string) string {
+	if record.Conflicts[key] {
+		return ""
+	}
 	if value := recordValue(record, key); value != "" {
 		return value
 	}

@@ -61,7 +61,7 @@ func TestSeccompRemainsPresentWithAVCAndRealAuthenticationOrigin(t *testing.T) {
 
 func TestConflictingSeccompCodesRemainUnknown(t *testing.T) {
 	e := canonicalLines(t, `type=SECCOMP msg=audit(100.0:1): code=0x7ffc0000 code=0x0005000d`)
-	if e.Event.Action != "filter_syscall" || e.Security.Seccomp.Action != "unknown" || len(e.Event.Issues) != 2 {
+	if e.Event.Action != "filter_syscall" || e.Security.Seccomp.Action != "unknown" || len(e.Event.Issues) != 4 {
 		t.Fatal("concealed conflicting filter codes")
 	}
 }

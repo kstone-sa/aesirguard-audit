@@ -193,3 +193,13 @@ payloads still parse. Evidence size is bounded by the existing physical-line
 and event-state limits. This uses the existing issue schema.
 
 `source.host` uses the Audit node when present, with an explicit configured host taking precedence. The original node remains in reversible `audit_node` issues even when overridden.
+
+Repeated singleton semantic fields with distinct decoded values produce
+`conflicting_singleton` issues for every contributing token and withhold the
+canonical field. Identical repeats remain usable. Process and identity fields
+are checked across correlated records; path ownership and security fields are
+checked within their originating record, including embedded payloads. Raw and
+interpreted identity/syscall pairs are withheld together on conflict. Rule
+keys, permission lists and argv fragments are not singleton fields. Result
+conflicts retain the existing `conflicting_result` handling. All conflict
+evidence uses bounded, reversible hex values with record and section provenance.
