@@ -22,7 +22,7 @@ Unsupported record families are reported through `event.issues`; arbitrary sourc
 |---|---|---|
 | `schema_version` | string | Canonical schema version; currently `1.0` |
 | `audit` | object | Original Audit ID and event time |
-| `source` | object | Optional explicitly configured source host |
+| `source` | object | Optional Audit node or explicitly configured source host |
 | `event` | object | Event type, outcome, integrity anomalies, and conversion issues |
 | `rule` | object | Local Audit rule keys |
 | `actor` | object | Login identity |
@@ -42,7 +42,7 @@ A local rule key is never used as a portable event type.
 
 An invalid ID remains in `audit.id`; `audit.time` is omitted and `event.issues` reports `invalid_audit_id`.
 
-`source` is omitted by default. `source.host` is emitted only when `--source-host` is supplied; the Audit `node` field is not copied automatically because collecting backends commonly attach source identity themselves. Boot identity belongs to collector and checkpoint state and is not repeated in every event.
+`source` is omitted when neither an Audit node nor `--source-host` is available. An explicit host overrides the display host; original Audit node evidence is retained in issues. This pre-1.0 correction replaces the earlier explicit-host-only behavior. Boot identity belongs to collector and checkpoint state and is not repeated in every event.
 
 ## Event metadata
 
@@ -128,7 +128,7 @@ The renderer:
 - quotes ambiguous arguments;
 - omits itself for unsupported event families.
 
-Renderer version `4` covers the Linux Audit activity families selected by the targeted CIS Server L1+L2 profiles plus the security-event families in `security-event-coverage.md`. Process execution messages require a named `execve`/`execveat` syscall, EXECVE provenance, or an execution action already established by the classifier. An executable path or PROCTITLE-derived argv alone never establishes execution.
+Renderer version `5` covers the Linux Audit activity families selected by the targeted CIS Server L1+L2 profiles plus the security-event families in `security-event-coverage.md`. Process execution messages require a named `execve`/`execveat` syscall, EXECVE provenance, or an execution action already established by the classifier. An executable path or PROCTITLE-derived argv alone never establishes execution.
 
 Classification uses typed EXECVE or named execution-syscall evidence, normalized syscall and outcome, normalized rule keys, and conservatively matched paths. Rule keys are locally configurable and therefore are not the sole contract. A security-relevant path is accepted without a recognized key only when the syscall itself proves a mutation. See `cis-coverage.md` for the supported baseline and family matrix.
 
@@ -173,7 +173,7 @@ The existing flat `security` object represents one deterministic decision (famil
 
 The primary action's own result takes precedence over a correlated syscall result: successful netlink transport does not establish a successful audit-configuration change. CONFIG_CHANGE, FEATURE_CHANGE, MAC_STATUS and MAC_POLICY_LOAD accept their kernel `res=0/1` convention; unrelated userspace families do not inherit that convention. Contradictory result evidence within the selected family remains unknown with explicit source-field issues.
 
-Renderer version 4 distinguishes a policy denial that was not enforced in permissive mode from an enforced denial. Permissive mode does not itself imply that the underlying syscall succeeded; its outcome remains independently represented by `event.success`.
+Renderer version 5 distinguishes a policy denial that was not enforced in permissive mode from an enforced denial. Permissive mode does not itself imply that the underlying syscall succeeded; its outcome remains independently represented by `event.success`.
 
 ### SECCOMP evidence (pre-1.0 addition)
 

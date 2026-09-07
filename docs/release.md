@@ -42,6 +42,6 @@ After publication, download the selected archive and `SHA256SUMS` from GitHub an
 
 ## Roll back
 
-Retain at least the previous release archive and configuration. Stop the collector cleanly, restore the previous binary, validate its configuration, and restart it against the existing version-1 checkpoint. At-least-once semantics mean a bounded replay is safer than manually advancing state.
+Retain at least the previous release archive and configuration. Stop the collector cleanly, restore the previous binary, validate its configuration, and restart it only against a checkpoint version it supports. Current binaries require checkpoint v2; v1-only binaries cannot consume it. Follow the explicit replay upgrade/rollback procedure in `runbook.md`; never synthesize an anchor for historical v1 state. At-least-once semantics mean a bounded replay is safer than manually advancing state.
 
 Do not move or recreate a published tag. If a release is defective, mark it accordingly and publish a new patch version.

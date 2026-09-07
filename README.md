@@ -37,7 +37,7 @@ The current `main` branch provides:
 - write synchronously to stdout or an append-only managed file;
 - stop cleanly on SIGINT or SIGTERM;
 - enforce a non-blocking singleton lock per followed input.
-- persist a versioned checkpoint at complete-line and accepted-output boundaries;
+- persist a v2 checkpoint with a bounded source-content anchor at complete-line and accepted-output boundaries;
 - resume the same file generation with at-least-once delivery.
 - locate a checkpoint generation among retained numeric rotations such as `audit.log.1`;
 - drain rename/create rotations before following the replacement inode;
@@ -185,7 +185,7 @@ Enable crash recovery with an explicit durable checkpoint path:
   /var/log/audit/audit.log
 ```
 
-Checkpoint updates sync a managed output file before advancing input progress. With stdout, a successful write confirms only that the local pipe accepted the bytes; replay after a crash is therefore expected and delivery remains at-least-once. If the checkpoint inode is not the current input, audit2json searches retained uncompressed numeric rotations and drains them in descending numeric suffix order (`.2` before `.1`, then the active file). Missing intermediate generations, duplicate suffix numbers, and inode aliases fail closed; non-numeric siblings are not input generations. If it cannot locate the inode, it fails explicitly instead of skipping to the current file.
+Checkpoint updates sync a managed output file before advancing input progress. With stdout, a successful write confirms only that the local pipe accepted the bytes; replay after a crash is therefore expected and delivery remains at-least-once. If the checkpoint inode is not the current input, audit2json searches retained uncompressed numeric rotations and drains them in descending numeric suffix order (`.2` before `.1`, then the active file). Missing intermediate generations, duplicate suffix numbers, and inode aliases fail closed; non-numeric siblings are not input generations. If it cannot locate the inode, or its saved content anchor does not match, it fails explicitly instead of skipping to the current file. Checkpoint v1 is rejected; see the runbook for explicit replay migration and the reliability document for the sampled anchor guarantee and limitations.
 
 For live rename/create rotation, the old descriptor must remain at a stable EOF for `--rotation-drain-interval` (default `500ms`) before the collector switches. Same-inode shrink, including copytruncate, is detected and reported as a gap; automatic continuation is intentionally not claimed lossless.
 
