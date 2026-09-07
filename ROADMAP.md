@@ -6,7 +6,9 @@ audit2json is approaching its first stable release. Completed implementation his
 
 The canonical schema v1.0, persistent collector, checkpoint and rotation recovery, security-event normalization, optional renderer, operational diagnostics, synthetic hardening, and Linux amd64/arm64 release packages are implemented.
 
-No stable release has been tagged. The distribution-labelled fixtures are synthetic regression data. Compatibility with real RAW and ENRICHED Linux Audit output on the distributions listed in `docs/compatibility.md` has not yet been empirically validated.
+The 0.9.x series is the public pre-release and qualification line. It is intended for controlled evaluation against real Linux Audit output and does not constitute stable distribution compatibility certification. The distribution-labelled fixtures remain synthetic regression data until replaced or supplemented by sanitized evidence from empirical testing.
+
+No stable release has been tagged.
 
 ## Before v1.0
 
@@ -14,8 +16,8 @@ No stable release has been tagged. The distribution-labelled fixtures are synthe
 - Exercise the selected CIS Server Level 1 and Level 2 Audit event families using both RAW and ENRICHED output where available.
 - Record the tested distribution, kernel, auditd, rule-set, and rotation configuration without publishing identifying data.
 - Convert confirmed record variations into sanitized regression fixtures when safe and useful.
-- Re-run the complete test, race, fuzz, benchmark, and package-verification workflows.
-- Complete `docs/public-release-checklist.md` and obtain explicit maintainer approval before changing repository visibility or creating the `v1.0` tag.
+- Re-run the complete test, race, fuzz, benchmark, vulnerability, schema, and package-verification workflows.
+- Complete the stable-release items in `docs/public-release-checklist.md` and obtain explicit maintainer approval before creating the `v1.0.0` tag.
 
 Until this validation is complete, the documented distribution matrix is a test target, not a compatibility certification.
 
