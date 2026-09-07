@@ -14,9 +14,11 @@ The project is deliberately backend-agnostic. Splunk, Microsoft Sentinel, Elasti
 
 This project was designed and developed by Kstone SA with assistance from OpenAI Codex. AI-assisted changes were reviewed, tested, and accepted by the maintainer, who retains responsibility for the project’s architecture, security, quality, and licensing compliance.
 
-## Release status
+## Pre-release status
 
-The v1.0 implementation is feature-complete but has not been released. Empirical validation against real Linux Audit output is still pending; see [Compatibility](docs/compatibility.md). Until that work is complete, distro-labelled fixtures are synthetic regression data rather than compatibility certification.
+The 0.9.x series is the public pre-release and qualification line for audit2json. It is intended for controlled evaluation against real Linux Audit output and does **not** constitute stable distribution compatibility certification.
+
+The v1.0 implementation is feature-complete, but empirical validation against real Linux Audit output is still pending; see [Compatibility](docs/compatibility.md). Until that work is complete, distro-labelled fixtures are synthetic regression data rather than compatibility certification. No stable release is currently supported.
 
 The current `main` branch provides:
 
@@ -95,7 +97,7 @@ The projects therefore overlap in the problem they address, but optimize for dif
 
 ## Installation
 
-Tagged releases will provide two independent archives per Linux architecture:
+Tagged releases provide two independent archives per Linux architecture:
 
 - `*_standalone.tar.gz` is the portable package. It contains the static binary, example configuration, JSON Schema, license, changelog, and documentation. It makes no service-manager assumption and is the appropriate artifact for Splunk, containers, schedulers, and custom supervisors.
 - `*_systemd.tar.gz` is the optional host-service package. It contains the standalone payload plus a hardened systemd unit and its sysusers/tmpfiles definitions.
@@ -111,7 +113,7 @@ See `docs/runbook.md` for standalone and systemd installation instructions and l
 
 ## Build from source
 
-Use the supported release toolchain pinned in `.go-version`. The `go 1.22` directive in `go.mod` is minimum source compatibility, not the official build toolchain. See [Release verification](docs/release.md) for the full shared quality gate.
+Go 1.26 is the minimum source version. Official CI and release builds use the exact supported toolchain pinned in `.go-version` (currently Go 1.26.8). See [Release verification](docs/release.md) for the full shared quality gate.
 
 ```bash
 go test ./...
@@ -201,8 +203,8 @@ For live rename/create rotation, the old descriptor must remain at a stable EOF 
 - `docs/development.md`: focused development modes and validation;
 - `docs/compatibility.md`: runtime, distribution, and rotation compatibility matrix;
 - `docs/runbook.md`: installation, monitoring, recovery, upgrade, and rollback;
-- `docs/release.md`: tagged build and publication procedure;
-- `docs/public-release-checklist.md`: final checks before changing repository visibility and tagging v1.0;
+- `docs/release.md`: pre-release and stable tagged build/publication procedure;
+- `docs/public-release-checklist.md`: public visibility, 0.9.x qualification, and stable v1.0 gates;
 - `schema/audit2json-v1.schema.json`: machine-readable canonical event contract;
 - `ROADMAP.md`: pending validation, release gates, and future work.
 
