@@ -48,6 +48,52 @@ null rule-key, unset-AUID and kernel LOGIN attribution semantic gaps addressed i
 line; the published v0.9.0 artifact is unchanged. Local regression tests of those
 corrections do not substitute for a new native platform qualification run.
 
+## Controlled ENRICHED volume sample
+
+The maintainer reported the following measurements from one controlled Ubuntu
+24.04 arm64 ENRICHED qualification sample. This is a sample-specific volume
+observation, not a general benchmark or performance guarantee. Event mix, Audit
+rules and optional output fields affect the result; these numbers do not qualify
+other workloads or establish complete distribution compatibility.
+
+| Whole sample | Measured value |
+|---|---:|
+| Linux Audit source records | 175 |
+| Raw bytes | 39,220 |
+| Canonical events | 47 |
+| Canonical bytes without renderer | 27,794 |
+| Canonical bytes with `--render-message` | 32,393 |
+| Byte reduction without renderer | 29.13% |
+| Byte reduction with renderer | 17.41% |
+| Renderer overhead relative to canonical output without renderer | 16.55% |
+
+For the compound kernel-event subset, 158 Audit records became 30 canonical
+events: 34,483 raw bytes became 21,388 canonical bytes, a 37.98% reduction and
+an average of 5.27 source records per canonical event. Within the measured sample,
+`process/execute` comprised 17 events from 102 source records: 21,490 raw bytes
+became 12,371 canonical bytes, a 42.43% reduction.
+
+| Other observed category/action | Byte reduction |
+|---|---:|
+| `session/observe_session_activity` | 25.68% |
+| `file/change_permissions` | 27.74% |
+| `file/delete` | 34.45% |
+| `file/rename` | 46.14% |
+| `file/access` | 27.30% |
+
+Single-record userspace events expanded after canonical JSON normalization in
+this sample. audit2json reduces volume primarily by collapsing compound Linux
+Audit record groups into one canonical event. It is not a generic text compressor;
+already compact single-record userspace events may become larger. Rendered messages
+add convenience/debug text that duplicates canonical information, so they should
+normally remain disabled for volume-sensitive SIEM ingestion.
+
+The qualification Audit rules also had to be architecture-aware: an initial
+x86-style rule containing legacy `open` was rejected on AArch64, while the
+equivalent arm64 syscall set loaded successfully. This was a qualification-environment
+observation, not an audit2json defect. Native arm64 requalification of the pushed
+v0.9.1 candidate remains the next step before maintainer authorization of a release.
+
 ## Operational compatibility
 
 - Rename/create input rotation is supported and provides the strongest continuity guarantee.
