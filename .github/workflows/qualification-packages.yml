@@ -1,0 +1,14 @@
+name: Build qualification packages
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    uses: ./.github/workflows/verify.yml
+    with:
+      version: qualification
+      retain-packages: true
