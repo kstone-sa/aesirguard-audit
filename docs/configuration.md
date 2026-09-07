@@ -37,7 +37,7 @@ See `configs/audit2json.example.json` for a complete example.
 | `collection.max_records_per_event` | `--max-records-per-event` | per-event record limit |
 | `collection.max_pending_bytes` | `--max-pending-bytes` | unresolved source-byte limit |
 | `mapping.render_message` | `--render-message` | optional analyst-readable renderer |
-| `operations.heartbeat_interval` | `--heartbeat-interval` | heartbeat period; `0s` disables it |
+| `operations.heartbeat_interval` | `--heartbeat-interval` | heartbeat period; default `10m`; `0s` disables it |
 
 Durations use Go duration syntax, for example `200ms`, `2s`, or `1m30s`. Zero-valued integer limits mean "use the built-in default"; negative values are invalid.
 

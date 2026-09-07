@@ -27,6 +27,6 @@
     "render_message": true
   },
   "operations": {
-    "heartbeat_interval": "30s"
+    "heartbeat_interval": "10m"
   }
 }

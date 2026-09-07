@@ -26,7 +26,7 @@ const (
 	defaultMaxPendingBytes    = 64 * 1024 * 1024
 	defaultCheckpointInterval = time.Second
 	defaultRotationDrain      = 500 * time.Millisecond
-	defaultHeartbeatInterval  = 30 * time.Second
+	defaultHeartbeatInterval  = 10 * time.Minute
 )
 
 var (
@@ -272,6 +272,7 @@ func parseOptions(args []string, _ io.Writer) (commandOptions, error) {
 
 func writeUsage(writer io.Writer) {
 	fmt.Fprintln(writer, "usage: audit2json [options] [audit.log]")
+	fmt.Fprintf(writer, "  --heartbeat-interval duration\n      structured heartbeat interval (default %s; 0s disables)\n", defaultHeartbeatInterval)
 }
 
 func openSink(options commandOptions, stdout io.Writer) (eventoutput.Sink, error) {

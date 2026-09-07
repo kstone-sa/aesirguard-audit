@@ -8,7 +8,7 @@ The collector reports lifecycle, configuration validation, singleton contention,
 
 ## Heartbeat
 
-Follow mode emits `heartbeat` at `operations.heartbeat_interval`, default `30s`. Set the interval to `0s` to disable it. Heartbeats are produced by the main collection loop, so an absent heartbeat can indicate a blocked sink or a stalled collector as well as a dead process.
+Follow mode emits `heartbeat` at `operations.heartbeat_interval`, default `10m`. Set the interval to `0s` to disable it. At 2,000 hosts, `10m` produces about 288,000 heartbeats/day, compared with 5.76 million at `30s`; choose an explicit interval to match supervision and ingestion-volume needs. This cadence does not change event, checkpoint, or rotation timing. Heartbeats are produced by the main collection loop, so an absent heartbeat can indicate a blocked sink or a stalled collector as well as a dead process.
 
 ```json
 {"timestamp":"2026-09-04T18:00:00Z","level":"info","event":"heartbeat","health":"ok","uptime_seconds":120,"input_lag_bytes":0,"pending_events":0,"pending_bytes":0,"counters":{"input_lines":1532,"input_bytes":388421,"emitted_events":409,"parse_failures":0,"replay_candidates":0,"gaps":0,"rotations":1}}
