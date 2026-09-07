@@ -15,6 +15,13 @@ All notable changes will be documented in this file. The project has not yet pub
 - Secure filesystem boundaries, structured operational diagnostics, fuzzing, fault injection, and stress tests.
 - Reproducible Linux amd64 and arm64 standalone and systemd release packages.
 
+### Pre-1.0 correctness corrections
+
+- Checkpoint v2 binds safe offsets to bounded content anchors; legacy v1 state requires explicit replay rather than automatic migration.
+- Preserve malformed userspace payload evidence, isolate Audit nodes during correlation, and reject special follow sources without blocking.
+- Neutralize unsupported mutation claims and conflicting singleton evidence; decode multi-key separators and exclude invalid serials from watermarks.
+- Event schema remains v1.0 with existing issue fields; renderer version 5 adds neutral activity wording. Audit node now supplies the default source host while explicit configuration can override it.
+
 ### Release gates
 
 - Empirical validation against controlled real RAW and ENRICHED Audit output on the documented distribution matrix remains pending.
