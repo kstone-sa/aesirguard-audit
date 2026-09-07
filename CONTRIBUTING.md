@@ -9,6 +9,21 @@ Thank you for helping improve audit2json. Keep changes small, reviewable, and in
 - Keep backend-specific mappings and detections outside the core canonical model.
 - Add mapping data as reviewable JSON instead of introducing an expression language.
 
+## AI-assisted and agentic development
+
+AI-assisted development is welcome, including coding agents, provided the human contributor remains responsible for the submitted change.
+
+- Read and follow `AGENTS.md` before using an agent on this repository. Its scope, architectural boundaries, status guardrails, and validation rules apply equally to human-authored and agent-authored changes.
+- Review all generated code, tests, documentation, configuration, and commit content before submission. Do not treat generated output or an agent's successful completion message as verification.
+- Run the same required validation for AI-assisted changes as for manually written changes. Generated tests must exercise the intended invariant rather than merely reproduce the implementation.
+- Keep agent work narrowly scoped. Do not use an agent to perform broad refactors, dependency changes, schema migrations, history rewrites, release publication, or security-boundary changes unless those actions are explicitly part of the reviewed task.
+- Do not weaken, bypass, remove, or rewrite CI, security checks, release verification, compatibility gates, or fail-closed behavior merely to make a generated change pass.
+- Never provide agents or external AI services with secrets, credentials, customer data, production Audit logs, identifying infrastructure details, or other material that is not appropriate for disclosure to that service.
+- Preserve provenance when it matters to review. If AI assistance materially shaped a pull request, mention it briefly in the pull-request description together with the human verification performed.
+- The contributor who submits the change is accountable for its correctness, security, licensing, and compatibility impact regardless of which tools were used to produce it.
+
+The repository itself may use AI-assisted development, but no AI system is treated as an author, approver, security authority, or substitute for maintainer review.
+
 ## Development
 
 The project requires the Go version declared in `go.mod` and uses the standard library only.
