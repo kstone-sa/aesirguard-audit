@@ -27,13 +27,14 @@ All rows below recognize/classify the listed types. Typed values are conditional
 | Seccomp: `SECCOMP` | `security.seccomp.action/code/signal/instruction_pointer`, correlated syscall/process evidence; action-specific classification | No reconstruction of filter program or proof that the eventual syscall succeeded |
 | BPF: `BPF` | Common projection and source operation | Program ID, program type, tag and program contents are not normalized |
 | Process capabilities: `CAPSET`, `BPRM_FCAPS` | Common projection; correlated PATH file capabilities when present | Process before/after permitted/effective/inheritable sets are not normalized; PATH capabilities are a different feature |
+| User commands: `USER_CMD` | `process` / `user_command`; decoded `process.command` with `command_source=user_cmd`, actor, PID, cwd, executable, terminal and source result | Command text has no reliable argv boundaries and does not prove execution or eventual command success; invalid/conflicting command tokens remain reversible issues |
 | Modules: `KERN_MODULE` | Common projection, source operation/name when supplied; named init_module/finit_module/delete_module syscalls get the specific load/unload action | No dedicated module identity/signature/version object |
 | Anomalies: `ANOM_*` | Exact primary type, umbrella classification, common projection and supported security context/decision fields if present | No decoder for each anomaly subtype or anomaly-specific counters/thresholds |
 | Integrity: `INTEGRITY_*` | Exact primary type, umbrella classification, common projection, supplied name, recognized result and supported security contexts | No IMA/EVM digest, algorithm, signature or measurement object |
 
 For compound events, mapped security evidence takes deterministic priority over ordinary syscall classification. AVC contexts remain separate from unrelated subjects. Additional distinct supported security decisions are retained in explicit issues; this does not extend preservation to all unmodeled fields in the table. Unknown/conflicting results and exceptional byte/argv evidence also remain explicit issues.
 
-Renderer version 4 summarizes only the available canonical fields. It cannot reconstruct omitted transitions or provide richer semantics than the structured event. SECCOMP LOG, ALLOW, TRACE and USER_NOTIF are distinct from blocking; permissive denials do not imply enforcement or syscall success.
+Renderer version 5 summarizes only the available canonical fields. It cannot reconstruct omitted transitions or provide richer semantics than the structured event. SECCOMP LOG, ALLOW, TRACE and USER_NOTIF are distinct from blocking; permissive denials do not imply enforcement or syscall success.
 
 ## Contract tests
 
@@ -43,4 +44,4 @@ Renderer version 4 summarizes only the available canonical fields. It cannot rec
 
 `SOCKADDR` binary address decoding, packet-level Netfilter records, IPC/message queues, virtualization, cryptographic/IPsec lifecycle, and TTY keystroke payloads are not normalized in this pass. They need dedicated typed objects and privacy/volume decisions; treating them as generic names or copying their raw fields would create a misleading contract.
 
-These mappings are based on upstream Linux Audit record definitions and synthetic regression fixtures. Empirical RAW and ENRICHED validation on Debian, Ubuntu, RHEL, and Oracle Linux has not yet been completed and is not claimed by this document.
+These mappings are based on upstream Linux Audit record definitions and synthetic regression fixtures, supplemented by the initial Ubuntu USER_CMD format in `testdata/user_cmd.audit`. That sanitized fixture retains the real ENRICHED separator byte 0x1d before UID/AUID; plain-text pastes may hide that byte. Missing field boundaries remain malformed input, rather than triggering guessed repairs. See [Compatibility](compatibility.md) for the observed platform exercise. Empirical RAW and ENRICHED validation on Debian, Ubuntu, RHEL, and Oracle Linux has not yet been completed and is not claimed by this document.

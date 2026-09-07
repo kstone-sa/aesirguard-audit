@@ -1,0 +1,1 @@
+type=USER_CMD msg=audit(1788767447.129:761): pid=1234 uid=1000 auid=1000 ses=42 subj=unconfined msg='cwd="/home/test/audit2json" cmd=617564697463746C202D76 exe="/usr/bin/sudo" terminal=pts/0 res=success'UID="test" AUID="test"

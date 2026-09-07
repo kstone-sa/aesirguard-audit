@@ -139,6 +139,8 @@ type CanonicalSecurity struct {
 }
 
 type CanonicalProcess struct {
+	Command          string   `json:"command,omitempty"`
+	CommandSource    string   `json:"command_source,omitempty"`
 	PID              string   `json:"pid,omitempty"`
 	PPID             string   `json:"ppid,omitempty"`
 	User             string   `json:"user,omitempty"`
@@ -256,6 +258,7 @@ func BuildCanonicalEvent(assembled AssembledEvent, options CanonicalOptions) Can
 		event.Rule = &CanonicalRule{Keys: keys}
 	}
 
+	event.Event.Issues = append(event.Event.Issues, unsetAuditEvidence(assembled.Records)...)
 	login := recordIdentity(assembled.Records, "AUID", "auid")
 	real := recordIdentity(assembled.Records, "UID", "uid")
 	effective := recordIdentity(assembled.Records, "EUID", "euid")
@@ -327,6 +330,9 @@ func buildCanonicalProcess(records []Record) (CanonicalProcess, []CanonicalIssue
 
 	var issues []CanonicalIssue
 	process.Argv, process.ArgvSource, issues = buildArguments(records)
+	var commandIssues []CanonicalIssue
+	process.Command, process.CommandSource, commandIssues = buildUserCommand(records)
+	issues = append(issues, commandIssues...)
 	return process, issues
 }
 
@@ -411,7 +417,7 @@ func meaningfulAuditValue(value string) string {
 }
 
 func hasCanonicalProcess(process CanonicalProcess) bool {
-	return process.PID != "" || process.PPID != "" || process.User != "" ||
+	return process.CommandSource != "" || process.PID != "" || process.PPID != "" || process.User != "" ||
 		process.UserID != "" || process.RealUser != "" || process.RealUserID != "" ||
 		process.Name != "" || process.Executable != "" || len(process.Argv) > 0 || process.ArgvSource != "" ||
 		process.CWD != "" || process.TTY != "" || process.ArchitectureCode != "" ||
@@ -544,6 +550,9 @@ func mustLinuxCapabilityNames() []string {
 }
 
 func recordIdentity(records []Record, nameKey, idKey string) sourceIdentity {
+	if idKey == "auid" && (auditIDUnset(firstRecordValue(records, idKey)) || strings.EqualFold(firstRecordValue(records, nameKey), "unset")) {
+		return sourceIdentity{}
+	}
 	return sourceIdentity{
 		name: interpretedValue(records, nameKey),
 		id:   firstRecordValue(records, idKey),

@@ -112,6 +112,8 @@
         "name": {"type": "string"},
         "executable": {"type": "string"},
         "argv": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "command": {"type": "string"},
+        "command_source": {"enum": ["user_cmd"]},
         "argv_source": {"enum": ["execve", "proctitle"]},
         "cwd": {"type": "string"},
         "tty": {"type": "string"},

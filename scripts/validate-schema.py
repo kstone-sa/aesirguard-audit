@@ -31,6 +31,8 @@ for name, data in inputs:
         count += 1
         if event.get("process", {}).get("argv_source"):
             features.add("argv_source")
+        if event.get("process", {}).get("command_source") == "user_cmd":
+            features.add("user_command")
         if event.get("security", {}).get("seccomp"):
             features.add("seccomp")
         if event["audit"].get("raw_encoding"):
@@ -38,7 +40,7 @@ for name, data in inputs:
         if any(i.get("value_encoding") for i in event["event"].get("issues", [])):
             features.add("issue_encoding")
 
-assert features == {"argv_source", "seccomp", "raw_encoding", "issue_encoding"}, features
+assert features == {"argv_source", "seccomp", "raw_encoding", "issue_encoding", "user_command"}, features
 valid = {"schema_version": "1.0", "audit": {}, "event": {"type": "TEST"}}
 validator.validate(valid)
 invalid = []
@@ -48,6 +50,7 @@ for key in ("schema_version", "audit", "event"):
     invalid.append(e)
 for extra in ({"process": {"argv": "scalar"}}, {"event": {"type": "TEST", "success": "yes"}},
               {"process": {"argv_source": "invented"}}, {"security": {"seccomp": {"action": "invented"}}},
+              {"process": {"command_source": "invented"}}, {"process": {"command": []}},
               {"unpublished_field": True}):
     invalid.append(dict(valid, **extra))
 for e in invalid:

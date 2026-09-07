@@ -76,6 +76,20 @@ func WithHumanMessage(event CanonicalEvent) CanonicalEvent {
 }
 
 func renderCanonicalMessage(event CanonicalEvent) (string, bool) {
+	if event.Event.Type == "USER_CMD" {
+		message := renderedActor(event) + " generated a USER_CMD record"
+		if event.Process != nil && event.Process.Command != "" {
+			message += " for " + strconv.Quote(event.Process.Command)
+		}
+		if event.Event.Success != nil {
+			if *event.Event.Success {
+				message += " (USER_CMD operation succeeded)"
+			} else {
+				message += " (USER_CMD operation failed)"
+			}
+		}
+		return message, true
+	}
 	if event.Event.Type == "SECCOMP" {
 		message := renderedActor(event) + " triggered seccomp filtering"
 		if event.Security != nil && event.Security.Seccomp != nil && event.Security.Seccomp.Action != "unknown" {

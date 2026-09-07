@@ -43,7 +43,7 @@ func encodedTextField(recordType, key string) bool {
 	case "comm", "exe", "key":
 		return true
 	case "cwd":
-		return recordType == "CWD"
+		return recordType == "CWD" || recordType == "USER_CMD"
 	case "name":
 		return recordType == "PATH" || recordType == "AVC" || recordType == "USER_AVC" || recordType == "SELINUX_ERR" || recordType == "USER_SELINUX_ERR" || strings.HasPrefix(recordType, "APPARMOR_") || recordType == "KERN_MODULE"
 	case "acct":
@@ -68,6 +68,11 @@ func decodedRecords(records []Record) ([]Record, []CanonicalIssue) {
 				// have been assembled. Other fields can be decoded independently.
 				if encodedTextField(r.Type, f.Key) {
 					value, _ = untrustedString(f, false)
+					// Only the unquoted raw key sentinel denotes absence.
+					// Quoted/hex spellings can be legitimate literal rule keys.
+					if f.Key == "key" && !f.Quoted && !f.Interpreted && f.Value == "(null)" {
+						value = ""
+					}
 				}
 				if !utf8.ValidString(value) {
 					issues = append(issues, sourceFieldIssue("invalid_utf8", *r, i, f, embedded))

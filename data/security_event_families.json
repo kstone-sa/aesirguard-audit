@@ -1,6 +1,7 @@
 {
   "version": "1",
   "record_types": {
+    "USER_CMD": {"category": "process", "action": "user_command"},
     "USER_AUTH": {"category": "authentication", "action": "authenticate"},
     "USER_ACCT": {"category": "authentication", "action": "check_account"},
     "USER_LOGIN": {"category": "authentication", "action": "login"},
@@ -72,7 +73,7 @@
     "7fff0000": {"action": "allow", "event_action": "allow_syscall"}
   },
   "single_record_types": [
-    "USER_AUTH", "USER_ACCT", "USER_LOGIN", "USER_LOGOUT", "USER_START", "USER_END",
+    "USER_CMD", "USER_AUTH", "USER_ACCT", "USER_LOGIN", "USER_LOGOUT", "USER_START", "USER_END",
     "CRED_ACQ", "CRED_DISP", "CRED_REFR", "USER_CHAUTHTOK", "GRP_CHAUTHTOK",
     "USER_MGMT", "GRP_MGMT", "ADD_USER", "DEL_USER", "ADD_GROUP", "DEL_GROUP",
     "ACCT_LOCK", "ACCT_UNLOCK", "USER_ERR", "SYSTEM_BOOT", "SYSTEM_SHUTDOWN",

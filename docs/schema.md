@@ -77,7 +77,7 @@ Unknown result values and unsupported record families are reported explicitly wi
 
 ## Identity handling
 
-Audit `log_format=ENRICHED` is required for the targeted CIS renderer behavior. ENRICHED names are preferred because they represent the account resolution performed when auditd wrote the event. Distribution-specific compatibility has not yet been empirically validated.
+Audit `log_format=ENRICHED` is required for the targeted CIS renderer behavior. ENRICHED names are preferred because they represent the account resolution performed when auditd wrote the event. Initial Ubuntu 24.04 arm64 ENRICHED use has been empirically exercised; full distribution qualification remains incomplete. See [Compatibility](compatibility.md).
 
 RAW input remains accepted. When an interpreted name is unavailable, the raw numeric identifier is emitted in a separate `*_id` field. A numeric value is never placed in a name field. Classification may be less specific when RAW input exposes only architecture-dependent syscall numbers.
 
@@ -101,7 +101,7 @@ The process object may contain:
 - `syscall_number` and `architecture_code` together as the RAW fallback, because a syscall number is architecture-dependent;
 - `return_value`, derived from the Audit `exit` field.
 
-The ENRICHED architecture name is not emitted because it adds no useful context once the syscall is named. No derived command-line string is emitted by default. Backend adapters can derive one from `argv` without paying the indexed-volume cost twice.
+The ENRICHED architecture name is not emitted because it adds no useful context once the syscall is named. No command-line string is derived from argv by default. USER_CMD instead supplies command text without validated argument boundaries: optional `process.command` preserves that text and `process.command_source` is `user_cmd`, including when invalid text is withheld. These compatible optional v1 fields avoid falsely treating a whole command as one argument or inventing shell boundaries. EXECVE/PROCTITLE argv and provenance remain independent. Backend adapters can derive one from `argv` without paying the indexed-volume cost twice.
 
 ## PATH records
 
@@ -204,4 +204,32 @@ keys, permission lists and argv fragments are not singleton fields. Result
 conflicts retain the existing `conflicting_result` handling. All conflict
 evidence uses bounded, reversible hex values with record and section provenance.
 
-Audit `key` values are decoded before splitting the Linux 0x01 multi-key separator. `rule.keys` preserves first occurrence order and removes empty/duplicate keys; classification matches individual keys.
+Audit `key=(null)` (unquoted raw token) denotes absence and is omitted from `rule.keys`; quoted or hex-encoded literal `(null)` keys remain real keys; this is field-specific and does not erase other `(null)` text. Audit `key` values are decoded before splitting the Linux 0x01 multi-key separator. `rule.keys` preserves first occurrence order and removes empty/duplicate keys; classification matches individual keys.
+
+
+### USER_CMD and unset login/session evidence
+
+USER_CMD is explicit userspace command evidence (commonly sudo), classified as
+`process` / `user_command`. Its `res` describes the recorded userspace operation;
+it never establishes that the represented command ran or completed successfully.
+The renderer says that a USER_CMD operation succeeded or failed. Quoted commands
+remain literal; unquoted commands require valid hex. Invalid encoding, UTF-8,
+NUL bytes or conflicting command values withhold the command and preserve every
+source cmd token in `invalid_user_command` issues with record, section and quoting
+provenance. Identical decoded repeats are usable. A missing cmd leaves only source
+provenance, without an invented command. Producer truncation cannot be reconstructed.
+The existing embedded-payload parse failure contract still applies.
+
+The [audit-userspace 3.1.2 producer](https://github.com/linux-audit/audit-userspace/blob/v3.1.2/lib/audit_logging.c)
+logs USER_CMD as a userspace message with quoted-or-hex command and cwd fields.
+The [Linux Audit userspace receive path](https://kernel.googlesource.com/pub/scm/linux/kernel/git/torvalds/linux.git/+/refs/tags/v6.17-rc7/kernel/audit.c) starts this record without a syscall context and ends the userspace message independently. USER_CMD therefore joins the existing known single-record completion table. No assembler
+limit, checkpoint, watermark or kernel compound-event rule changes.
+
+AUID `4294967295` (and signed `-1`) denotes an unset login identity in RAW as well
+as ENRICHED data; explicit `AUID="unset"` also suppresses actor identity. Ordinary
+UID, EUID, PID and other numeric fields do not inherit this interpretation.
+`unset_audit_id` issues preserve original auid/AUID and ses/SES sentinel tokens
+with reversible byte and record/section provenance. There is no canonical session
+ID field in v1; normal session projection is unchanged. Renderer fallback for an
+unset actor is `A process`, never a fabricated user identity. Event schema 1.0 and
+checkpoint schema 2 remain unchanged.
