@@ -2,6 +2,18 @@
 
 All notable changes will be documented in this file. The project has not yet published a stable release.
 
+## Unreleased — v0.9.1 correction line
+
+- Support USER_CMD with literal command text, explicit provenance, safe decoding,
+  standalone completion and renderer wording scoped to the recorded operation.
+- Omit the Audit null rule-key sentinel; preserve real and multi-key handling.
+- Omit unset login identities and retain reversible login/session sentinel evidence.
+- Default operational heartbeats to 10m; configuration, CLI overrides and 0s disable remain supported.
+- Correct stale renderer references and record the initial Ubuntu 24.04.4 arm64
+  ENRICHED exercise without claiming complete distribution qualification.
+- Event schema 1.0 and checkpoint schema 2 remain unchanged. Published v0.9.0
+  tags and assets are immutable; no new release is published by these changes.
+
 ## Unreleased
 
 No entries yet.

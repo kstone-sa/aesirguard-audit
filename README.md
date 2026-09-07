@@ -18,7 +18,7 @@ This project was designed and developed by Kstone SA with assistance from OpenAI
 
 The 0.9.x series is the public pre-release and qualification line for audit2json. It is intended for controlled evaluation against real Linux Audit output and does **not** constitute stable distribution compatibility certification.
 
-The v1.0 implementation is feature-complete, but empirical validation against real Linux Audit output is still pending; see [Compatibility](docs/compatibility.md). Until that work is complete, distro-labelled fixtures are synthetic regression data rather than compatibility certification. No stable release is currently supported.
+The v1.0 implementation is feature-complete, but empirical qualification is incomplete, with initial Ubuntu 24.04 arm64 ENRICHED use now exercised; see [Compatibility](docs/compatibility.md). Until that work is complete, distro-labelled fixtures are synthetic regression data rather than compatibility certification. No stable release is currently supported.
 
 The current `main` branch provides:
 
