@@ -140,3 +140,46 @@ func TestCheckpointVersionOneIsNotMigrated(t *testing.T) {
 		t.Fatal("legacy state modified")
 	}
 }
+
+func TestCheckpointAnchorAppendAndBoundedWindows(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "audit.log")
+	data := make([]byte, 20000)
+	for i := range data {
+		data[i] = 'x'
+	}
+	data[len(data)-1] = '\n'
+	if err := os.WriteFile(path, data, 0600); err != nil {
+		t.Fatal(err)
+	}
+	f, err := os.OpenFile(path, os.O_RDWR, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	anchor, err := ContentAnchor(f, int64(len(data)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.WriteAt([]byte("appended\n"), int64(len(data))); err != nil {
+		t.Fatal(err)
+	}
+	appended, err := ContentAnchor(f, int64(len(data)))
+	if err != nil || appended != anchor {
+		t.Fatal("append invalidated anchor")
+	}
+	// The documented sampled discriminator is bounded, not full-file hashing.
+	if _, err := f.WriteAt([]byte("middle"), 10000); err != nil {
+		t.Fatal(err)
+	}
+	middle, _ := ContentAnchor(f, int64(len(data)))
+	if middle != anchor {
+		t.Fatal("anchor exceeded documented windows")
+	}
+	if _, err := f.WriteAt([]byte("tail"), 19000); err != nil {
+		t.Fatal(err)
+	}
+	changed, _ := ContentAnchor(f, int64(len(data)))
+	if changed == anchor || len(changed) != 64 {
+		t.Fatal("tail mutation was not detected")
+	}
+}
