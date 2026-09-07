@@ -1,16 +1,24 @@
 # Release procedure
 
+## Release channels
+
+The 0.9.x series is the public pre-release and qualification line. Tags matching `v0.*` are published as GitHub **Pre-releases** and are intended for controlled evaluation, including empirical distribution testing. They are not stable compatibility certification.
+
+The first stable release will be `v1.0.0` after the empirical validation matrix and stable-release checklist are complete.
+
 ## Prepare
 
 1. Confirm that CI passes on `main` and that the documented compatibility claims match completed validation.
 2. Update release notes and the roadmap without presenting synthetic fixtures as empirical distribution support.
 3. Use the exact Go version in `.go-version` and run `scripts/verify-all.sh` as documented below, including the current vulnerability check.
-4. Complete every mandatory pre-tag item in `docs/public-release-checklist.md`.
+4. Complete the applicable items in `docs/public-release-checklist.md` for either a 0.9.x pre-release or stable v1.0.
 5. Create an annotated semantic-version tag from the reviewed `main` commit.
 
 ## Publish
 
-Pushing a tag matching `v*` runs the release workflow. Both main/PR CI and tag verification call the same reusable `verify.yml` workflow and `scripts/verify-all.sh`. Tag publication requires its successful completion; it cannot bypass formatting, full tests, race, vet, schema validation, both fuzz campaigns, benchmark, vulnerability checking, package inspection/fault tests or reproducibility verification. It creates static Linux amd64 and arm64 packages with embedded version metadata:
+Pushing a tag matching `v*` runs the release workflow. Tags matching `v0.*` are automatically created as GitHub Pre-releases; later stable tags are published normally.
+
+Both main/PR CI and tag verification call the same reusable `verify.yml` workflow and `scripts/verify-all.sh`. Tag publication requires its successful completion; it cannot bypass formatting, full tests, race, vet, schema validation, both fuzz campaigns, benchmark, vulnerability checking, package inspection/fault tests or reproducibility verification. It creates static Linux amd64 and arm64 packages with embedded version metadata:
 
 - the standalone archive contains the binary, example configuration, JSON Schema, license, public project policies, changelog, README, and documentation, with no service-manager files;
 - the systemd archive contains the same payload plus the unit, sysusers, and tmpfiles examples.
@@ -38,10 +46,10 @@ Ensure the installed tools are on PATH; the output directory must be absent or e
 
 The vulnerability database is current at execution time, so a newly published advisory can deliberately fail a previously passing source revision. This does not change package bytes. Keep the tool and Go pins under review; a passing check is not proof of absence of vulnerabilities.
 
-After publication, download the selected archive and `SHA256SUMS` from GitHub and verify them again before promoting the release. This final check covers the published download path in addition to the workflow's pre-publication verification.
+After publication, download the selected archive and `SHA256SUMS` from GitHub and verify them again before qualification or promotion. This final check covers the published download path in addition to the workflow's pre-publication verification.
 
 ## Roll back
 
 Retain at least the previous release archive and configuration. Stop the collector cleanly, restore the previous binary, validate its configuration, and restart it only against a checkpoint version it supports. Current binaries require checkpoint v2; v1-only binaries cannot consume it. Follow the explicit replay upgrade/rollback procedure in `runbook.md`; never synthesize an anchor for historical v1 state. At-least-once semantics mean a bounded replay is safer than manually advancing state.
 
-Do not move or recreate a published tag. If a release is defective, mark it accordingly and publish a new patch version.
+Do not move or recreate a published tag. If a release is defective, mark it accordingly and publish a new patch/pre-release version.
