@@ -4,6 +4,10 @@ All notable changes will be documented in this file. The project has not yet pub
 
 ## Unreleased
 
+No entries yet.
+
+## v0.9.0 - 2026-09-07
+
 ### Added
 
 - Stable canonical event schema v1.0 and a machine-readable JSON Schema.
@@ -22,8 +26,8 @@ All notable changes will be documented in this file. The project has not yet pub
 - Neutralize unsupported mutation claims and conflicting singleton evidence; decode multi-key separators and exclude invalid serials from watermarks.
 - Event schema remains v1.0 with existing issue fields; renderer version 5 adds neutral activity wording. Audit node now supplies the default source host while explicit configuration can override it.
 
-### Release gates
+### Release status
 
-- The 0.9.x line is the public pre-release and qualification series; it is not a stable compatibility certification.
+- v0.9.0 is the first public pre-release and qualification build; it is not a stable compatibility certification.
 - Empirical validation against controlled real RAW and ENRICHED Audit output on the documented distribution matrix remains pending before v1.0.
 - No stable v1.0 tag has been created.
