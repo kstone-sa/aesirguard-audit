@@ -67,13 +67,21 @@ func ParseRecord(line string) (Record, error) {
 	for i, field := range allFields {
 		if field.Key == "msg" && !field.Quoted && !field.Interpreted {
 			if id := auditIDFromMessage(field.Value); id != "" {
+				if envelope >= 0 {
+					if r.ID != id {
+						return Record{}, fmt.Errorf("conflicting Audit IDs")
+					}
+					continue
+				}
 				r.ID = id
 				envelope = i
-				break
 			}
 		}
 	}
 	for _, f := range allFields {
+		if f.Key == "type" && f.Value != r.Type {
+			return Record{}, fmt.Errorf("conflicting Audit types")
+		}
 		if f.Key != "node" || f.Interpreted {
 			continue
 		}

@@ -51,3 +51,11 @@ func TestCrossRecordAndEmbeddedSingletonConflicts(t *testing.T) {
 		}
 	}
 }
+
+func TestConflictingEnvelopeRejectedWithFallbackEvidence(t *testing.T) {
+	for _, line := range []string{`type=SYSCALL type=AVC msg=audit(100.1:1):`, `type=SYSCALL msg=audit(100.1:1): msg=audit(100.1:2):`} {
+		if _, err := ParseRecord(line); err == nil {
+			t.Fatal("conflicting envelope accepted")
+		}
+	}
+}
