@@ -118,7 +118,7 @@ Inode, device, and raw mode values are not emitted. A capability mask is decoded
 
 ## Optional human renderer
 
-`--render-message` adds `message` and `renderer_version` when a supported deterministic template exists.
+`--render-message` adds `message` and `renderer_version` when a supported deterministic template exists. These are optional convenience/debug output and should normally remain disabled for volume-sensitive SIEM ingestion because they duplicate canonical information. Built-in and shipped example defaults disable rendering; explicit CLI or configuration opt-in remains supported.
 
 The renderer:
 
@@ -228,8 +228,11 @@ limit, checkpoint, watermark or kernel compound-event rule changes.
 AUID `4294967295` (and signed `-1`) denotes an unset login identity in RAW as well
 as ENRICHED data; explicit `AUID="unset"` also suppresses actor identity. Ordinary
 UID, EUID, PID and other numeric fields do not inherit this interpretation.
-`unset_audit_id` issues preserve original auid/AUID and ses/SES sentinel tokens
-with reversible byte and record/section provenance. There is no generic canonical session
+Routine unset auid/AUID and ses/SES values are normal absence of attribution,
+not conversion issues; no issue or raw-token copy is emitted merely for these
+sentinels. Exceptional malformed, conflicting or ambiguous evidence retains its
+existing reversible issue contract. Security-relevant LOGIN transitions retain
+their explicit old/new unset states in `process.audit_attribution`. There is no generic canonical session
 ID field in v1; LOGIN-specific attribution is documented below. Renderer fallback for an
 unset actor is `A process`, never a fabricated user identity. Event schema 1.0 and
 checkpoint schema 2 remain unchanged.

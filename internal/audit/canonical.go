@@ -259,7 +259,6 @@ func BuildCanonicalEvent(assembled AssembledEvent, options CanonicalOptions) Can
 		event.Rule = &CanonicalRule{Keys: keys}
 	}
 
-	event.Event.Issues = append(event.Event.Issues, unsetAuditEvidence(assembled.Records)...)
 	login := recordIdentity(assembled.Records, "AUID", "auid")
 	// LOGIN auid is requested attribution. Only a successful operation
 	// establishes it as the login identity; old/new evidence remains separate.

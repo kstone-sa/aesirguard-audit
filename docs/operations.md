@@ -28,3 +28,12 @@ Counters are process-lifetime monotonic values:
 The instantaneous gauges are `input_lag_bytes`, `pending_events`, and `pending_bytes`. Lag includes unread bytes visible in the active and later retained generations and is omitted when a stable estimate is temporarily unavailable.
 
 External supervision should alert on missed heartbeats, non-zero gaps, sustained or retention-threatening lag, parse failures, and repeated restarts. It should not parse human prose or mix stderr into the event stream.
+
+## Compact event output
+
+Keep `mapping.render_message` disabled for volume-sensitive SIEM ingestion.
+Rendered messages are optional convenience/debug output that duplicates canonical
+information; opt in with `--render-message` or configuration only when useful.
+Routine unset login/session attribution adds no issue entries. LOGIN transitions
+retain explicit old/new unset semantics, and exceptional evidence still carries
+its existing issues. This compaction changes neither event delivery nor checkpoints.

@@ -36,10 +36,12 @@ See `configs/audit2json.example.json` for a complete example.
 | `collection.max_pending_events` | `--max-pending-events` | unresolved event limit |
 | `collection.max_records_per_event` | `--max-records-per-event` | per-event record limit |
 | `collection.max_pending_bytes` | `--max-pending-bytes` | unresolved source-byte limit |
-| `mapping.render_message` | `--render-message` | optional analyst-readable renderer |
+| `mapping.render_message` | `--render-message` | optional convenience/debug renderer; default `false` |
 | `operations.heartbeat_interval` | `--heartbeat-interval` | heartbeat period; default `10m`; `0s` disables it |
 
 Durations use Go duration syntax, for example `200ms`, `2s`, or `1m30s`. Zero-valued integer limits mean "use the built-in default"; negative values are invalid.
+
+Rendered messages should normally remain disabled for volume-sensitive SIEM ingestion: they add indexed volume and duplicate canonical fields. The shipped example sets `mapping.render_message` to `false`. Use `--render-message` or configure `mapping.render_message: true` for an explicit convenience/debug opt-in. `message` and `renderer_version` remain supported with their existing semantics.
 
 Configuration reload is deliberately not implemented. A validated restart makes configuration changes explicit and preserves the existing checkpoint and singleton model.
 

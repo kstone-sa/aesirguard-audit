@@ -638,3 +638,71 @@ func runFollowerUntilOutput(t *testing.T, inputPath, outputPath, checkpointPath 
 	<-done
 	t.Fatalf("output did not reach %d lines", lines)
 }
+
+func TestShippedRendererIsDisabledAndCLIOptInWorks(t *testing.T) {
+	data, err := os.ReadFile("../../configs/audit2json.example.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	configPath := filepath.Join(t.TempDir(), "config.json")
+	if err := os.WriteFile(configPath, data, 0600); err != nil {
+		t.Fatal(err)
+	}
+	for _, enable := range []bool{false, true} {
+		args := []string{"--config", configPath}
+		if enable {
+			args = append(args, "--render-message")
+		}
+		options, err := parseOptions(args, io.Discard)
+		if err != nil || options.renderMessage != enable {
+			t.Fatalf("renderMessage=%v err=%v", options.renderMessage, err)
+		}
+	}
+}
+
+func TestRendererVolumeDefaultsAndExplicitOptIn(t *testing.T) {
+	for _, tc := range []struct {
+		name, config string
+		flags        []string
+		want         bool
+	}{
+		{"built-in", "", nil, false},
+		{"config-omitted", `{"version":1}`, nil, false},
+		{"config-on", `{"version":1,"mapping":{"render_message":true}}`, nil, true},
+		{"cli-on", `{"version":1,"mapping":{"render_message":false}}`, []string{"--render-message"}, true},
+		{"cli-off", `{"version":1,"mapping":{"render_message":true}}`, []string{"--render-message=false"}, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			args := []string{}
+			if tc.config != "" {
+				path := filepath.Join(t.TempDir(), "config.json")
+				if err := os.WriteFile(path, []byte(tc.config), 0600); err != nil {
+					t.Fatal(err)
+				}
+				args = append(args, "--config", path)
+			}
+			args = append(args, tc.flags...)
+			var stdout, stderr bytes.Buffer
+			input := `type=DAEMON_START msg=audit(100.1:1): auid=4294967295 ses=4294967295 res=success`
+			if err := run(args, strings.NewReader(input), &stdout, &stderr); err != nil {
+				t.Fatal(err)
+			}
+			var event audit.CanonicalEvent
+			if err := json.Unmarshal(stdout.Bytes(), &event); err != nil {
+				t.Fatal(err)
+			}
+			var fields map[string]json.RawMessage
+			if err := json.Unmarshal(stdout.Bytes(), &fields); err != nil {
+				t.Fatal(err)
+			}
+			_, message := fields["message"]
+			_, version := fields["renderer_version"]
+			if message != tc.want || version != tc.want || event.Actor != nil || len(event.Event.Issues) != 0 {
+				t.Fatalf("unexpected output volume: %s", stdout.String())
+			}
+			if tc.want && (event.Renderer != audit.HumanRendererVersion || event.Message != "A process started the audit daemon") {
+				t.Fatalf("renderer semantics changed: %#v", event)
+			}
+		})
+	}
+}

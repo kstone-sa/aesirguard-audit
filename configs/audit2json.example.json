@@ -24,7 +24,7 @@
     "max_pending_bytes": 67108864
   },
   "mapping": {
-    "render_message": true
+    "render_message": false
   },
   "operations": {
     "heartbeat_interval": "10m"

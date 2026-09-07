@@ -9,7 +9,10 @@ All notable changes will be documented in this file. The project has not yet pub
 - Support USER_CMD with literal command text, explicit provenance, safe decoding,
   standalone completion and renderer wording scoped to the recorded operation.
 - Omit the Audit null rule-key sentinel; preserve real and multi-key handling.
-- Omit unset login identities and retain reversible login/session sentinel evidence.
+- Omit routine unset login identities without emitting sentinel issues; retain
+  explicit LOGIN transition states and exceptional evidence.
+- Disable rendered messages in the shipped example for volume-sensitive ingestion;
+  explicit CLI/configuration opt-in and renderer/schema semantics remain unchanged.
 - Default operational heartbeats to 10m; configuration, CLI overrides and 0s disable remain supported.
 - Correct stale renderer references and record the initial Ubuntu 24.04.4 arm64
   ENRICHED exercise without claiming complete distribution qualification.

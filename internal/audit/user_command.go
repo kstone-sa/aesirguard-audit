@@ -43,20 +43,3 @@ func buildUserCommand(records []Record) (string, string, []CanonicalIssue) {
 func auditIDUnset(value string) bool {
 	return value == "4294967295" || value == "-1" || strings.EqualFold(value, "unset")
 }
-
-func unsetAuditEvidence(records []Record) []CanonicalIssue {
-	var issues []CanonicalIssue
-	for index, record := range records {
-		for _, section := range []struct {
-			fields   []Field
-			embedded bool
-		}{{record.AllFields, false}, {record.EmbeddedAllFields, true}} {
-			for _, field := range section.fields {
-				if (field.Key == "auid" || field.Key == "AUID" || field.Key == "ses" || field.Key == "SES") && auditIDUnset(field.Value) {
-					issues = append(issues, sourceFieldIssue("unset_audit_id", record, index, field, section.embedded))
-				}
-			}
-		}
-	}
-	return issues
-}

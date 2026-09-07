@@ -75,20 +75,15 @@ func TestUserCommandDoesNotReplaceExecutionArguments(t *testing.T) {
 	}
 }
 
-func TestUnsetAuditIdentityEvidence(t *testing.T) {
+func TestUnsetAuditIdentityIsRoutineAbsence(t *testing.T) {
 	for _, fields := range []string{`auid=4294967295 ses=4294967295`, `auid=4294967295 ses=4294967295 AUID="unset"`, `auid=-1 ses=-1`, `AUID="unset" SES="unset"`} {
 		r := mustParseRecord(t, `type=DAEMON_START msg=audit(100.1:1): uid=0 res=success `+fields)
 		e := WithHumanMessage(BuildCanonicalEvent(AssembledEvent{ID: r.ID, Records: []Record{r}, Complete: true}, CanonicalOptions{}))
 		if e.Actor != nil || strings.Contains(e.Message, "4294967295") || e.Process == nil || e.Process.UserID != "0" {
 			t.Fatalf("event: %#v", e)
 		}
-		if len(e.Event.Issues) < 2 {
-			t.Fatalf("lost sentinel evidence: %#v", e.Event.Issues)
-		}
-		for _, issue := range e.Event.Issues {
-			if issue.Code != "unset_audit_id" || issue.ValueEncoding != "hex" || issue.RecordIndex == nil {
-				t.Fatalf("issue: %#v", issue)
-			}
+		if len(e.Event.Issues) != 0 || !strings.HasPrefix(e.Message, "A process ") {
+			t.Fatalf("routine unset attribution added volume or invented an actor: %#v", e)
 		}
 	}
 	r := mustParseRecord(t, `type=USER_AUTH msg=audit(100.1:1): auid=1000 uid=4294967295 pid=4294967295 AUID="test"`)
@@ -165,5 +160,35 @@ func TestUserCommandUnknownResultAndRawEvidence(t *testing.T) {
 	}
 	if !found {
 		t.Fatal("lost raw command evidence")
+	}
+}
+
+func TestUnsetAuditIdentityRetainsExceptionalEvidence(t *testing.T) {
+	for _, tc := range []struct{ fields, code, original string }{
+		{`auid=4294967295 auid=1000 AUID="unset"`, "conflicting_singleton", "4294967295"},
+		{"auid=-1 AUID=\"" + string([]byte{0xff}) + "\"", "invalid_utf8", string([]byte{0xff})},
+	} {
+		e := canonicalLines(t, `type=DAEMON_START msg=audit(100.1:1): res=success `+tc.fields)
+		if e.Actor != nil {
+			t.Fatal("invented actor")
+		}
+		found := false
+		for _, issue := range e.Event.Issues {
+			if issue.Code == "unset_audit_id" {
+				t.Fatal("routine sentinel issue")
+			}
+			if issue.Code == tc.code {
+				original, err := hex.DecodeString(issue.Value)
+				if err != nil || issue.ValueEncoding != "hex" || issue.RecordIndex == nil || issue.Quoted == nil || issue.Source != "raw" {
+					t.Fatalf("lost source provenance: %#v", issue)
+				}
+				if string(original) == tc.original {
+					found = true
+				}
+			}
+		}
+		if !found {
+			t.Fatalf("lost exceptional evidence: %#v", e.Event.Issues)
+		}
 	}
 }

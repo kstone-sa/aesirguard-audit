@@ -138,7 +138,7 @@ cat /var/log/audit/audit.log | ./audit2json --source-host host01
 
 `source` is omitted by default because the collecting backend commonly supplies host metadata itself.
 
-Include the optional analyst-readable message:
+Rendered messages are optional convenience/debug output. They duplicate canonical fields and should normally remain disabled for volume-sensitive SIEM ingestion. The shipped configuration disables them; explicitly opt in when useful:
 
 ```bash
 ./audit2json --render-message testdata/execve.audit
@@ -155,7 +155,7 @@ This redirection is batch behavior, not the managed file sink.
 Follow a live Audit log and emit to stdout:
 
 ```bash
-./audit2json --follow --render-message /var/log/audit/audit.log
+./audit2json --follow /var/log/audit/audit.log
 ```
 
 Run the same collector from a validated configuration:
