@@ -1,6 +1,6 @@
 # Public release checklist
 
-This is the authoritative operational gate for making the repository public and tagging v1.0. A checked implementation item does not replace empirical validation or maintainer approval.
+This is the authoritative operational gate for public pre-release publication and the later stable v1.0 release. Public source availability and a 0.9.x pre-release do not replace empirical validation or maintainer approval for v1.0.
 
 ## Completed in the v1.0 readiness pass
 
@@ -13,27 +13,43 @@ This is the authoritative operational gate for making the repository public and 
 - [x] Scan the current tree, pull requests, review comments, commit metadata, and failed workflow logs for credentials, private infrastructure, customer data, and obsolete repository-owner links.
 - [x] Keep the Apache-2.0 license and AI-assisted development disclosure visible.
 
-## Mandatory before visibility change or v1.0 tag
+## Mandatory before making the repository public
+
+- [ ] Review current GitHub Actions logs and downloadable artifacts for sensitive data immediately before publication.
+- [ ] Verify repository description and topics; leave the homepage empty unless there is a real project site to link.
+- [ ] Confirm that README, compatibility, changelog, roadmap, security policy and release documentation clearly identify 0.9.x as pre-release/qualification software and do not claim empirical distribution compatibility.
+- [ ] Review the intended `main`/tag protection policy and private security-reporting activation steps. Under the current GitHub plan, these controls may be unavailable while the repository is private; activate and verify them immediately after visibility changes.
+- [ ] Obtain explicit maintainer approval to change visibility.
+
+## Mandatory immediately after becoming public
+
+- [ ] Enable GitHub private vulnerability reporting and verify that **Security → Report a vulnerability** is available.
+- [ ] Enable enforceable branch protection/rulesets for `main`, require the shared verification status check, disable force-push/delete, and restrict stable-tag creation/update/deletion as supported by the plan.
+- [ ] Verify that repository description, topics, license detection and public security/contribution documentation render correctly.
+
+## Before publishing v0.9.0 pre-release
+
+- [ ] Recheck the pinned Go toolchain's support/security status and pass the full shared release gate on the exact approved commit.
+- [ ] Create an annotated `v0.9.0` tag only from that approved `main` commit.
+- [ ] Verify that the GitHub release is marked **Pre-release** and contains the four expected archives plus `SHA256SUMS`.
+- [ ] Download the intended qualification package and `SHA256SUMS` from GitHub and verify the published download independently before live testing.
+
+The 0.9.x series is intended for qualification and controlled evaluation. Findings from live testing may be fixed in later 0.9.x pre-releases without implying stable compatibility.
+
+## Mandatory before stable v1.0.0
 
 - [ ] Complete controlled local testing with real RAW and ENRICHED events for every distribution in `docs/compatibility.md`.
 - [ ] Record tested distribution, kernel, auditd, audit rules, and rotation behavior without committing identifying data.
-- [ ] Convert confirmed variations into sanitized regression fixtures and rerun the full CI suite.
-- [ ] Review all remaining GitHub Actions logs and downloadable artifacts for sensitive data immediately before publication.
-- [ ] Review the intended `main`/tag protection policy and private security-reporting activation steps. Under the current GitHub plan, these controls may be unavailable while the repository is private; activate and verify them immediately after visibility changes, before tagging.
-- [ ] Set the public repository description, topics, and homepage as appropriate.
-- [ ] Obtain explicit maintainer approval to change visibility.
+- [ ] Convert confirmed variations into sanitized regression fixtures and rerun the full shared verification suite.
+- [ ] Review all public release notes and compatibility claims against the completed empirical matrix.
+- [ ] Recheck the pinned Go toolchain's support/security status and pass the full shared release gate on the approved stable commit.
+- [ ] Obtain explicit maintainer approval for stable release.
+- [ ] Create and verify the annotated `v1.0.0` tag only from the approved `main` commit.
 
-## Mandatory after becoming public, before v1.0 tag
+GitHub documents [ruleset availability by plan](https://docs.github.com/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/about-rulesets) and [private reporting for public repositories](https://docs.github.com/code-security/security-advisories/guidance-on-reporting-and-writing/privately-reporting-a-security-vulnerability). Do not treat an unavailable private-repository control as enabled, or require an impossible pre-visibility configuration step.
 
-- [ ] Enable GitHub private vulnerability reporting and verify that the private report form is available.
-- [ ] Enable enforceable branch protection/rulesets for `main`, require the shared verification status check, and restrict stable-tag creation/update/deletion as supported by the plan.
-- [ ] Recheck the pinned Go toolchain's support/security status and pass the full shared release gate on the approved commit.
-- [ ] Create and verify the annotated v1.0 tag only from the approved `main` commit.
+## Mandatory after stable tagging, before promotion
 
-GitHub documents [ruleset availability by plan](https://docs.github.com/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/about-rulesets) and [private reporting for public repositories](https://docs.github.com/code-security/security-advisories/guidance-on-reporting-and-writing/privately-reporting-a-security-vulnerability). Do not treat an unavailable private-repository control as enabled, or require an impossible pre-visibility configuration step. No settings were enabled by this checklist.
+- [ ] Download the selected package variant and `SHA256SUMS` from the GitHub release and verify the published files independently.
 
-## Mandatory after tagging, before promotion
-
-- [ ] Download both package variants and `SHA256SUMS` from the GitHub release and verify the published files independently.
-
-History rewriting, deletion of review records, and repository visibility changes are never implicit parts of this checklist. They require an explicit, separately reviewed maintainer decision.
+History rewriting, deletion of review records, repository visibility changes, and stable release approval are never implicit parts of this checklist. They require explicit maintainer decisions.
