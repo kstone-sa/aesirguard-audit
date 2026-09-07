@@ -30,4 +30,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.ref_name }}
           REPOSITORY: ${{ github.repository }}
-        run: gh release create "$RELEASE_TAG" dist/* --repo "$REPOSITORY" --verify-tag --generate-notes
+        run: |
+          set -euo pipefail
+          prerelease=()
+          case "$RELEASE_TAG" in
+            v0.*) prerelease=(--prerelease) ;;
+          esac
+          gh release create "$RELEASE_TAG" dist/* --repo "$REPOSITORY" --verify-tag --generate-notes "${prerelease[@]}"
