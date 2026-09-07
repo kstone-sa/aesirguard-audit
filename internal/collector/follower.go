@@ -78,7 +78,7 @@ func OpenFileFollowerAt(path string, options FollowerOptions, offset int64, expe
 	if offset < 0 {
 		return nil, fmt.Errorf("start offset must not be negative")
 	}
-	file, err := os.Open(path)
+	file, err := os.OpenFile(path, os.O_RDONLY|syscall.O_NONBLOCK|syscall.O_NOFOLLOW, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -86,6 +86,10 @@ func OpenFileFollowerAt(path string, options FollowerOptions, offset int64, expe
 	if err != nil {
 		_ = file.Close()
 		return nil, err
+	}
+	if !info.Mode().IsRegular() {
+		_ = file.Close()
+		return nil, fmt.Errorf("unsupported source: regular file required")
 	}
 	identity, err := identityFromFileInfo(info)
 	if err != nil {

@@ -211,3 +211,10 @@ pending events receive `ambiguous_node_presence`; orphan unnamed EOE also marks
 matching named pending events. No unbounded history is retained after emission.
 Each named node is preserved as reversible `audit_node` evidence, and supplies
 `source.host` unless the explicit host option overrides that display value.
+
+Follow-mode source opens are nonblocking and reject non-regular descriptors
+(FIFOs, sockets, devices and directories). Leaf symlinks are rejected with
+`O_NOFOLLOW`; opening and validating the same descriptor avoids a type-check
+race. Parent directory aliases are not an ownership boundary for read-only
+sources. As with ordinary file I/O, cancellation cannot interrupt a kernel
+filesystem operation stuck in uninterruptible I/O; it does interrupt polling.
