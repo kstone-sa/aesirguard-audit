@@ -35,7 +35,7 @@ func TestWatermarkDiscontinuityPreservesEventAssembly(t *testing.T) {
 				}
 			}
 			got := a.FlushExpired(now.Add(2 * time.Second))
-			if len(got) != 1 || got[0].Completion != CompletionTimeout {
+			if len(got) != 1 || got[0].Complete || got[0].Completion != CompletionTimeout {
 				t.Fatalf("outlier did not expire by inactivity: %#v", got)
 			}
 		})

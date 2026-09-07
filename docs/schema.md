@@ -56,7 +56,7 @@ An invalid ID remains in `audit.id`; `audit.time` is omitted and `event.issues` 
 | `event.integrity` | object | Present only for incomplete events |
 | `event.issues` | array | Conversion limitations, invalid/unsupported input, and additional or conflicting evidence |
 
-Normal EOE and known single-record completions add no assembly metadata. Timeout, watermark, shutdown, or EOF flushes produce:
+Normal EOE, correlated PROCTITLE, known single-record and valid event-time watermark completions add no assembly metadata. Wall-clock inactivity timeout, shutdown, or EOF flushes of unresolved groups produce:
 
 ```json
 "integrity": {
@@ -66,6 +66,13 @@ Normal EOE and known single-record completions add no assembly metadata. Timeout
 ```
 
 Unknown result values and unsupported record families are reported explicitly without copying their arbitrary fields.
+
+`integrity.incomplete` denotes an unresolved assembly/delivery boundary, not the
+normal absence of EOE in audit.log. Completion is not a proof that every expected
+source field survived: malformed lines, incomplete argv, conflicts and source
+gaps retain their separate reporting. See [Reliability](reliability.md#event-completion-and-latency).
+Schema 1.0 continues to accept the historical `watermark` incomplete reason for
+older output; the corrected assembler emits valid watermark completions without it.
 
 ## Target, origin, and security context
 
@@ -132,7 +139,7 @@ Renderer version `5` covers the Linux Audit activity families selected by the ta
 
 Classification uses typed EXECVE or named execution-syscall evidence, normalized syscall and outcome, normalized rule keys, and conservatively matched paths. Rule keys are locally configurable and therefore are not the sole contract. A security-relevant path is accepted without a recognized key only when the syscall itself proves a mutation. See `cis-coverage.md` for the supported baseline and family matrix.
 
-Some user-space Audit records embed a second key/value payload inside `msg`. The parser extracts that payload without copying it wholesale. Recognized standalone user-space, lifecycle, and audit-daemon records complete immediately; kernel security and configuration records such as `CONFIG_CHANGE`, `FEATURE_CHANGE`, `MAC_STATUS`, `MAC_POLICY_LOAD`, `AVC`, `SECCOMP`, and `BPF` continue to wait for `EOE` or the normal assembler boundary because they may be part of a compound event.
+Some user-space Audit records embed a second key/value payload inside `msg`. The parser extracts that payload without copying it wholesale. Recognized standalone user-space, lifecycle, and audit-daemon records complete immediately; kernel security and configuration records such as `CONFIG_CHANGE`, `FEATURE_CHANGE`, `MAC_STATUS`, `MAC_POLICY_LOAD`, `AVC`, `SECCOMP`, and `BPF` wait for a compound boundary (EOE, correlated PROCTITLE or event-time watermark), or a conservative incomplete flush.
 
 ## Example and validation
 
@@ -244,9 +251,10 @@ checkpoint schema 2 remain unchanged.
 represents the kernel loginuid/session assignment operation, not authentication.
 The [6.17 kernel implementation](https://kernel.googlesource.com/pub/scm/linux/kernel/git/torvalds/linux.git/+/refs/tags/v6.17-rc7/kernel/audit.c)
 uses the syscall Audit context and records old/new IDs plus `res=!rc`.
-LOGIN stays in its correlated event with SYSCALL/PROCTITLE until EOE or the
-existing timeout/watermark/EOF/shutdown boundary. No standalone completion is
-inferred. A supplied group without EOE therefore remains explicitly incomplete.
+LOGIN stays correlated with SYSCALL/PROCTITLE. A trailing PROCTITLE completes
+the group even without EOE; EOE and valid event-time watermarks also complete it.
+No standalone LOGIN completion is inferred. Unresolved groups flushed by
+inactivity, EOF or shutdown remain explicitly incomplete.
 
 The compatible optional `process.audit_attribution` object contains `old` and
 `new` sides, each with optional `loginuid`, `user`, `loginuid_unset`, `session_id`

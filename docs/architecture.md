@@ -52,11 +52,16 @@ Groups records by audit ID. Linux Audit records may be interleaved and may arriv
 Completion may be established by:
 
 - an EOE record;
+- a PROCTITLE record for an already pending correlation key;
 - a known single-record message type;
-- an event-time watermark;
-- an inactivity timeout.
+- a valid event-time watermark.
 
-`PROCTITLE` is context, not a reliable terminal marker: later `PATH`, `SYSCALL`, or other records may share the same Audit ID. It supplies an `argv` fallback when `EXECVE` is absent.
+`PROCTITLE` is the final data record under the Linux Audit completion grammar.
+It completes only its own `(node presence, node value, audit ID)` group; physical
+record contiguity is never required. An orphan PROCTITLE remains pending, and
+a trailing orphan EOE carries no data and emits nothing. PROCTITLE also supplies
+an `argv` fallback when `EXECVE` is absent. Inactivity, EOF and shutdown flush
+unresolved groups as incomplete; see [Reliability](reliability.md#event-completion-and-latency).
 
 The assembler must use bounded state and report incomplete events explicitly.
 

@@ -96,6 +96,23 @@ v0.9.1 candidate remains the next step before maintainer authorization of a rele
 
 ## Operational compatibility
 
+### Native arm64 completion finding
+
+During native Ubuntu 24.04 arm64 ENRICHED requalification, the maintainer
+observed valid `SYSCALL + EXECVE + CWD + PATH + PATH + PROCTITLE` and
+`SYSCALL + CWD + PATH + PROCTITLE` groups without EOE in audit.log. The earlier
+candidate assembled them but incorrectly reported `incomplete/timeout`.
+The correction recognizes correlated PROCTITLE and valid stream-age watermarks
+as complete boundaries, consistent with the upstream references in
+[Reliability](reliability.md#event-completion-and-latency). Sanitized arm64
+regressions cover both groups, interleaving, kernel security context and
+conservative incomplete flushes. These tests are not a claim of completed native
+qualification; the corrected candidate still requires maintainer requalification
+before a v0.9.1 release. The volume measurements above describe the earlier sample
+and have not been recalculated for this correction.
+
+### Supported operations
+
 - Rename/create input rotation is supported and provides the strongest continuity guarantee.
 - Retained, uncompressed numeric rotations such as `audit.log.1` are supported during recovery.
 - Compressed rotations are not read.

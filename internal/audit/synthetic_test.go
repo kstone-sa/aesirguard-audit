@@ -47,7 +47,7 @@ func FuzzAssemblerPreservesAcceptedRecords(f *testing.F) {
 				t.Fatalf("record %d rejected despite sized limits: %v", index, err)
 			}
 			accepted = append(accepted, record)
-			if recordType == "EOE" {
+			if recordType == "EOE" || recordType == "PROCTITLE" && active[eventIndex] {
 				active[eventIndex] = false
 			} else {
 				active[eventIndex] = true

@@ -129,7 +129,7 @@ func TestCanonicalEventOrdersPathsByItem(t *testing.T) {
 	}
 }
 
-func TestAssemblerWaitsForEOEAfterOutOfOrderProctitle(t *testing.T) {
+func TestAssemblerProctitleClosesOnlyItsInterleavedEvent(t *testing.T) {
 	assembler := NewAssembler(0)
 	first := mustParseRecord(t, `type=SYSCALL msg=audit(1721721610.000:50): syscall=59`)
 	second := mustParseRecord(t, `type=SYSCALL msg=audit(1721721611.000:51): syscall=2`)
@@ -141,18 +141,18 @@ func TestAssemblerWaitsForEOEAfterOutOfOrderProctitle(t *testing.T) {
 		t.Fatalf("unexpected events: %#v", events)
 	}
 	assembler.Add(second)
-	if events := assembler.Add(proctitle); len(events) != 0 {
-		t.Fatalf("PROCTITLE completed event early: %#v", events)
-	}
 	if events := assembler.Add(path); len(events) != 0 {
 		t.Fatalf("PATH completed event early: %#v", events)
 	}
-	events := assembler.Add(eoe)
-	if len(events) != 1 || events[0].ID != first.ID || len(events[0].Records) != 4 {
-		t.Fatalf("EOE events = %#v", events)
+	events := assembler.Add(proctitle)
+	if len(events) != 1 || events[0].ID != first.ID || len(events[0].Records) != 3 {
+		t.Fatalf("PROCTITLE events = %#v", events)
 	}
-	if !events[0].Complete || events[0].Completion != CompletionEOE {
-		t.Fatalf("EOE completion = %#v", events[0])
+	if !events[0].Complete || events[0].Completion != CompletionProctitle {
+		t.Fatalf("PROCTITLE completion = %#v", events[0])
+	}
+	if events := assembler.Add(eoe); len(events) != 0 {
+		t.Fatalf("trailing EOE duplicated event: %#v", events)
 	}
 	remaining := assembler.FlushAll()
 	if len(remaining) != 1 || remaining[0].ID != second.ID {
@@ -200,7 +200,7 @@ func TestAssemblerUsesAuditTimeWatermark(t *testing.T) {
 	if len(events) != 1 || events[0].ID != oldRecord.ID {
 		t.Fatalf("watermark events = %#v", events)
 	}
-	if events[0].Complete || events[0].Completion != CompletionWatermark {
+	if !events[0].Complete || events[0].Completion != CompletionWatermark {
 		t.Fatalf("watermark completion = %#v", events[0])
 	}
 }

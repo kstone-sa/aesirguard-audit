@@ -4,6 +4,9 @@ All notable changes will be documented in this file. The project has not yet pub
 
 ## Unreleased — v0.9.1 correction line
 
+- Complete compound events on correlated PROCTITLE or valid Audit event-time
+  watermarks; normal audit.log groups without EOE no longer report false
+  incomplete integrity. Inactivity, EOF, shutdown and loss handling remain conservative.
 - Support confirmed kernel LOGIN attribution transitions separately from USER_LOGIN,
   retaining correlated syscall context, old/new loginuid/session evidence and source result.
 - Support USER_CMD with literal command text, explicit provenance, safe decoding,

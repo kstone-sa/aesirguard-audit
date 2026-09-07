@@ -111,14 +111,37 @@ For truncation on the same inode, the collector detects that file size is smalle
 
 ## Event completion and latency
 
-Emit an event immediately when a reliable boundary is observed, including EOE, a known terminal record, or a known single-record type.
+Emit a complete event on EOE, PROCTITLE for an already pending correlation key,
+or a known single-record type. PROCTITLE never closes another interleaved group
+and is not itself classified as a standalone event. A subsequent orphan EOE is
+ignored because it has no event data.
 
 For ambiguous events, use:
 
-- an event-time watermark while newer records are arriving;
-- a monotonic inactivity timeout when the stream is idle.
+- an event-time watermark while newer records are arriving (complete);
+- a monotonic inactivity timeout when the stream is idle (incomplete).
+
+This follows [audit-userspace 3.1.2 auditd.conf(5)](https://github.com/linux-audit/audit-userspace/blob/v3.1.2/docs/auditd.conf.5):
+interleaving is allowed, PROCTITLE ends the event, and sufficient event age in
+the processed stream establishes completion. The configured audit2json event
+timeout supplies the reorder window; audit2json does not read auditd.conf.
+[Linux 6.17 audit_log_exit()](https://github.com/torvalds/linux/blob/v6.17/kernel/auditsc.c)
+emits auxiliary security records, paths and other syscall context before
+PROCTITLE, followed only by EOE. Kernel security families remain compound;
+their type alone does not justify premature completion.
+
+Wall-clock inactivity, EOF and shutdown provide no equivalent source completion
+guarantee. They retain `integrity.incomplete` on unresolved events. A valid
+boundary does not erase exceptional evidence such as incomplete EXECVE arguments
+or malformed-line fallback events. No boundary rule changes fail-closed source-gap
+handling, state limits, sink acceptance or safe checkpoint positioning.
 
 Watermarks operate within a continuous Audit-clock epoch. A forward jump exceeding the greater of one minute or twice the event timeout, or a rollback of at least the event timeout, starts a new epoch. Pending events from the previous epoch retain all records and expire only by inactivity or an explicit boundary. Invalid timestamp syntax cannot advance the watermark. Small out-of-order arrivals within the timeout retain the current watermark. This conservative heuristic cannot distinguish every legitimate clock change from bad source time; it prevents a large jump from permanently poisoning subsequent event assembly.
+
+A change of node value or node presence also starts a new watermark epoch:
+one producer's clock cannot establish completion for another. Mixed-node streams
+may therefore rely more often on explicit boundaries or inactivity. No unbounded
+per-node clock history is retained.
 
 This avoids unnecessary delay during continuous historical backlog and bounds live-event latency when an explicit terminator is absent. Inactivity uses observation time (monotonic in the running process), independently of source timestamps.
 

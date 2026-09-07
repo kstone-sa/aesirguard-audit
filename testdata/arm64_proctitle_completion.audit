@@ -1,0 +1,10 @@
+type=SYSCALL msg=audit(1788790000.100:1495): arch=c00000b7 syscall=221 success=yes exit=0 a0=ffffc0001000 a1=ffffc0002000 a2=ffffc0003000 a3=0 items=2 ppid=1000 pid=1234 auid=1000 uid=1000 gid=1000 euid=1000 tty=pts0 ses=42 comm="id" exe="/usr/bin/id" key="exec"ARCH=aarch64 SYSCALL=execve AUID="test" UID="test" GID="test" EUID="test"
+type=EXECVE msg=audit(1788790000.100:1495): argc=1 a0="id"
+type=CWD msg=audit(1788790000.100:1495): cwd="/home/test"
+type=PATH msg=audit(1788790000.100:1495): item=0 name="/usr/bin/id" inode=100 dev=08:01 mode=0100755 ouid=0 ogid=0 nametype=NORMAL
+type=PATH msg=audit(1788790000.100:1495): item=1 name="/lib/ld-linux-aarch64.so.1" inode=101 dev=08:01 mode=0100755 ouid=0 ogid=0 nametype=NORMAL
+type=PROCTITLE msg=audit(1788790000.100:1495): proctitle="id"
+type=SYSCALL msg=audit(1788790000.200:1496): arch=c00000b7 syscall=56 success=yes exit=3 a0=ffffff9c a1=ffffc0001000 a2=0 a3=0 items=1 ppid=1000 pid=1235 auid=1000 uid=1000 gid=1000 euid=1000 tty=pts0 ses=42 comm="cat" exe="/usr/bin/cat" key=(null)ARCH=aarch64 SYSCALL=openat AUID="test" UID="test" GID="test" EUID="test"
+type=CWD msg=audit(1788790000.200:1496): cwd="/home/test"
+type=PATH msg=audit(1788790000.200:1496): item=0 name="/home/test/sample" inode=102 dev=08:01 mode=0100644 ouid=1000 ogid=1000 nametype=NORMAL
+type=PROCTITLE msg=audit(1788790000.200:1496): proctitle=6361740073616d706c65

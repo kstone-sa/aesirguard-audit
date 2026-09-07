@@ -10,12 +10,14 @@ import (
 
 // Assembler groups interleaved records and emits deterministic logical events.
 type Assembler struct {
-	timeout         time.Duration
-	limits          AssemblerLimits
-	pending         map[correlationKey]*pendingEvent
-	pendingBytes    int
-	nextSequence    uint64
-	latestAuditTime time.Time
+	timeout           time.Duration
+	limits            AssemblerLimits
+	pending           map[correlationKey]*pendingEvent
+	pendingBytes      int
+	nextSequence      uint64
+	latestAuditTime   time.Time
+	latestAuditNode   string
+	latestNodePresent bool
 }
 
 type correlationKey struct {
@@ -56,6 +58,7 @@ type Completion string
 
 const (
 	CompletionEOE          Completion = "eoe"
+	CompletionProctitle    Completion = "proctitle"
 	CompletionSingleRecord Completion = "single_record"
 	CompletionWatermark    Completion = "watermark"
 	CompletionTimeout      Completion = "timeout"
@@ -142,7 +145,7 @@ func (assembler *Assembler) addAt(record Record, observedAt time.Time) ([]Assemb
 			if auditTime, ok := auditTimeFromID(record.ID); ok {
 				pending.auditTime = auditTime
 				pending.hasAuditTS = true
-				assembler.observeAuditTime(auditTime)
+				assembler.observeAuditTime(auditTime, key)
 			}
 			assembler.pending[key] = pending
 		}
@@ -150,7 +153,12 @@ func (assembler *Assembler) addAt(record Record, observedAt time.Time) ([]Assemb
 		assembler.pendingBytes += record.SourceBytes
 		pending.lastSeen = observedAt
 
-		if isTerminalRecord(record.Type) {
+		// auditd.conf(5) defines PROCTITLE as the last event record. It
+		// closes only an already pending correlation key, never a standalone
+		// context record. A following EOE is harmless and carries no data.
+		if record.Type == "PROCTITLE" && exists {
+			ready = append(ready, assembler.finish(key, CompletionProctitle, true))
+		} else if isTerminalRecord(record.Type) {
 			ready = append(ready, assembler.finish(key, terminalCompletion(record.Type), true))
 		}
 	}
@@ -251,7 +259,18 @@ func (assembler *Assembler) checkLimits(record Record, pending *pendingEvent, ex
 // observeAuditTime confines watermark expiry to a continuous clock epoch.
 // A large forward jump is not proof that pending events are old; a rollback
 // outside the reorder window must not leave a permanent future watermark.
-func (assembler *Assembler) observeAuditTime(timestamp time.Time) {
+func (assembler *Assembler) observeAuditTime(timestamp time.Time, key correlationKey) {
+	// Different producers need not share a clock. On a node change, keep
+	// unresolved groups conservative rather than completing them by another
+	// producer's time. This retains no unbounded per-node clock history.
+	if !assembler.latestAuditTime.IsZero() && (key.Node != assembler.latestAuditNode || key.NodePresent != assembler.latestNodePresent) {
+		for _, pending := range assembler.pending {
+			pending.hasAuditTS = false
+		}
+		assembler.latestAuditTime = time.Time{}
+	}
+	assembler.latestAuditNode = key.Node
+	assembler.latestNodePresent = key.NodePresent
 	if !assembler.latestAuditTime.IsZero() && assembler.timeout > 0 {
 		forwardWindow := time.Minute
 		if assembler.timeout > forwardWindow/2 {
@@ -297,7 +316,9 @@ func (assembler *Assembler) expired(now time.Time) []readyEvent {
 		if pending.hasAuditTS && !assembler.latestAuditTime.Before(pending.auditTime.Add(assembler.timeout)) {
 			completion = CompletionWatermark
 		}
-		ready = append(ready, assembler.finish(id, completion, false))
+		// Stream age is an Audit completion boundary; elapsed wall time is
+		// only an inactivity bound and does not establish complete delivery.
+		ready = append(ready, assembler.finish(id, completion, completion == CompletionWatermark))
 	}
 	return ready
 }

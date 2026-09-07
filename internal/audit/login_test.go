@@ -24,9 +24,10 @@ func loginFixture(t *testing.T) []Record {
 
 func TestLOGINRealCompoundTransition(t *testing.T) {
 	records := loginFixture(t)
-	for _, order := range [][3]int{{0, 1, 2}, {0, 2, 1}, {1, 0, 2}, {1, 2, 0}, {2, 0, 1}, {2, 1, 0}} {
+	// LOGIN and SYSCALL may interleave with other events; PROCTITLE is last.
+	for _, order := range [][3]int{{0, 1, 2}, {1, 0, 2}} {
 		a := NewAssembler(time.Second)
-		for _, i := range order {
+		for _, i := range order[:2] {
 			if events := a.Add(records[i]); len(events) != 0 {
 				t.Fatalf("premature standalone completion: %#v", events)
 			}
@@ -34,8 +35,8 @@ func TestLOGINRealCompoundTransition(t *testing.T) {
 		if a.Pending() != 1 {
 			t.Fatal("lost correlation")
 		}
-		events := a.Add(mustParseRecord(t, `type=EOE msg=audit(1788768576.891:863):`))
-		if len(events) != 1 || !events[0].Complete || len(events[0].Records) != 4 {
+		events := a.Add(records[order[2]])
+		if len(events) != 1 || !events[0].Complete || events[0].Completion != CompletionProctitle || len(events[0].Records) != 3 {
 			t.Fatalf("assembly: %#v", events)
 		}
 		e := WithHumanMessage(BuildCanonicalEvent(events[0], CanonicalOptions{}))
@@ -69,7 +70,7 @@ func TestLOGINBoundaryAndUserLoginDistinction(t *testing.T) {
 	for _, timeout := range []bool{false, true} {
 		a := NewAssembler(time.Second)
 		now := time.Unix(1, 0)
-		for _, r := range records {
+		for _, r := range records[:2] {
 			if got := a.AddAt(r, now); len(got) != 0 {
 				t.Fatal("premature completion")
 			}
@@ -80,7 +81,7 @@ func TestLOGINBoundaryAndUserLoginDistinction(t *testing.T) {
 		} else {
 			events = a.FlushAll()
 		}
-		if len(events) != 1 || events[0].Complete || len(events[0].Records) != 3 {
+		if len(events) != 1 || events[0].Complete || len(events[0].Records) != 2 {
 			t.Fatalf("boundary: %#v", events)
 		}
 		e := BuildCanonicalEvent(events[0], CanonicalOptions{})
