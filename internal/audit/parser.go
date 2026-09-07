@@ -28,6 +28,7 @@ type Record struct {
 	EmbeddedFields     map[string]string
 	EmbeddedValues     map[string][]string
 	EmbeddedParseError string
+	EmbeddedFailures   []Field
 	SourceBytes        int
 	Source             SourcePosition
 }
@@ -59,10 +60,14 @@ func ParseRecord(line string) (Record, error) {
 		Type:        firstValue(values, "type"),
 		SourceBytes: len(line),
 	}
-	for _, msg := range values["msg"] {
-		if id := auditIDFromMessage(msg); id != "" {
-			r.ID = id
-			break
+	envelope := -1
+	for i, field := range allFields {
+		if field.Key == "msg" && !field.Quoted && !field.Interpreted {
+			if id := auditIDFromMessage(field.Value); id != "" {
+				r.ID = id
+				envelope = i
+				break
+			}
 		}
 	}
 	if r.ID == "" {
@@ -74,7 +79,13 @@ func ParseRecord(line string) (Record, error) {
 	if !utf8.ValidString(r.Type) || !utf8.ValidString(r.ID) {
 		return Record{}, fmt.Errorf("invalid UTF-8 in Audit envelope")
 	}
-	r.EmbeddedAllFields, r.EmbeddedFields, r.EmbeddedValues, r.EmbeddedParseError = parseEmbeddedMessages(values["msg"])
+	var messages []Field
+	for i, field := range allFields {
+		if field.Key == "msg" && i != envelope {
+			messages = append(messages, field)
+		}
+	}
+	r.EmbeddedAllFields, r.EmbeddedFields, r.EmbeddedValues, r.EmbeddedFailures, r.EmbeddedParseError = parseEmbeddedMessages(messages)
 	return r, nil
 }
 
@@ -117,17 +128,21 @@ func normalizeAuditPayload(payload string) string {
 	return "decision=" + strconv.Quote(decision) + " permissions=" + strconv.Quote(permissions) + " " + remainder
 }
 
-func parseEmbeddedMessages(messages []string) ([]Field, map[string]string, map[string][]string, string) {
+func parseEmbeddedMessages(messages []Field) ([]Field, map[string]string, map[string][]string, []Field, string) {
 	var all []Field
 	first := map[string]string{}
 	values := map[string][]string{}
-	for _, message := range messages {
-		if auditIDFromMessage(message) != "" || !strings.Contains(message, "=") {
-			continue
-		}
+	var failures []Field
+	var firstError string
+	for _, field := range messages {
+		message := field.Value
 		parsedAll, parsedFirst, parsedValues, err := parseFields(normalizeAuditPayload(message))
 		if err != nil {
-			return all, first, values, err.Error()
+			failures = append(failures, field)
+			if firstError == "" {
+				firstError = err.Error()
+			}
+			continue
 		}
 		all = append(all, parsedAll...)
 		for key, value := range parsedFirst {
@@ -139,7 +154,7 @@ func parseEmbeddedMessages(messages []string) ([]Field, map[string]string, map[s
 			values[key] = append(values[key], entries...)
 		}
 	}
-	return all, first, values, ""
+	return all, first, values, failures, firstError
 }
 
 func parseFields(line string) ([]Field, map[string]string, map[string][]string, error) {
@@ -228,13 +243,13 @@ func parseFields(line string) ([]Field, map[string]string, map[string][]string, 
 func fieldBoundary(b byte) bool { return b == ' ' || b == 0x1d }
 
 func auditIDFromMessage(msg string) string {
-	start := strings.Index(msg, "audit(")
-	if start < 0 {
+	start := 0
+	if !strings.HasPrefix(msg, "audit(") || !strings.HasSuffix(msg, "):") {
 		return ""
 	}
 	start += len("audit(")
 	end := strings.IndexByte(msg[start:], ')')
-	if end < 0 {
+	if end < 0 || start+end != len(msg)-2 {
 		return ""
 	}
 	return msg[start : start+end]
@@ -330,6 +345,26 @@ func primaryRecordType(records []Record) string {
 	sort.Strings(fallback)
 	if len(fallback) > 0 {
 		return fallback[0]
+	}
+	return ""
+}
+
+// Recover only a structurally parsed envelope prefix from a malformed line.
+func auditIDFromLinePrefix(line string) string {
+	end := strings.Index(line, "):")
+	if end < 0 {
+		return ""
+	}
+	fields, _, _, err := parseFields(line[:end+2])
+	if err != nil {
+		return ""
+	}
+	for _, f := range fields {
+		if f.Key == "msg" && !f.Quoted && !f.Interpreted {
+			if id := auditIDFromMessage(f.Value); id != "" {
+				return id
+			}
+		}
 	}
 	return ""
 }

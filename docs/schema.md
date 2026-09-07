@@ -182,3 +182,12 @@ Renderer version 4 distinguishes a policy denial that was not enforced in permis
 Canonical actions distinguish termination, trapping, rejection, notification, tracing, logging, and allowance. LOG permits execution after logging; TRACE and USER_NOTIF leave the eventual decision to another participant and do not imply a block or successful syscall. Unknown or conflicting codes remain `filter_syscall` with explicit issues. Secondary distinct seccomp records are retained in `additional_seccomp_evidence` issues. The renderer describes the filter observation without attributing a user's intent to block their own syscall.
 
 Origin extraction is limited to mapped userspace/account/authentication/session producers. A SECCOMP `ip` is only an instruction pointer; it never populates `origin.address`, even in a compound event with a genuine connection origin. SECCOMP and access-control decision evidence may coexist in `security` independently of the chosen primary event type.
+
+Userspace `msg` payloads are never identified as envelopes by an embedded
+`audit(...)` substring. Only an unquoted raw `msg=audit(...):` field supplies
+the envelope ID. Malformed or legacy embedded payloads produce
+`embedded_parse_failure` issues whose hex `value` reversibly preserves the
+entire payload value, with record index, source section and quoting. No partial
+semantic interpretation of a malformed payload is trusted; subsequent valid
+payloads still parse. Evidence size is bounded by the existing physical-line
+and event-state limits. This uses the existing issue schema.

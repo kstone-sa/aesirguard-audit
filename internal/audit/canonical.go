@@ -61,7 +61,7 @@ func BuildParseFailureEvent(line string, parseErr error, options CanonicalOption
 			}},
 		},
 	}
-	if id := auditIDFromMessage(line); id != "" && utf8.ValidString(id) {
+	if id := auditIDFromLinePrefix(line); id != "" && utf8.ValidString(id) {
 		event.Audit = canonicalAudit(id)
 		event.Audit.Raw = line
 	}
@@ -220,14 +220,9 @@ func BuildCanonicalEvent(assembled AssembledEvent, options CanonicalOptions) Can
 			RecordType: recordType,
 		})
 	}
-	for _, record := range assembled.Records {
-		if record.EmbeddedParseError != "" {
-			event.Event.Issues = append(event.Event.Issues, CanonicalIssue{
-				Code:       "embedded_parse_failure",
-				RecordType: record.Type,
-				Field:      "msg",
-				Value:      record.EmbeddedParseError,
-			})
+	for index, record := range assembled.Records {
+		for _, field := range record.EmbeddedFailures {
+			event.Event.Issues = append(event.Event.Issues, sourceFieldIssue("embedded_parse_failure", record, index, field, false))
 		}
 	}
 
