@@ -120,7 +120,7 @@
     }
   ],
   "message": "operator executed /usr/bin/sudo as root with arguments: cat -- /etc/shadow",
-  "renderer_version": "4",
+  "renderer_version": "5",
   "source": {
     "host": "workstation-01"
   }

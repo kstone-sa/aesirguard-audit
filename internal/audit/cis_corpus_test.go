@@ -12,13 +12,13 @@ func TestCISDistroCorpus(t *testing.T) {
 		action  string
 		message string
 	}{
-		{"debian12.audit", "update_session_record", "operator updated session records at /var/log/wtmp"},
+		{"debian12.audit", "observe_session_activity", "operator generated session activity at /var/log/wtmp using openat"},
 		{"debian13.audit", "change_permissions", "operator changed file permissions or ownership on /srv/data using fchmodat2"},
-		{"ubuntu2204.audit", "change_mac_policy", "operator changed mandatory access control policy at /etc/apparmor.d/usr.bin.example"},
+		{"ubuntu2204.audit", "observe_configuration_activity", "operator generated configuration activity at /etc/apparmor.d/usr.bin.example using openat"},
 		{"ubuntu2404.audit", "change_network_configuration", "operator changed network configuration using sethostname"},
-		{"rhel8.audit", "change_time", "operator changed system time using settimeofday"},
-		{"rhel9.audit", "change_mac_policy", "operator changed mandatory access control policy at /etc/selinux/targeted/contexts/files/file_contexts.local"},
-		{"oracle8.audit", "change_privilege_scope", "operator changed sudo privilege scope at /etc/sudoers.d/operators"},
+		{"rhel8.audit", "observe_system_activity", "operator generated system activity using settimeofday"},
+		{"rhel9.audit", "observe_configuration_activity", "operator generated configuration activity at /etc/selinux/targeted/contexts/files/file_contexts.local using openat"},
+		{"oracle8.audit", "observe_configuration_activity", "operator generated configuration activity at /etc/sudoers.d/operators using openat"},
 		{"oracle9.audit", "load_kernel_module", "operator loaded a kernel module from /lib/modules/example.ko using finit_module"},
 	}
 

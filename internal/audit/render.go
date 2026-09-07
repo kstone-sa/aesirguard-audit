@@ -7,7 +7,7 @@ import (
 )
 
 // HumanRendererVersion identifies the deterministic message template set.
-const HumanRendererVersion = "4"
+const HumanRendererVersion = "5"
 
 type actionWording struct {
 	success string
@@ -91,6 +91,9 @@ func renderCanonicalMessage(event CanonicalEvent) (string, bool) {
 			}
 		}
 		return message, true
+	}
+	if strings.HasPrefix(event.Event.Action, "observe_") {
+		return renderMappedAction(event, "generated "+event.Event.Category+" activity", "generated failed "+event.Event.Category+" activity", "generated "+event.Event.Category+" activity", "at", true)
 	}
 	switch event.Event.Action {
 	case "execute":

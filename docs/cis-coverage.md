@@ -68,3 +68,13 @@ Renderer wording follows the tri-state result: past tense for success, `failed t
 The mapping is versioned in `data/cis_audit_families.json`. Updating a CIS baseline requires updating this matrix, mapping data, and the affected fixtures together.
 
 These fixtures validate the current semantic contract but are not an empirical distribution corpus. Controlled local testing with real RAW and ENRICHED Level 1 and Level 2 Audit output from every listed platform has not yet been completed. Until then, distribution-specific coverage is a target rather than a verified compatibility claim.
+
+Rule keys are policy labels, not mutation evidence. A matched key without a
+supported operation now yields `observe_<category>_activity`. A path-based
+mutation classification requires a known modifying syscall; write-family calls
+also require a positive byte count. `adjtimex`, `clock_adjtime`, and
+`settimeofday` remain neutral because their pointer arguments do not establish
+whether state was changed. Renderer version 5 uses neutral activity wording
+for these cases. Specific operation actions describe the attempted operation;
+only an explicit successful result permits successful-operation wording. This
+is not a before/after state-difference proof or a claim of malicious intent.

@@ -2,6 +2,7 @@ package audit
 
 import (
 	"encoding/json"
+	"strconv"
 	"strings"
 
 	mappingdata "github.com/kstone-sa/audit2json/data"
@@ -70,6 +71,9 @@ func classifyCanonicalEvent(event *CanonicalEvent) {
 		if classificationRuleMatches(*event, rule) {
 			event.Event.Category = rule.Category
 			event.Event.Action = rule.Action
+			if rule.Action != "access" && !classificationOperationSupported(*event, rule) {
+				event.Event.Action = "observe_" + rule.Category + "_activity"
+			}
 			return
 		}
 	}
@@ -154,8 +158,10 @@ func pathEvidenceIsMutation(event CanonicalEvent) bool {
 		return false
 	}
 	switch strings.ToLower(event.Process.Syscall) {
-	case "write", "pwrite64", "writev", "pwritev", "pwritev2",
-		"creat", "truncate", "ftruncate",
+	case "write", "pwrite64", "writev", "pwritev", "pwritev2":
+		n, err := strconv.ParseInt(event.Process.ReturnValue, 10, 64)
+		return err == nil && n > 0
+	case "creat", "truncate", "ftruncate",
 		"chmod", "fchmod", "fchmodat", "fchmodat2",
 		"chown", "fchown", "fchownat", "lchown",
 		"setxattr", "lsetxattr", "fsetxattr",
@@ -217,4 +223,34 @@ func mustSecurityEventFamilies() securityEventFamilyDocument {
 		}
 	}
 	return document
+}
+
+// Rule keys describe collection policy, not what the process actually did.
+func classificationOperationSupported(event CanonicalEvent, rule canonicalClassificationRule) bool {
+	if event.Process == nil {
+		return false
+	}
+	syscall := strings.ToLower(event.Process.Syscall)
+	// Audit records contain a pointer, not struct timex.modes. These calls may
+	// query or modify; neither transport success nor a rule key resolves that.
+	if syscall == "adjtimex" || syscall == "clock_adjtime" || syscall == "settimeofday" {
+		return false
+	}
+	if containsString(rule.Syscalls, syscall) {
+		return true
+	}
+	if !pathEvidenceIsMutation(event) {
+		return false
+	}
+	for _, path := range event.Paths {
+		if containsString(rule.Paths, path.Name) {
+			return true
+		}
+		for _, prefix := range rule.PathPrefixes {
+			if strings.HasPrefix(path.Name, prefix) {
+				return true
+			}
+		}
+	}
+	return false
 }

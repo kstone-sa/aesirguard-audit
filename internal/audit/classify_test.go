@@ -23,12 +23,12 @@ func TestClassifyCanonicalEventCoversCISAuditFamilies(t *testing.T) {
 		{
 			name:     "network configuration on Debian",
 			event:    CanonicalEvent{Rule: &CanonicalRule{Keys: []string{"system_network"}}, Paths: []CanonicalPath{{Name: "/etc/network/interfaces"}}},
-			category: "configuration", action: "change_network_configuration",
+			category: "configuration", action: "observe_configuration_activity",
 		},
 		{
 			name:     "network configuration on RHEL or Oracle Linux",
 			event:    CanonicalEvent{Rule: &CanonicalRule{Keys: []string{"system_network"}}, Paths: []CanonicalPath{{Name: "/etc/NetworkManager/system-connections/prod.nmconnection"}}},
-			category: "configuration", action: "change_network_configuration",
+			category: "configuration", action: "observe_configuration_activity",
 		},
 		{
 			name:     "unsuccessful access",
@@ -38,7 +38,7 @@ func TestClassifyCanonicalEventCoversCISAuditFamilies(t *testing.T) {
 		{
 			name:     "identity configuration",
 			event:    CanonicalEvent{Rule: &CanonicalRule{Keys: []string{"identity"}}, Paths: []CanonicalPath{{Name: "/etc/security/opasswd"}}},
-			category: "configuration", action: "change_identity_configuration",
+			category: "configuration", action: "observe_configuration_activity",
 		},
 		{
 			name:     "Debian 13 permission syscall",
@@ -53,12 +53,12 @@ func TestClassifyCanonicalEventCoversCISAuditFamilies(t *testing.T) {
 		{
 			name:     "session record",
 			event:    CanonicalEvent{Rule: &CanonicalRule{Keys: []string{"session"}}, Paths: []CanonicalPath{{Name: "/var/log/wtmp"}}},
-			category: "session", action: "update_session_record",
+			category: "session", action: "observe_session_activity",
 		},
 		{
 			name:     "login record",
 			event:    CanonicalEvent{Rule: &CanonicalRule{Keys: []string{"logins"}}, Paths: []CanonicalPath{{Name: "/run/faillock/operator"}}},
-			category: "authentication", action: "update_login_record",
+			category: "authentication", action: "observe_authentication_activity",
 		},
 		{
 			name:     "Debian 13 rename syscall",
@@ -73,22 +73,22 @@ func TestClassifyCanonicalEventCoversCISAuditFamilies(t *testing.T) {
 		{
 			name:     "AppArmor policy",
 			event:    CanonicalEvent{Rule: &CanonicalRule{Keys: []string{"MAC-policy"}}, Paths: []CanonicalPath{{Name: "/etc/apparmor.d/usr.bin.example"}}},
-			category: "configuration", action: "change_mac_policy",
+			category: "configuration", action: "observe_configuration_activity",
 		},
 		{
 			name:     "SELinux policy",
 			event:    CanonicalEvent{Rule: &CanonicalRule{Keys: []string{"MAC-policy"}}, Paths: []CanonicalPath{{Name: "/etc/selinux/targeted/contexts/files/file_contexts"}}},
-			category: "configuration", action: "change_mac_policy",
+			category: "configuration", action: "observe_configuration_activity",
 		},
 		{
 			name:     "sudo scope",
 			event:    CanonicalEvent{Rule: &CanonicalRule{Keys: []string{"scope"}}, Paths: []CanonicalPath{{Name: "/etc/sudoers.d/operators"}}},
-			category: "configuration", action: "change_privilege_scope",
+			category: "configuration", action: "observe_configuration_activity",
 		},
 		{
 			name:     "configured sudo log",
 			event:    CanonicalEvent{Rule: &CanonicalRule{Keys: []string{"sudo-log-file"}}},
-			category: "file", action: "write_sudo_log",
+			category: "file", action: "observe_file_activity",
 		},
 		{
 			name:     "kernel module load",
@@ -108,7 +108,7 @@ func TestClassifyCanonicalEventCoversCISAuditFamilies(t *testing.T) {
 		{
 			name:     "audit configuration",
 			event:    CanonicalEvent{Rule: &CanonicalRule{Keys: []string{"audit_config"}}, Paths: []CanonicalPath{{Name: "/etc/audit/rules.d/cis.rules"}}},
-			category: "configuration", action: "change_audit_configuration",
+			category: "configuration", action: "observe_configuration_activity",
 		},
 	}
 
