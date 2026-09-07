@@ -10,15 +10,24 @@ The first stable release will be `v1.0.0` after the empirical validation matrix 
 
 1. Confirm that CI passes on `main` and that the documented compatibility claims match completed validation.
 2. Update release notes and the roadmap without presenting synthetic fixtures as empirical distribution support.
-3. Use the exact Go version in `.go-version` and run `scripts/verify-all.sh` as documented below, including the current vulnerability check.
+3. Use the exact Go version in `.go-version` and run `scripts/verify-all.sh` as documented below when performing a local independent gate.
 4. Complete the applicable items in `docs/public-release-checklist.md` for either a 0.9.x pre-release or stable v1.0.
-5. Create an annotated semantic-version tag from the reviewed `main` commit.
+5. Select the reviewed `main` revision that will become the release source. Do not move a published release tag afterward.
 
 ## Publish
 
-Pushing a tag matching `v*` runs the release workflow. Tags matching `v0.*` are automatically created as GitHub Pre-releases; later stable tags are published normally.
+The preferred publication path does not require a local Git or GitHub CLI installation:
 
-Both main/PR CI and tag verification call the same reusable `verify.yml` workflow and `scripts/verify-all.sh`. Tag publication requires its successful completion; it cannot bypass formatting, full tests, race, vet, schema validation, both fuzz campaigns, benchmark, vulnerability checking, package inspection/fault tests or reproducibility verification. It creates static Linux amd64 and arm64 packages with embedded version metadata:
+1. Open **Actions → Release → Run workflow** in GitHub.
+2. Select the `main` branch.
+3. Enter a full semantic version such as `v0.9.0`.
+4. Run the workflow and wait for verification to complete.
+
+For a manual run, the workflow accepts only `main` and a full `vMAJOR.MINOR.PATCH` version. It runs the shared verification gate first, retains the verified packages, rechecks the transferred checksums, then creates an annotated tag on the exact verified commit and publishes the GitHub release. Tags matching `v0.*` are automatically marked as GitHub **Pre-releases**. The publication job does not check out or execute repository code.
+
+Pushing an existing `v*` tag remains supported as an alternate maintainer path and uses the same verification and publication logic.
+
+Both main/PR CI and release verification call the same reusable `verify.yml` workflow and `scripts/verify-all.sh`. Publication requires successful completion; it cannot bypass formatting, full tests, race, vet, schema validation, both fuzz campaigns, benchmark, vulnerability checking, package inspection/fault tests or reproducibility verification. It creates static Linux amd64 and arm64 packages with embedded version metadata:
 
 - the standalone archive contains the binary, example configuration, JSON Schema, license, public project policies, changelog, README, and documentation, with no service-manager files;
 - the systemd archive contains the same payload plus the unit, sysusers, and tmpfiles examples.
