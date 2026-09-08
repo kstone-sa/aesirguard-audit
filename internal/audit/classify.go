@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	mappingdata "github.com/kstone-sa/audit2json/data"
+	mappingdata "github.com/kstone-sa/aesirguard-audit/data"
 )
 
 type canonicalClassificationDocument struct {

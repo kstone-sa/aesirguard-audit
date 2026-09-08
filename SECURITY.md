@@ -10,4 +10,4 @@ Once this repository is public and private vulnerability reporting is enabled, u
 
 Describe the affected revision, impact, prerequisites, and a minimal reproduction using synthetic data where possible. The maintainer will acknowledge and triage reports as practical, coordinate remediation privately, and publish an advisory when disclosure is appropriate. No response-time SLA is promised.
 
-Security reports should cover audit2json itself or its supplied deployment material. Vulnerabilities in a SIEM, host operating system, auditd, or a downstream adapter belong to the corresponding project unless audit2json creates or materially amplifies the issue.
+Security reports should cover AesirGuard Audit itself or its supplied deployment material. Vulnerabilities in a SIEM, host operating system, auditd, or a downstream adapter belong to the corresponding project unless AesirGuard Audit creates or materially amplifies the issue.

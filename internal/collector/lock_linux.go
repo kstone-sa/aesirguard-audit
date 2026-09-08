@@ -12,7 +12,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/kstone-sa/audit2json/internal/securefile"
+	"github.com/kstone-sa/aesirguard-audit/internal/securefile"
 )
 
 // FileLock owns a kernel-managed advisory lock. The lock file remains on disk
@@ -28,7 +28,7 @@ func DefaultLockPath(inputPath string) string {
 		abs = filepath.Clean(inputPath)
 	}
 	sum := sha256.Sum256([]byte(filepath.Clean(abs)))
-	directory := filepath.Join(os.TempDir(), fmt.Sprintf("audit2json-%d", os.Getuid()))
+	directory := filepath.Join(os.TempDir(), fmt.Sprintf("aesirguard-audit-%d", os.Getuid()))
 	return filepath.Join(directory, hex.EncodeToString(sum[:16])+".lock")
 }
 

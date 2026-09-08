@@ -1,6 +1,6 @@
 # Public release checklist
 
-This is the authoritative operational gate for public pre-release publication and the later stable v1.0 release. Public source availability and a 0.9.x pre-release do not replace empirical validation or maintainer approval for v1.0.
+This is the authoritative operational gate for public pre-release publication and the later stable v1.0 release. Public source availability and a pre-1.0 release do not replace empirical validation or maintainer approval for v1.0.
 
 ## Completed in the v1.0 readiness pass
 
@@ -17,7 +17,7 @@ This is the authoritative operational gate for public pre-release publication an
 
 - [ ] Review current GitHub Actions logs and downloadable artifacts for sensitive data immediately before publication.
 - [ ] Verify repository description and topics; leave the homepage empty unless there is a real project site to link.
-- [ ] Confirm that README, compatibility, changelog, roadmap, security policy and release documentation clearly identify 0.9.x as pre-release/qualification software and do not claim empirical distribution compatibility.
+- [ ] Confirm that README, compatibility, changelog, roadmap, security policy and release documentation clearly identify pre-1.0 releases as pre-release/qualification software and do not claim empirical distribution compatibility.
 - [ ] Review the intended `main`/tag protection policy and private security-reporting activation steps. Under the current GitHub plan, these controls may be unavailable while the repository is private; activate and verify them immediately after visibility changes.
 - [ ] Obtain explicit maintainer approval to change visibility.
 
@@ -27,14 +27,17 @@ This is the authoritative operational gate for public pre-release publication an
 - [ ] Enable enforceable branch protection/rulesets for `main`, require the shared verification status check, disable force-push/delete, and restrict stable-tag creation/update/deletion as supported by the plan.
 - [ ] Verify that repository description, topics, license detection and public security/contribution documentation render correctly.
 
-## Before publishing v0.9.0 pre-release
+## Before publishing the intended v0.10.0 pre-release
 
 - [ ] Recheck the pinned Go toolchain's support/security status and pass the full shared release gate on the exact approved commit.
-- [ ] Create an annotated `v0.9.0` tag only from that approved `main` commit.
+- [ ] Create an annotated `v0.10.0` tag only from that approved `main` commit.
 - [ ] Verify that the GitHub release is marked **Pre-release** and contains the four expected archives plus `SHA256SUMS`.
 - [ ] Download the intended qualification package and `SHA256SUMS` from GitHub and verify the published download independently before live testing.
 
-The 0.9.x series is intended for qualification and controlled evaluation. Findings from live testing may be fixed in later 0.9.x pre-releases without implying stable compatibility.
+Published audit2json v0.9.0/v0.9.1 remain immutable historical releases. Further qualification continues under AesirGuard Audit; fixes in pre-1.0 releases do not imply stable compatibility.
+
+- [ ] Finish source rebranding review and the repository rename.
+- [ ] Obtain separate maintainer approval before creating v0.10.0.
 
 ## Mandatory before stable v1.0.0
 

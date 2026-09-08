@@ -10,7 +10,7 @@ import (
 	"os"
 	"syscall"
 
-	"github.com/kstone-sa/audit2json/internal/audit"
+	"github.com/kstone-sa/aesirguard-audit/internal/audit"
 )
 
 func runBatch(ctx context.Context, options commandOptions, stdin io.Reader, processor *eventProcessor) error {

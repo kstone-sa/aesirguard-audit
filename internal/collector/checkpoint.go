@@ -13,7 +13,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/kstone-sa/audit2json/internal/securefile"
+	"github.com/kstone-sa/aesirguard-audit/internal/securefile"
 )
 
 const CheckpointVersion = 2
@@ -130,7 +130,7 @@ func SaveCheckpoint(path string, checkpoint Checkpoint) (returnErr error) {
 	if _, err := rand.Read(random[:]); err != nil {
 		return err
 	}
-	temporaryName := ".audit2json-checkpoint-" + hex.EncodeToString(random[:])
+	temporaryName := ".aesirguard-audit-checkpoint-" + hex.EncodeToString(random[:])
 	temporary, err := securefile.OpenRegularAt(directory, temporaryName, "checkpoint temporary", syscall.O_CREAT|syscall.O_EXCL|syscall.O_WRONLY, 0o600, false)
 	if err != nil {
 		return err

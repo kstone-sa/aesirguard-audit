@@ -1,5 +1,7 @@
 # Canonical JSON schema
 
+For an existing deployment, read the [pre-1.0 migration guide](rebranding.md) before changing paths or schema references.
+
 ## Status
 
 Canonical schema v1.0 is the pre-release event contract and the only event output. There is no legacy schema mode.
@@ -8,7 +10,7 @@ Output is newline-delimited JSON: one logical Linux Audit event per line. Empty 
 
 Within schema major version 1, field types and documented semantics are stable. Compatible revisions may add optional fields; consumers must ignore fields they do not use. Removing a field, changing its type or meaning, or making an optional field required needs a new schema major version and migration documentation.
 
-The machine-readable contract is `schema/audit2json-v1.schema.json`. CI checks the version constant and independently validates emitted fixture events against Draft 2020-12, including negative contracts.
+The machine-readable contract is `schema/aesirguard-audit-v1.schema.json`. CI checks the version constant and independently validates emitted fixture events against Draft 2020-12, including negative contracts.
 
 ## Security-oriented boundary
 

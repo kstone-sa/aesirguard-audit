@@ -2,7 +2,7 @@
 
 ## Purpose
 
-audit2json converts Linux Audit records into compact, canonical newline-delimited JSON. The core must remain independent from Splunk, Sentinel, Elastic, and every other backend.
+AesirGuard Audit converts Linux Audit records into compact, canonical newline-delimited JSON. The core must remain independent from Splunk, Sentinel, Elastic, and every other backend.
 
 ## Context budget
 
@@ -20,7 +20,7 @@ Inspect additional files only when an observed dependency requires them.
 
 ## Status guardrail
 
-The 0.9.x series is the public qualification pre-release for the v1.0 implementation. Compatibility with real RAW and ENRICHED Audit output on each listed distribution is still being empirically validated. Never describe synthetic fixtures or pre-release availability as verified distribution or production compatibility. Do not create a stable v1.0 tag until the documented empirical validation and release gates are complete and explicit maintainer approval is given.
+Published audit2json v0.9.0/v0.9.1 remain historical qualification pre-releases. AesirGuard Audit v0.10.0 is the intended next pre-release; do not create it during rebranding. Compatibility with real RAW and ENRICHED Audit output on each listed distribution is still being empirically validated. Never describe synthetic fixtures or pre-release availability as verified distribution or production compatibility. Do not create a stable v1.0 tag until the documented empirical validation and release gates are complete and explicit maintainer approval is given.
 
 ## Design rules
 

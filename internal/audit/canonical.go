@@ -9,7 +9,7 @@ import (
 	"time"
 	"unicode/utf8"
 
-	mappingdata "github.com/kstone-sa/audit2json/data"
+	mappingdata "github.com/kstone-sa/aesirguard-audit/data"
 )
 
 // CanonicalSchemaVersion identifies the emitted canonical contract.

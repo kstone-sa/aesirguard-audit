@@ -1,12 +1,12 @@
 # Configuration
 
-audit2json uses one strict, versioned JSON configuration file. Unknown fields, trailing JSON values, unsupported versions, invalid durations, path conflicts, and unsafe option combinations cause startup to fail.
+AesirGuard Audit uses one strict, versioned JSON configuration file. Unknown fields, trailing JSON values, unsupported versions, invalid durations, path conflicts, and unsafe option combinations cause startup to fail.
 
 ## Loading and validation
 
 ```bash
-audit2json --config /etc/audit2json/config.json
-audit2json --config /etc/audit2json/config.json --check-config
+ag-audit --config /etc/aesirguard-audit/config.json
+ag-audit --config /etc/aesirguard-audit/config.json --check-config
 ```
 
 `--check-config` performs both structural and semantic validation, writes a `configuration_valid` diagnostic to stderr, and exits without opening the input or sink. It requires `--config`.
@@ -17,7 +17,7 @@ The configuration must be a regular file, not a symbolic link. Its owner must be
 
 ## Schema version 1
 
-See `configs/audit2json.example.json` for a complete example.
+See `configs/aesirguard-audit.example.json` for a complete example.
 
 | JSON field | CLI override | Meaning |
 |---|---|---|

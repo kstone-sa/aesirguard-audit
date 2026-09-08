@@ -1,14 +1,14 @@
-# audit2json
+# AesirGuard Audit
 
 **Security-oriented Linux Audit normalization without changing the Linux Audit stack.**
 
-audit2json turns raw Linux Audit data into compact, canonical JSON events for detection engineering, threat hunting, incident investigation, and compliance monitoring.
+AesirGuard Audit turns raw Linux Audit data into compact, canonical JSON events for detection engineering, threat hunting, incident investigation, and compliance monitoring.
 
-It is deliberately non-invasive: audit2json can process existing `audit.log` files without replacing `auditd`, installing an audit plugin, or modifying the host's audit pipeline. It can run entirely within the collection layer—for example as part of a Splunk deployment—so security teams can add Linux Audit normalization without introducing another host-level service.
+It is deliberately non-invasive: AesirGuard Audit can process existing `audit.log` files without replacing `auditd`, installing an audit plugin, or modifying the host's audit pipeline. It can run entirely within the collection layer—for example as part of a Splunk deployment—so security teams can add Linux Audit normalization without introducing another host-level service.
 
-Linux Audit provides rich forensic evidence, but emits fragmented, kernel-centric records whose security meaning is expensive to reconstruct downstream. audit2json follows the audit stream, correlates multi-record events, preserves relevant evidence, and normalizes supported process, file, identity and access-control evidence into a stable canonical JSON schema. Additional audit, integrity and kernel-security families receive stable classifications; their field-level normalization varies, as documented in the [coverage matrix](docs/security-event-coverage.md).
+Linux Audit provides rich forensic evidence, but emits fragmented, kernel-centric records whose security meaning is expensive to reconstruct downstream. AesirGuard Audit follows the audit stream, correlates multi-record events, preserves relevant evidence, and normalizes supported process, file, identity and access-control evidence into a stable canonical JSON schema. Additional audit, integrity and kernel-security families receive stable classifications; their field-level normalization varies, as documented in the [coverage matrix](docs/security-event-coverage.md).
 
-The project is deliberately backend-agnostic. Splunk, Microsoft Sentinel, Elastic, and other analytics platforms are consumers of its output; their data models do not define audit2json's security semantics.
+The project is deliberately backend-agnostic. Splunk, Microsoft Sentinel, Elastic, and other analytics platforms are consumers of its output; their data models do not define AesirGuard Audit's security semantics.
 
 ## AI-assisted development
 
@@ -16,7 +16,12 @@ This project was designed and developed by Kstone SA with assistance from OpenAI
 
 ## Pre-release status
 
-The 0.9.x series is the public pre-release and qualification line for audit2json. It is intended for controlled evaluation against real Linux Audit output and does **not** constitute stable distribution compatibility certification.
+AesirGuard Audit is the new pre-1.0 product name; **v0.10.0 is the intended first
+release under this name and has not been published by this pass**. Published
+audit2json v0.9.0 and v0.9.1 retain their original names and assets. This branch's
+commands use the new naming; see [the migration guide](docs/rebranding.md).
+Qualification builds are for controlled evaluation, with no stable distribution
+compatibility certification.
 
 The v1.0 implementation is feature-complete, but empirical qualification is incomplete, with initial Ubuntu 24.04 arm64 ENRICHED use now exercised; see [Compatibility](docs/compatibility.md). Until that work is complete, distro-labelled fixtures are synthetic regression data rather than compatibility certification. No stable release is currently supported.
 
@@ -91,13 +96,13 @@ Stdout is the default sink for consumers such as a Splunk scripted input. An app
 
 [LAUREL](https://github.com/threathunters-io/laurel) addresses a closely related problem: it correlates Linux Audit records and emits structured JSON suitable for security analytics. Its normal deployment model integrates with the Linux Audit pipeline as an auditd/audisp-style processor and provides rich process-oriented enrichment.
 
-audit2json deliberately takes a different operational approach. It can consume existing `audit.log` files without replacing `auditd`, installing an Audit plugin, or changing the host's Audit pipeline, which allows it to live in an existing collection layer such as a Splunk deployment. It also projects Audit evidence into a compact, backend-agnostic security schema rather than primarily preserving Audit's native record structure.
+AesirGuard Audit deliberately takes a different operational approach. It can consume existing `audit.log` files without replacing `auditd`, installing an Audit plugin, or changing the host's Audit pipeline, which allows it to live in an existing collection layer such as a Splunk deployment. It also projects Audit evidence into a compact, backend-agnostic security schema rather than primarily preserving Audit's native record structure.
 
 The projects therefore overlap in the problem they address, but optimize for different deployment and normalization models.
 
 ## Installation
 
-Tagged releases provide two independent archives per Linux architecture:
+The renamed packaging produces two independent archives per Linux architecture:
 
 - `*_standalone.tar.gz` is the portable package. It contains the static binary, example configuration, JSON Schema, license, changelog, and documentation. It makes no service-manager assumption and is the appropriate artifact for Splunk, containers, schedulers, and custom supervisors.
 - `*_systemd.tar.gz` is the optional host-service package. It contains the standalone payload plus a hardened systemd unit and its sysusers/tmpfiles definitions.
@@ -105,11 +110,11 @@ Tagged releases provide two independent archives per Linux architecture:
 Verify the selected archive using `SHA256SUMS`, extract it, and run:
 
 ```bash
-./audit2json --version
-./audit2json --config configs/audit2json.example.json --check-config
+./ag-audit --version
+./ag-audit --config configs/aesirguard-audit.example.json --check-config
 ```
 
-See `docs/runbook.md` for standalone and systemd installation instructions and least-privilege guidance. The supplied service is a deployment option, not a requirement of audit2json.
+See `docs/runbook.md` for standalone and systemd installation instructions and least-privilege guidance. The supplied service is a deployment option, not a requirement of AesirGuard Audit.
 
 ## Build from source
 
@@ -118,8 +123,8 @@ Go 1.26 is the minimum source version. Official CI and release builds use the ex
 ```bash
 go test ./...
 go vet ./...
-go build -o audit2json ./cmd/audit2json
-./audit2json --version
+go build -o ag-audit ./cmd/ag-audit
+./ag-audit --version
 ```
 
 ## Quick start
@@ -127,13 +132,13 @@ go build -o audit2json ./cmd/audit2json
 Read a sample file using canonical v1.0 output:
 
 ```bash
-./audit2json testdata/execve.audit
+./ag-audit testdata/execve.audit
 ```
 
 Read stdin and explicitly include source identity:
 
 ```bash
-cat /var/log/audit/audit.log | ./audit2json --source-host host01
+cat /var/log/audit/audit.log | ./ag-audit --source-host host01
 ```
 
 `source` is omitted by default because the collecting backend commonly supplies host metadata itself.
@@ -141,13 +146,13 @@ cat /var/log/audit/audit.log | ./audit2json --source-host host01
 Rendered messages are optional convenience/debug output. They duplicate canonical fields and should normally remain disabled for volume-sensitive SIEM ingestion. The shipped configuration disables them; explicitly opt in when useful:
 
 ```bash
-./audit2json --render-message testdata/execve.audit
+./ag-audit --render-message testdata/execve.audit
 ```
 
 Write current output to a file:
 
 ```bash
-./audit2json /var/log/audit/audit.log > audit.json
+./ag-audit /var/log/audit/audit.log > audit.json
 ```
 
 This redirection is batch behavior, not the managed file sink.
@@ -155,17 +160,17 @@ This redirection is batch behavior, not the managed file sink.
 Follow a live Audit log and emit to stdout:
 
 ```bash
-./audit2json --follow /var/log/audit/audit.log
+./ag-audit --follow /var/log/audit/audit.log
 ```
 
 Run the same collector from a validated configuration:
 
 ```bash
-./audit2json --config /etc/audit2json/config.json --check-config
-./audit2json --config /etc/audit2json/config.json
+./ag-audit --config /etc/aesirguard-audit/config.json --check-config
+./ag-audit --config /etc/aesirguard-audit/config.json
 ```
 
-See `configs/audit2json.example.json`. Command-line values override the file, which keeps one deployment configuration reusable while allowing bootstrap or diagnostic overrides.
+See `configs/aesirguard-audit.example.json`. Command-line values override the file, which keeps one deployment configuration reusable while allowing bootstrap or diagnostic overrides.
 
 Repeated scheduled invocations are safe: while one healthy process owns the per-input lock, another exits successfully without emitting data.
 The default lock is stored in a private per-user temporary directory and is derived from the absolute input path. Use `--lock-file` to place it in a service-managed runtime directory.
@@ -173,7 +178,7 @@ The default lock is stored in a private per-user temporary directory and is deri
 Use the managed append-only file sink:
 
 ```bash
-./audit2json --follow --output-file /var/log/audit2json/events.ndjson /var/log/audit/audit.log
+./ag-audit --follow --output-file /var/log/aesirguard-audit/events.ndjson /var/log/audit/audit.log
 ```
 
 Add `--sync-output` only when every emitted line must cross the local filesystem durability boundary before processing continues. It deliberately trades throughput for durability.
@@ -181,13 +186,13 @@ Add `--sync-output` only when every emitted line must cross the local filesystem
 Enable crash recovery with an explicit durable checkpoint path:
 
 ```bash
-./audit2json --follow \
-  --checkpoint-file /var/lib/audit2json/audit.checkpoint \
-  --output-file /var/log/audit2json/events.ndjson \
+./ag-audit --follow \
+  --checkpoint-file /var/lib/aesirguard-audit/audit.checkpoint \
+  --output-file /var/log/aesirguard-audit/events.ndjson \
   /var/log/audit/audit.log
 ```
 
-Checkpoint updates sync a managed output file before advancing input progress. With stdout, a successful write confirms only that the local pipe accepted the bytes; replay after a crash is therefore expected and delivery remains at-least-once. If the checkpoint inode is not the current input, audit2json searches retained uncompressed numeric rotations and drains them in descending numeric suffix order (`.2` before `.1`, then the active file). Missing intermediate generations, duplicate suffix numbers, and inode aliases fail closed; non-numeric siblings are not input generations. If it cannot locate the inode, or its saved content anchor does not match, it fails explicitly instead of skipping to the current file. Checkpoint v1 is rejected; see the runbook for explicit replay migration and the reliability document for the sampled anchor guarantee and limitations.
+Checkpoint updates sync a managed output file before advancing input progress. With stdout, a successful write confirms only that the local pipe accepted the bytes; replay after a crash is therefore expected and delivery remains at-least-once. If the checkpoint inode is not the current input, AesirGuard Audit searches retained uncompressed numeric rotations and drains them in descending numeric suffix order (`.2` before `.1`, then the active file). Missing intermediate generations, duplicate suffix numbers, and inode aliases fail closed; non-numeric siblings are not input generations. If it cannot locate the inode, or its saved content anchor does not match, it fails explicitly instead of skipping to the current file. Checkpoint v1 is rejected; see the runbook for explicit replay migration and the reliability document for the sampled anchor guarantee and limitations.
 
 For live rename/create rotation, the old descriptor must remain at a stable EOF for `--rotation-drain-interval` (default `500ms`) before the collector switches. Same-inode shrink, including copytruncate, is detected and reported as a gap; automatic continuation is intentionally not claimed lossless.
 
@@ -204,8 +209,8 @@ For live rename/create rotation, the old descriptor must remain at a stable EOF 
 - `docs/compatibility.md`: runtime, distribution, and rotation compatibility matrix;
 - `docs/runbook.md`: installation, monitoring, recovery, upgrade, and rollback;
 - `docs/release.md`: pre-release and stable tagged build/publication procedure;
-- `docs/public-release-checklist.md`: public visibility, 0.9.x qualification, and stable v1.0 gates;
-- `schema/audit2json-v1.schema.json`: machine-readable canonical event contract;
+- `docs/public-release-checklist.md`: public visibility, pre-1.0 qualification, and stable v1.0 gates;
+- `schema/aesirguard-audit-v1.schema.json`: machine-readable canonical event contract;
 - `ROADMAP.md`: pending validation, release gates, and future work.
 
 ## Contributing and security
@@ -215,7 +220,7 @@ See `CONTRIBUTING.md` before proposing changes, especially schema changes. Repor
 ## Repository layout
 
 ```text
-cmd/audit2json/      command-line program
+cmd/ag-audit/        command-line program
 internal/audit/      current parser and event builder
 data/                embedded static mapping data
 configs/             example operational configuration

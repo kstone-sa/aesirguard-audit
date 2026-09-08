@@ -1,3 +1,3 @@
-module github.com/kstone-sa/audit2json
+module github.com/kstone-sa/aesirguard-audit
 
 go 1.26

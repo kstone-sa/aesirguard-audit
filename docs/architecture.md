@@ -2,7 +2,7 @@
 
 ## Scope
 
-audit2json converts Linux Audit streams into canonical newline-delimited JSON. The core understands Linux Audit semantics but does not understand Splunk CIM, Sentinel ASIM, Elastic ECS, or any other backend schema.
+AesirGuard Audit converts Linux Audit streams into canonical newline-delimited JSON. The core understands Linux Audit semantics but does not understand Splunk CIM, Sentinel ASIM, Elastic ECS, or any other backend schema.
 
 The implementation combines strict operational configuration and a structured health surface with the versioned checkpoint and rotation model.
 
@@ -108,7 +108,7 @@ Backend packages consume canonical NDJSON and own:
 - tags, dashboards, and detections;
 - transport acknowledgements beyond the selected sink.
 
-A Splunk TA may launch audit2json and map its fields to CIM. Those mappings do not belong in this repository.
+Downstream adapters may launch AesirGuard Audit and map its fields to their backend schemas. Those adapters and mappings are maintained independently of this repository.
 
 ## Back-pressure and buffering
 

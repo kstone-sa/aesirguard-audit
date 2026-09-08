@@ -1,4 +1,4 @@
-audit2json
+/ag-audit
 *.exe
 *.test
 *.out

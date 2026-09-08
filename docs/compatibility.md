@@ -2,7 +2,7 @@
 
 ## Runtime
 
-audit2json is a Linux-only Go program. Tagged releases contain static `linux/amd64` and `linux/arm64` binaries in standalone and systemd package variants. The standalone package has no service-manager assumption. The source has no CGO or external runtime dependency.
+AesirGuard Audit is a Linux-only Go program. Tagged releases contain static `linux/amd64` and `linux/arm64` binaries in standalone and systemd package variants. The standalone package has no service-manager assumption. The source has no CGO or external runtime dependency.
 
 The parser accepts Linux Audit RAW and ENRICHED records. ENRICHED input is recommended because user names and architecture-dependent syscall names are then available without host-local lookup.
 
@@ -20,7 +20,7 @@ The parser accepts Linux Audit RAW and ENRICHED records. ENRICHED input is recom
 | RHEL 8 and 9 | CIS Server Level 1 and 2 | Not yet empirically validated |
 | Oracle Linux 8 and 9 | CIS Server Level 1 and 2 | Not yet empirically validated |
 
-The distro-labelled fixtures are synthetic representatives. They verify deterministic parser and renderer behavior, not compatibility with every auditd and kernel combination. Public 0.9.x releases are qualification pre-releases; they do not certify this matrix.
+The distro-labelled fixtures are synthetic representatives. They verify deterministic parser and renderer behavior, not compatibility with every auditd and kernel combination. Public pre-1.0 releases are qualification pre-releases; they do not certify this matrix.
 
 ## Initial empirical exercise (2026-09-07)
 
@@ -82,7 +82,7 @@ became 12,371 canonical bytes, a 42.43% reduction.
 | `file/access` | 27.30% |
 
 Single-record userspace events expanded after canonical JSON normalization in
-this sample. audit2json reduces volume primarily by collapsing compound Linux
+this sample. AesirGuard Audit reduces volume primarily by collapsing compound Linux
 Audit record groups into one canonical event. It is not a generic text compressor;
 already compact single-record userspace events may become larger. Rendered messages
 add convenience/debug text that duplicates canonical information, so they should
@@ -91,8 +91,8 @@ normally remain disabled for volume-sensitive SIEM ingestion.
 The qualification Audit rules also had to be architecture-aware: an initial
 x86-style rule containing legacy `open` was rejected on AArch64, while the
 equivalent arm64 syscall set loaded successfully. This was a qualification-environment
-observation, not an audit2json defect. Native arm64 requalification of the pushed
-v0.9.1 candidate remains the next step before maintainer authorization of a release.
+observation, not an AesirGuard Audit defect. Native arm64 requalification of the pushed
+renamed candidate remains pending; published v0.9.1 is historical and unchanged.
 
 ## Operational compatibility
 

@@ -1,6 +1,6 @@
-# Contributing to audit2json
+# Contributing to AesirGuard Audit
 
-Thank you for helping improve audit2json. Keep changes small, reviewable, and independent from any SIEM backend.
+Thank you for helping improve AesirGuard Audit. Keep changes small, reviewable, and independent from any SIEM backend.
 
 ## Before opening a change
 

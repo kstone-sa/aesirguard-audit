@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/kstone-sa/audit2json/main/schema/audit2json-v1.schema.json",
-  "title": "audit2json canonical event v1",
+  "$id": "https://raw.githubusercontent.com/kstone-sa/aesirguard-audit/main/schema/aesirguard-audit-v1.schema.json",
+  "title": "AesirGuard Audit canonical event v1",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema_version", "audit", "event"],

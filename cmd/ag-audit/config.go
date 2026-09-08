@@ -8,7 +8,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/kstone-sa/audit2json/internal/securefile"
+	"github.com/kstone-sa/aesirguard-audit/internal/securefile"
 )
 
 const configVersion = 1
