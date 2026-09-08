@@ -24,8 +24,8 @@ def verify(root, version, commit, epoch):
     require(re.fullmatch(r"[0-9a-f]{40}", commit), "expected full commit hash")
     go_version = "go" + Path(".go-version").read_text().strip()
     build_date = datetime.fromtimestamp(int(epoch), timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-    identity = f"audit2json {version} commit={commit} built={build_date} go={go_version}"
-    expected = {f"audit2json_{version}_linux_{arch}_{variant}.tar.gz"
+    identity = f"ag-audit {version} commit={commit} built={build_date} go={go_version}"
+    expected = {f"aesirguard-audit_{version}_linux_{arch}_{variant}.tar.gz"
                 for arch in ("amd64", "arm64") for variant in ("standalone", "systemd")}
     require({p.name for p in root.iterdir()} == expected | {"SHA256SUMS"}, "unexpected or missing release files")
     sums = {}
@@ -39,7 +39,7 @@ def verify(root, version, commit, epoch):
     payloads = {}
     for arch in ("amd64", "arm64"):
         for variant in ("standalone", "systemd"):
-            name = f"audit2json_{version}_linux_{arch}_{variant}"
+            name = f"aesirguard-audit_{version}_linux_{arch}_{variant}"
             archive = root / (name + ".tar.gz")
             require(hashlib.sha256(archive.read_bytes()).hexdigest() == sums[archive.name], "archive checksum mismatch")
             files = {}
@@ -53,20 +53,21 @@ def verify(root, version, commit, epoch):
                     require(entry.isdir() or entry.isfile(), "archive contains a link or special object")
                     require(entry.uid == 0 and entry.gid == 0 and entry.mtime == int(epoch), "non-reproducible archive metadata")
                     relative = "/".join(parts[1:])
-                    require(entry.mode == (0o755 if entry.isdir() or relative == "audit2json" else 0o644), "unexpected archive permissions")
+                    require(entry.mode == (0o755 if entry.isdir() or relative == "ag-audit" else 0o644), "unexpected archive permissions")
                     if entry.isfile():
                         require(0 <= entry.size <= 100 * 1024 * 1024, "unexpected member size")
                         files[relative] = tar.extractfile(entry).read()
-            assets = [Path(p) for p in ("LICENSE", "README.md", "CHANGELOG.md", "CONTRIBUTING.md", "SECURITY.md", "configs/audit2json.example.json")]
+            assets = [Path(p) for p in ("LICENSE", "README.md", "CHANGELOG.md", "CONTRIBUTING.md", "SECURITY.md", "configs/aesirguard-audit.example.json")]
             assets += sorted(Path("docs").rglob("*.md")) + sorted(Path("schema").rglob("*.json"))
             if variant == "systemd":
                 assets += sorted(p for p in Path("packaging/systemd").rglob("*") if p.is_file())
-            require(set(files) == {p.as_posix() for p in assets} | {"audit2json", "BUILD-INFO.json"}, "missing or unexpected package assets")
+            require(set(files) == {p.as_posix() for p in assets} | {"ag-audit", "BUILD-INFO.json"}, "missing or unexpected package assets")
             for asset in assets:
                 require(files[asset.as_posix()] == asset.read_bytes(), f"package asset differs: {asset}")
-            binary = files["audit2json"]
+            binary = files["ag-audit"]
             metadata = json.loads(files["BUILD-INFO.json"])
-            require(metadata == {"version": version, "commit": commit, "build_date": build_date,
+            require(metadata == {"product": "AesirGuard Audit", "binary": "ag-audit",
+                                 "version": version, "commit": commit, "build_date": build_date,
                                  "go": go_version, "arch": arch, "binary_sha256": hashlib.sha256(binary).hexdigest()}, "build metadata mismatch")
             require(binary[:6] == b"\x7fELF\x02\x01", "expected 64-bit little-endian ELF")
             require(struct.unpack_from("<H", binary, 18)[0] == {"amd64": 62, "arm64": 183}[arch], "ELF architecture mismatch")
@@ -76,7 +77,7 @@ def verify(root, version, commit, epoch):
             require(all(struct.unpack_from("<I", binary, phoff + i * size)[0] not in (2, 3) for i in range(count)), "dynamic ELF binary")
             require(identity.encode() in binary, "embedded release identity mismatch")
             with tempfile.TemporaryDirectory() as tmp:
-                exe = Path(tmp) / "audit2json"
+                exe = Path(tmp) / "ag-audit"
                 exe.write_bytes(binary)
                 exe.chmod(0o700)
                 info = subprocess.check_output(["go", "version", "-m", str(exe)], text=True)
@@ -89,7 +90,7 @@ def verify(root, version, commit, epoch):
                     actual = subprocess.check_output([str(exe), "--version"], text=True, timeout=10).strip()
                     require(actual == identity, "runtime release identity mismatch")
                     config = Path(tmp) / "config.json"
-                    config.write_bytes(files["configs/audit2json.example.json"])
+                    config.write_bytes(files["configs/aesirguard-audit.example.json"])
                     subprocess.run([str(exe), "--config", str(config), "--check-config"], check=True, capture_output=True, timeout=10)
                     print(f"Executed {arch} {variant}: version and configuration valid")
             payloads[arch, variant] = files

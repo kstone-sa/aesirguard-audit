@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/kstone-sa/audit2json/internal/audit"
+	"github.com/kstone-sa/aesirguard-audit/internal/audit"
 )
 
 var errInjectedWriter = errors.New("injected writer failure")

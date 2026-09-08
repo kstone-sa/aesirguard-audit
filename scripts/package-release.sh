@@ -39,22 +39,22 @@ build_date=$(date -u -d "@${source_date_epoch}" +%Y-%m-%dT%H:%M:%SZ)
 mkdir -p "$output_directory"
 
 for arch in amd64 arm64; do
-  base="audit2json_${version}_linux_${arch}"
+  base="aesirguard-audit_${version}_linux_${arch}"
   standalone="${base}_standalone"
   systemd="${base}_systemd"
 
   mkdir -p "${output_directory}/${standalone}/configs"
 
   CGO_ENABLED=0 GOOS=linux GOARCH="$arch" go build -trimpath -buildvcs=false \
-    -ldflags="-s -w -X 'main.releaseIdentity=audit2json ${version} commit=${commit} built=${build_date} go=${expected_go}'" \
-    -o "${output_directory}/${standalone}/audit2json" ./cmd/audit2json
+    -ldflags="-s -w -X 'main.releaseIdentity=ag-audit ${version} commit=${commit} built=${build_date} go=${expected_go}'" \
+    -o "${output_directory}/${standalone}/ag-audit" ./cmd/ag-audit
 
-  binary_sha=$(sha256sum "${output_directory}/${standalone}/audit2json" | cut -d ' ' -f 1)
-  printf '{"version":"%s","commit":"%s","build_date":"%s","go":"%s","arch":"%s","binary_sha256":"%s"}\n' \
+  binary_sha=$(sha256sum "${output_directory}/${standalone}/ag-audit" | cut -d ' ' -f 1)
+  printf '{"product":"AesirGuard Audit","binary":"ag-audit","version":"%s","commit":"%s","build_date":"%s","go":"%s","arch":"%s","binary_sha256":"%s"}\n' \
     "$version" "$commit" "$build_date" "$expected_go" "$arch" "$binary_sha" > "${output_directory}/${standalone}/BUILD-INFO.json"
 
   cp LICENSE README.md CHANGELOG.md CONTRIBUTING.md SECURITY.md "${output_directory}/${standalone}/"
-  cp configs/audit2json.example.json "${output_directory}/${standalone}/configs/"
+  cp configs/aesirguard-audit.example.json "${output_directory}/${standalone}/configs/"
   cp -R docs schema "${output_directory}/${standalone}/"
 
   cp -R "${output_directory}/${standalone}" "${output_directory}/${systemd}"
@@ -62,9 +62,9 @@ for arch in amd64 arm64; do
   cp -R packaging/systemd "${output_directory}/${systemd}/packaging/"
 
   test ! -e "${output_directory}/${standalone}/packaging"
-  test -f "${output_directory}/${standalone}/configs/audit2json.example.json"
-  test -f "${output_directory}/${standalone}/schema/audit2json-v1.schema.json"
-  test -f "${output_directory}/${systemd}/packaging/systemd/audit2json.service"
+  test -f "${output_directory}/${standalone}/configs/aesirguard-audit.example.json"
+  test -f "${output_directory}/${standalone}/schema/aesirguard-audit-v1.schema.json"
+  test -f "${output_directory}/${systemd}/packaging/systemd/aesirguard-audit.service"
   test -f "${output_directory}/${systemd}/packaging/systemd/README.md"
 
   find "${output_directory}/${standalone}" "${output_directory}/${systemd}" \
@@ -72,8 +72,8 @@ for arch in amd64 arm64; do
   find "${output_directory}/${standalone}" "${output_directory}/${systemd}" \
     -type f -exec chmod 0644 {} +
   chmod 0755 \
-    "${output_directory}/${standalone}/audit2json" \
-    "${output_directory}/${systemd}/audit2json"
+    "${output_directory}/${standalone}/ag-audit" \
+    "${output_directory}/${systemd}/ag-audit"
 
   tar --sort=name --mtime="@${source_date_epoch}" --owner=0 --group=0 --numeric-owner \
     -C "$output_directory" -cf - "$standalone" | gzip -n > "${output_directory}/${standalone}.tar.gz"

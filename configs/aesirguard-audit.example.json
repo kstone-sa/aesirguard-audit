@@ -4,14 +4,14 @@
     "path": "/var/log/audit/audit.log",
     "follow": true,
     "source_host": "",
-    "lock_file": "/run/audit2json/audit.lock"
+    "lock_file": "/run/aesirguard-audit/audit.lock"
   },
   "sink": {
     "file": "",
     "sync": false
   },
   "checkpoint": {
-    "file": "/var/lib/audit2json/audit.checkpoint",
+    "file": "/var/lib/aesirguard-audit/audit.checkpoint",
     "interval": "1s"
   },
   "collection": {

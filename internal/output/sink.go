@@ -8,8 +8,8 @@ import (
 	"os"
 	"syscall"
 
-	"github.com/kstone-sa/audit2json/internal/audit"
-	"github.com/kstone-sa/audit2json/internal/securefile"
+	"github.com/kstone-sa/aesirguard-audit/internal/audit"
+	"github.com/kstone-sa/aesirguard-audit/internal/securefile"
 )
 
 // Sink synchronously accepts canonical events.

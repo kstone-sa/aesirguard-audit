@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kstone-sa/audit2json/internal/audit"
-	"github.com/kstone-sa/audit2json/internal/collector"
+	"github.com/kstone-sa/aesirguard-audit/internal/audit"
+	"github.com/kstone-sa/aesirguard-audit/internal/collector"
 )
 
 var errInjectedSink = errors.New("injected sink failure")

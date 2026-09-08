@@ -1,15 +1,15 @@
 [Unit]
-Description=Linux Audit to canonical NDJSON collector
-Documentation=https://github.com/kstone-sa/audit2json
+Description=AesirGuard Audit - Linux Audit to canonical NDJSON collector
+Documentation=https://github.com/kstone-sa/aesirguard-audit
 After=auditd.service
 
 [Service]
 Type=simple
-User=audit2json
-Group=audit2json
-RuntimeDirectory=audit2json
+User=aesirguard-audit
+Group=aesirguard-audit
+RuntimeDirectory=aesirguard-audit
 RuntimeDirectoryMode=0700
-ExecStart=/usr/bin/audit2json --config /etc/audit2json/config.json
+ExecStart=/usr/bin/ag-audit --config /etc/aesirguard-audit/config.json
 Restart=on-failure
 RestartSec=5s
 UMask=0077
@@ -18,7 +18,7 @@ PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
 ReadOnlyPaths=/var/log/audit
-ReadWritePaths=/var/lib/audit2json /var/log/audit2json
+ReadWritePaths=/var/lib/aesirguard-audit /var/log/aesirguard-audit
 RestrictAddressFamilies=AF_UNIX
 LockPersonality=true
 MemoryDenyWriteExecute=true

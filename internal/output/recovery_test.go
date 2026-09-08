@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/kstone-sa/audit2json/internal/audit"
+	"github.com/kstone-sa/aesirguard-audit/internal/audit"
 )
 
 func TestEveryPartialNDJSONBoundaryFailsClosed(t *testing.T) {

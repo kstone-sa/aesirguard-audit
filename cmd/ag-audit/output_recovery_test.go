@@ -5,7 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/kstone-sa/audit2json/internal/collector"
+	"github.com/kstone-sa/aesirguard-audit/internal/collector"
 	"io"
 	"os"
 	"os/exec"
@@ -76,7 +76,7 @@ func TestManagedPartialWriteRestartPreservesSourceProgress(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestManagedOutputFaultChild$")
-		cmd.Env = append(os.Environ(), "AUDIT2JSON_FAULT_ARGS="+string(encoded), fmt.Sprintf("AUDIT2JSON_FAULT_LIMIT=%t", limited))
+		cmd.Env = append(os.Environ(), "AESIRGUARD_AUDIT_FAULT_ARGS="+string(encoded), fmt.Sprintf("AESIRGUARD_AUDIT_FAULT_LIMIT=%t", limited))
 		diagnostics, err := cmd.CombinedOutput()
 		if ctx.Err() != nil {
 			t.Fatal("fault subprocess blocked")
@@ -114,7 +114,7 @@ func TestManagedPartialWriteRestartPreservesSourceProgress(t *testing.T) {
 }
 
 func TestManagedOutputFaultChild(t *testing.T) {
-	encoded := os.Getenv("AUDIT2JSON_FAULT_ARGS")
+	encoded := os.Getenv("AESIRGUARD_AUDIT_FAULT_ARGS")
 	if encoded == "" {
 		return
 	}
@@ -122,7 +122,7 @@ func TestManagedOutputFaultChild(t *testing.T) {
 	if err := json.Unmarshal([]byte(encoded), &args); err != nil {
 		t.Fatal(err)
 	}
-	if os.Getenv("AUDIT2JSON_FAULT_LIMIT") == "true" {
+	if os.Getenv("AESIRGUARD_AUDIT_FAULT_LIMIT") == "true" {
 		if err := syscall.Setrlimit(syscall.RLIMIT_FSIZE, &syscall.Rlimit{Cur: 128, Max: 128}); err != nil {
 			t.Fatal(err)
 		}

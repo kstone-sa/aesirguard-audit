@@ -17,6 +17,8 @@ if [ -n "$unformatted" ]; then
   printf '%s\n' "$unformatted" >&2
   exit 1
 fi
+python3 scripts/check-branding.py
+git diff --check
 go test -count=1 ./...
 go test -race -count=1 ./...
 go vet ./...
@@ -26,8 +28,8 @@ go test ./internal/audit -run '^$' -fuzz '^FuzzAssemblerPreservesAcceptedRecords
 go test ./internal/audit -run '^$' -bench '^BenchmarkAuditPipeline$' -benchtime=200ms -benchmem
 scratch=$(mktemp -d)
 trap 'rm -rf -- "$scratch"' EXIT
-go build -o "$scratch/audit2json" ./cmd/audit2json
-python3 scripts/validate-schema.py "$scratch/audit2json"
+go build -o "$scratch/ag-audit" ./cmd/ag-audit
+python3 scripts/validate-schema.py "$scratch/ag-audit"
 ./scripts/package-release.sh "$version" "$commit" "$source_date_epoch" "$dist"
 ./scripts/verify-release.sh "$dist" "$version" "$commit" "$source_date_epoch"
 python3 scripts/test-release-verifier.py "$dist" "$version" "$commit" "$source_date_epoch"

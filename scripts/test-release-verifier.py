@@ -25,7 +25,7 @@ def rewrite(archive, fault):
     for entry, data in entries:
         if fault == "missing-schema" and "/schema/" in entry.name:
             continue
-        if entry.name.endswith("/audit2json"):
+        if entry.name.endswith("/ag-audit"):
             if fault == "wrong-architecture":
                 data = data[:18] + b"\xb7\x00" + data[20:]
             elif fault == "dynamic":
@@ -42,12 +42,28 @@ def rewrite(archive, fault):
             data = None
         if fault == "traversal" and entry.name.endswith("/README.md"):
             entry.name = "../escape"
+        if fault == "legacy-binary" and entry.name.endswith("/ag-audit"):
+            entry.name = entry.name.rsplit("/", 1)[0] + "/audit2json"
+        if fault == "legacy-systemd" and entry.name.endswith("/aesirguard-audit.service"):
+            entry.name = entry.name.rsplit("/", 1)[0] + "/audit2json.service"
+        if fault == "legacy-schema" and entry.name.endswith("/aesirguard-audit-v1.schema.json"):
+            entry.name = entry.name.rsplit("/", 1)[0] + "/audit2json-v1.schema.json"
+        if fault == "wrong-schema-id" and entry.name.endswith("/aesirguard-audit-v1.schema.json"):
+            import json
+            document = json.loads(data)
+            document["$id"] = "https://example.invalid/wrong.schema.json"
+            data = json.dumps(document).encode()
+        if fault == "wrong-product" and entry.name.endswith("/BUILD-INFO.json"):
+            import json
+            document = json.loads(data)
+            document["product"] = "Wrong product"
+            data = json.dumps(document).encode()
         if data is not None:
             entry.size = len(data)
         changed.append((entry, data))
     if fault in ("wrong-architecture", "dynamic", "wrong-identity", "variant-drift"):
         import json
-        binary = next(b for e, b in changed if e.name.endswith("/audit2json"))
+        binary = next(b for e, b in changed if e.name.endswith("/ag-audit"))
         for entry, data in changed:
             if entry.name.endswith("/BUILD-INFO.json"):
                 obj = json.loads(data)
@@ -61,12 +77,14 @@ def rewrite(archive, fault):
             tar.addfile(entry, io.BytesIO(data) if data is not None else None)
 
 
-for fault in ("missing-schema", "wrong-architecture", "dynamic", "wrong-identity", "variant-drift", "symlink", "traversal", "omitted-checksum", "duplicate-checksum", "bad-checksum"):
+for fault in ("missing-schema", "wrong-architecture", "dynamic", "wrong-identity", "variant-drift", "symlink", "traversal", "omitted-checksum", "duplicate-checksum", "bad-checksum", "legacy-binary", "legacy-systemd", "legacy-schema", "wrong-schema-id", "wrong-product", "legacy-archive"):
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp) / "dist"
         shutil.copytree(source, root)
-        archive = root / f"audit2json_{version}_linux_amd64_systemd.tar.gz"
+        archive = root / f"aesirguard-audit_{version}_linux_amd64_systemd.tar.gz"
         rewrite(archive, fault)
+        if fault == "legacy-archive":
+            archive.rename(root / f"audit2json_{version}_linux_amd64_systemd.tar.gz")
         lines = [hashlib.sha256(p.read_bytes()).hexdigest() + "  ./" + p.name for p in sorted(root.glob("*.tar.gz"))]
         if fault == "omitted-checksum": lines.pop()
         if fault == "duplicate-checksum": lines.append(lines[0])
@@ -78,4 +96,4 @@ for fault in ("missing-schema", "wrong-architecture", "dynamic", "wrong-identity
             print(f"Rejected {fault}: {error}")
         else:
             raise SystemExit(f"fault accepted: {fault}")
-print("All ten release-verifier fault invariants passed")
+print("All sixteen release-verifier fault invariants passed")

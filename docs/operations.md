@@ -23,7 +23,7 @@ Counters are process-lifetime monotonic values:
 - `gaps`: detected missing or truncated source generations;
 - `rotations`: completed input-generation switches.
 
-`replay_candidates` is intentionally conservative. It describes events that may duplicate downstream data after recovery; stdout provides no acknowledgement that would let audit2json know whether a SIEM indexed an earlier copy.
+`replay_candidates` is intentionally conservative. It describes events that may duplicate downstream data after recovery; stdout provides no acknowledgement that would let AesirGuard Audit know whether a SIEM indexed an earlier copy.
 
 The instantaneous gauges are `input_lag_bytes`, `pending_events`, and `pending_bytes`. Lag includes unread bytes visible in the active and later retained generations and is omitted when a stable estimate is temporarily unavailable.
 

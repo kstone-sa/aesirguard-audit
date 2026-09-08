@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Semantic version tag to publish (for example v0.9.0)
+        description: Semantic version tag to publish (for example v0.10.0)
         required: true
         type: string
   push:
@@ -41,7 +41,7 @@ jobs:
           fi
 
           if [[ ! "$version" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
-            echo "::error::Release version must be a full semantic version tag such as v0.9.0"
+            echo "::error::Release version must be a full semantic version tag such as v0.10.0"
             exit 1
           fi
 
@@ -85,7 +85,7 @@ jobs:
 
           tag_object_sha="$(gh api --method POST "repos/$REPOSITORY/git/tags" \
             -f tag="$RELEASE_TAG" \
-            -f message="audit2json $RELEASE_TAG" \
+            -f message="AesirGuard Audit $RELEASE_TAG" \
             -f object="$SOURCE_SHA" \
             -f type=commit \
             --jq .sha)"

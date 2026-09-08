@@ -77,7 +77,7 @@ func TestCheckpointIgnoresInterruptedTemporaryReplacement(t *testing.T) {
 	if err := SaveCheckpoint(path, Checkpoint{InputPath: "/audit.log", Device: 1, Inode: 2, Offset: 42, Anchor: emptyAnchor}); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(directory, ".audit2json-checkpoint-interrupted"), []byte("partial"), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(directory, ".aesirguard-audit-checkpoint-interrupted"), []byte("partial"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	loaded, err := LoadCheckpoint(path)

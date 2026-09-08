@@ -31,19 +31,19 @@ jobs:
           echo "${RUNNER_TEMP}/schema-validation/bin" >> "$GITHUB_PATH"
       - name: Install pinned vulnerability checker
         run: |
-          GOBIN="${RUNNER_TEMP}/audit2json-devtools" go install golang.org/x/vuln/cmd/govulncheck@v1.7.0
-          echo "${RUNNER_TEMP}/audit2json-devtools" >> "$GITHUB_PATH"
+          GOBIN="${RUNNER_TEMP}/aesirguard-audit-devtools" go install golang.org/x/vuln/cmd/govulncheck@v1.7.0
+          echo "${RUNNER_TEMP}/aesirguard-audit-devtools" >> "$GITHUB_PATH"
       - name: Run every main and tagged-release gate
         env:
           PACKAGE_VERSION: ${{ inputs.version }}
         run: |
           ./scripts/verify-all.sh "$PACKAGE_VERSION" "$(git rev-parse HEAD)" \
-            "$(git show -s --format=%ct HEAD)" "${RUNNER_TEMP}/audit2json-dist"
+            "$(git show -s --format=%ct HEAD)" "${RUNNER_TEMP}/aesirguard-audit-dist"
       - name: Retain verified release packages
         if: inputs.retain-packages
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: verified-release-packages
-          path: ${{ runner.temp }}/audit2json-dist/*
+          path: ${{ runner.temp }}/aesirguard-audit-dist/*
           if-no-files-found: error
           retention-days: 7

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Development-only JSON Schema validation; never used by the collector runtime.
 
-Usage: python3 scripts/validate-schema.py /absolute/path/to/audit2json
+Usage: python3 scripts/validate-schema.py /absolute/path/to/ag-audit
 Dependency: jsonschema==4.26.0 (install into a disposable virtual environment).
 """
 import copy
@@ -14,7 +14,10 @@ from jsonschema import Draft202012Validator, FormatChecker
 
 root = Path(__file__).resolve().parents[1]
 binary = str(Path(sys.argv[1]).resolve())
-schema = json.loads((root / "schema/audit2json-v1.schema.json").read_text())
+schema = json.loads((root / "schema/aesirguard-audit-v1.schema.json").read_text())
+assert schema["$id"] == "https://raw.githubusercontent.com/kstone-sa/aesirguard-audit/main/schema/aesirguard-audit-v1.schema.json"
+assert schema["title"] == "AesirGuard Audit canonical event v1"
+assert schema["properties"]["schema_version"]["const"] == "1.0"
 Draft202012Validator.check_schema(schema)
 validator = Draft202012Validator(schema, format_checker=FormatChecker())
 count = 0

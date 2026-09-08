@@ -114,7 +114,7 @@ Use one conceptual change per commit. Documentation-only planning should not con
 
 ## Schema validation tooling
 
-The collector runtime remains Go and standard-library-only. CI uses Python's `jsonschema==4.26.0` exclusively as an independent development validator in a disposable virtual environment. Build the binary, then run `python3 scripts/validate-schema.py /absolute/path/to/audit2json` from an environment with that validator installed. It validates all emitted fixture events against Draft 2020-12, exercises the exceptional byte and seccomp fields, and checks negative contracts. It is not part of runtime deployment or release archives.
+The collector runtime remains Go and standard-library-only. CI uses Python's `jsonschema==4.26.0` exclusively as an independent development validator in a disposable virtual environment. Build the binary, then run `python3 scripts/validate-schema.py /absolute/path/to/ag-audit` from an environment with that validator installed. It validates all emitted fixture events against Draft 2020-12, exercises the exceptional byte and seccomp fields, and checks negative contracts. It is not part of runtime deployment or release archives.
 
 ## Source compatibility and release toolchain
 
@@ -122,4 +122,4 @@ The collector runtime remains Go and standard-library-only. CI uses Python's `js
 
 `.go-version` pins **1.26.8** for CI and release builds. It is a supported, patched release listed by [Go downloads](https://go.dev/dl/) and the [release history](https://go.dev/doc/devel/release). Updating either the minimum source version or the release-toolchain pin is a deliberate reviewed maintenance change; recheck support and security advisories before every tagged release. Package builds reject other toolchains and disable automatic toolchain selection, workspace overrides, custom GOFLAGS/GOEXPERIMENT and CPU tuning. Archive metadata is normalized. `BUILD-INFO.json` records the actual toolchain, source commit, version, build date, architecture and binary digest; the binary's `--version` exposes the same release identity. No toolchain is bundled at runtime.
 
-The full shared CI/tag gate is `scripts/verify-all.sh`; see [Release](release.md) for invocation. It also runs `govulncheck` v1.7.0 against the live vulnerability database. This tool and its module dependencies are development-only and do not enter the collector's `go.mod` or release runtime.
+The full shared CI/tag gate is `scripts/verify-all.sh`, including `scripts/check-branding.py` for intentional legacy-reference classification, local documentation links, schema identity and deployment hardening; see [Release](release.md) for invocation. It also runs `govulncheck` v1.7.0 against the live vulnerability database. This tool and its module dependencies are development-only and do not enter the collector's `go.mod` or release runtime.

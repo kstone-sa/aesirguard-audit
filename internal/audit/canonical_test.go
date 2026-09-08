@@ -45,11 +45,13 @@ func TestBuildCanonicalEventGolden(t *testing.T) {
 }
 
 func TestPublishedSchemaMatchesCanonicalVersion(t *testing.T) {
-	contents, err := os.ReadFile("../../schema/audit2json-v1.schema.json")
+	contents, err := os.ReadFile("../../schema/aesirguard-audit-v1.schema.json")
 	if err != nil {
 		t.Fatal(err)
 	}
 	var document struct {
+		ID         string `json:"$id"`
+		Title      string `json:"title"`
 		Properties struct {
 			SchemaVersion struct {
 				Const string `json:"const"`
@@ -61,6 +63,9 @@ func TestPublishedSchemaMatchesCanonicalVersion(t *testing.T) {
 	}
 	if document.Properties.SchemaVersion.Const != CanonicalSchemaVersion {
 		t.Fatalf("published schema version = %q, canonical version = %q", document.Properties.SchemaVersion.Const, CanonicalSchemaVersion)
+	}
+	if document.ID != "https://raw.githubusercontent.com/kstone-sa/aesirguard-audit/main/schema/aesirguard-audit-v1.schema.json" || document.Title != "AesirGuard Audit canonical event v1" {
+		t.Fatalf("published schema identity = %q / %q", document.ID, document.Title)
 	}
 }
 

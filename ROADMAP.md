@@ -1,12 +1,12 @@
 # Roadmap
 
-audit2json is approaching its first stable release. Completed implementation history is recorded in `CHANGELOG.md`, the Git history, and merged pull requests; this document tracks only validation still required for release and plausible future work.
+AesirGuard Audit is approaching its first stable release. Completed implementation history is recorded in `CHANGELOG.md`, the Git history, and merged pull requests; this document tracks only validation still required for release and plausible future work.
 
 ## Current status
 
 The canonical schema v1.0, persistent collector, checkpoint and rotation recovery, security-event normalization, optional renderer, operational diagnostics, synthetic hardening, and Linux amd64/arm64 release packages are implemented.
 
-The 0.9.x series is the public pre-release and qualification line. It is intended for controlled evaluation against real Linux Audit output and does not constitute stable distribution compatibility certification. The distribution-labelled fixtures remain synthetic regression data until replaced or supplemented by sanitized evidence from empirical testing.
+Published audit2json v0.9.0/v0.9.1 are historical qualification releases. The next intended pre-release is AesirGuard Audit v0.10.0; see [migration](docs/rebranding.md). It is intended for controlled evaluation against real Linux Audit output and does not constitute stable distribution compatibility certification. The distribution-labelled fixtures remain synthetic regression data until replaced or supplemented by sanitized evidence from empirical testing.
 
 No stable release has been tagged.
 

@@ -28,7 +28,7 @@ func TestFollowSIGTERMInterruptsRegularAndFIFOStartup(t *testing.T) {
 				}
 			}
 			cmd := exec.Command(os.Args[0], "-test.run=^TestFollowSignalChild$")
-			cmd.Env = append(os.Environ(), "AUDIT2JSON_FOLLOW_SIGNAL_CHILD=1", "AUDIT2JSON_FOLLOW_SOURCE="+source)
+			cmd.Env = append(os.Environ(), "AESIRGUARD_AUDIT_FOLLOW_SIGNAL_CHILD=1", "AESIRGUARD_AUDIT_FOLLOW_SOURCE="+source)
 			stdin, err := cmd.StdinPipe()
 			if err != nil {
 				t.Fatal(err)
@@ -79,11 +79,11 @@ func TestFollowSIGTERMInterruptsRegularAndFIFOStartup(t *testing.T) {
 	}
 }
 func TestFollowSignalChild(t *testing.T) {
-	if os.Getenv("AUDIT2JSON_FOLLOW_SIGNAL_CHILD") != "1" {
+	if os.Getenv("AESIRGUARD_AUDIT_FOLLOW_SIGNAL_CHILD") != "1" {
 		return
 	}
-	source := os.Getenv("AUDIT2JSON_FOLLOW_SOURCE")
-	os.Args = []string{"audit2json", "--follow", "--poll-interval=1h", "--lock-file", source + ".lock", source}
+	source := os.Getenv("AESIRGUARD_AUDIT_FOLLOW_SOURCE")
+	os.Args = []string{"ag-audit", "--follow", "--poll-interval=1h", "--lock-file", source + ".lock", source}
 	main()
 	os.Exit(0)
 }

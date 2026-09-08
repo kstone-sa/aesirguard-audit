@@ -12,9 +12,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/kstone-sa/audit2json/internal/audit"
-	"github.com/kstone-sa/audit2json/internal/collector"
-	eventoutput "github.com/kstone-sa/audit2json/internal/output"
+	"github.com/kstone-sa/aesirguard-audit/internal/audit"
+	"github.com/kstone-sa/aesirguard-audit/internal/collector"
+	eventoutput "github.com/kstone-sa/aesirguard-audit/internal/output"
 )
 
 const (
@@ -99,7 +99,7 @@ func runContext(ctx context.Context, args []string, stdin io.Reader, stdout, std
 		if releaseIdentity != "" {
 			fmt.Fprintln(stdout, releaseIdentity)
 		} else {
-			fmt.Fprintf(stdout, "audit2json %s commit=%s built=%s\n", version, commit, buildDate)
+			fmt.Fprintf(stdout, "ag-audit %s commit=%s built=%s\n", version, commit, buildDate)
 		}
 		return nil
 	}
@@ -173,7 +173,7 @@ func parseOptions(args []string, _ io.Writer) (commandOptions, error) {
 	if err != nil {
 		return commandOptions{}, err
 	}
-	flags := flag.NewFlagSet("audit2json", flag.ContinueOnError)
+	flags := flag.NewFlagSet("ag-audit", flag.ContinueOnError)
 	flags.SetOutput(io.Discard)
 	flags.Usage = func() {}
 	options := commandOptions{
@@ -215,7 +215,7 @@ func parseOptions(args []string, _ io.Writer) (commandOptions, error) {
 		return options, err
 	}
 	if flags.NArg() > 1 {
-		return options, fmt.Errorf("usage: audit2json [options] [audit.log]")
+		return options, fmt.Errorf("usage: ag-audit [options] [audit.log]")
 	}
 	if flags.NArg() == 1 {
 		options.inputPath = flags.Arg(0)
@@ -271,7 +271,7 @@ func parseOptions(args []string, _ io.Writer) (commandOptions, error) {
 }
 
 func writeUsage(writer io.Writer) {
-	fmt.Fprintln(writer, "usage: audit2json [options] [audit.log]")
+	fmt.Fprintln(writer, "usage: ag-audit [options] [audit.log]")
 	fmt.Fprintf(writer, "  --heartbeat-interval duration\n      structured heartbeat interval (default %s; 0s disables)\n", defaultHeartbeatInterval)
 }
 

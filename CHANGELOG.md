@@ -2,7 +2,15 @@
 
 All notable changes will be documented in this file. The project has not yet published a stable release.
 
-## Unreleased — v0.9.1 correction line
+## Unreleased — intended v0.10.0 (AesirGuard Audit)
+
+- Rebrand product, repository/module, CLI (`ag-audit`), configuration, systemd,
+  schema identity and release archives; see [migration](docs/rebranding.md).
+- Coordinate the Splunk TA app ID and sourcetype migration without changing CIM semantics.
+- Preserve canonical event schema 1.0, checkpoint schema 2, renderer version 5,
+  configuration keys, and Go policy. No v0.10.0 tag or release is created here.
+
+## v0.9.1 - 2026-09-07 (audit2json)
 
 - Complete compound events on correlated PROCTITLE or valid Audit event-time
   watermarks; normal audit.log groups without EOE no longer report false
@@ -20,13 +28,9 @@ All notable changes will be documented in this file. The project has not yet pub
 - Correct stale renderer references and record the initial Ubuntu 24.04.4 arm64
   ENRICHED exercise without claiming complete distribution qualification.
 - Event schema 1.0 and checkpoint schema 2 remain unchanged. Published v0.9.0
-  tags and assets are immutable; no new release is published by these changes.
+  tags and assets remain immutable; these corrections were released as audit2json v0.9.1.
 
-## Unreleased
-
-No entries yet.
-
-## v0.9.0 - 2026-09-07
+## v0.9.0 - 2026-09-07 (audit2json)
 
 ### Added
 

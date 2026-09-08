@@ -13,8 +13,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kstone-sa/audit2json/internal/audit"
-	"github.com/kstone-sa/audit2json/internal/collector"
+	"github.com/kstone-sa/aesirguard-audit/internal/audit"
+	"github.com/kstone-sa/aesirguard-audit/internal/collector"
 )
 
 func TestRunFlushesIncompleteEventsInInputOrder(t *testing.T) {
@@ -372,12 +372,12 @@ func TestRunRejectsConflictingStatePaths(t *testing.T) {
 
 func TestParseOptionsLoadsConfigAndAppliesCLIOverrides(t *testing.T) {
 	directory := t.TempDir()
-	configPath := filepath.Join(directory, "audit2json.json")
+	configPath := filepath.Join(directory, "aesirguard-audit.json")
 	config := `{
   "version": 1,
   "input": {"path": "/var/log/audit/audit.log", "follow": true, "source_host": "configured"},
-  "sink": {"file": "/var/log/audit2json/events.ndjson", "sync": true},
-  "checkpoint": {"file": "/var/lib/audit2json/checkpoint", "interval": "3s"},
+  "sink": {"file": "/var/log/aesirguard-audit/events.ndjson", "sync": true},
+  "checkpoint": {"file": "/var/lib/aesirguard-audit/checkpoint", "interval": "3s"},
   "collection": {"poll_interval": "250ms", "event_timeout": "4s", "rotation_drain_interval": "750ms"},
   "mapping": {"render_message": true},
   "operations": {"heartbeat_interval": "15s"}
@@ -392,7 +392,7 @@ func TestParseOptionsLoadsConfigAndAppliesCLIOverrides(t *testing.T) {
 	if options.inputPath != "/var/log/audit/audit.log" || !options.follow || options.sourceHost != "override" {
 		t.Fatalf("input options = %#v", options)
 	}
-	if options.outputPath != "/var/log/audit2json/events.ndjson" || !options.syncOutput || !options.renderMessage {
+	if options.outputPath != "/var/log/aesirguard-audit/events.ndjson" || !options.syncOutput || !options.renderMessage {
 		t.Fatalf("sink and mapping options = %#v", options)
 	}
 	if options.pollInterval != 10*time.Millisecond || options.eventTimeout != 4*time.Second || options.checkpointInterval != 3*time.Second || options.heartbeatInterval != 15*time.Second {
@@ -401,7 +401,7 @@ func TestParseOptionsLoadsConfigAndAppliesCLIOverrides(t *testing.T) {
 }
 
 func TestParseOptionsAcceptsSingleDashConfig(t *testing.T) {
-	configPath := filepath.Join(t.TempDir(), "audit2json.json")
+	configPath := filepath.Join(t.TempDir(), "aesirguard-audit.json")
 	if err := os.WriteFile(configPath, []byte(`{"version":1,"input":{"source_host":"configured"}}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -426,7 +426,7 @@ func TestRunHelpUsesStdoutWithoutDiagnostics(t *testing.T) {
 	if err := run([]string{"--help"}, strings.NewReader(""), &stdout, &stderr); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(stdout.String(), "usage: audit2json") || stderr.Len() != 0 {
+	if !strings.Contains(stdout.String(), "usage: ag-audit") || stderr.Len() != 0 {
 		t.Fatalf("stdout = %q, stderr = %q", stdout.String(), stderr.String())
 	}
 }
@@ -437,13 +437,13 @@ func TestRunVersionUsesStdoutWithoutDiagnostics(t *testing.T) {
 	if err := run([]string{"--version"}, strings.NewReader(""), &stdout, &stderr); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(stdout.String(), "audit2json dev commit=unknown built=unknown") || stderr.Len() != 0 {
+	if stdout.String() != "ag-audit dev commit=unknown built=unknown\n" || stderr.Len() != 0 {
 		t.Fatalf("stdout = %q, stderr = %q", stdout.String(), stderr.String())
 	}
 }
 
 func TestParseOptionsRejectsUnknownConfigField(t *testing.T) {
-	configPath := filepath.Join(t.TempDir(), "audit2json.json")
+	configPath := filepath.Join(t.TempDir(), "aesirguard-audit.json")
 	if err := os.WriteFile(configPath, []byte(`{"version":1,"surprise":true}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -494,7 +494,7 @@ func TestParseOptionsRejectsFIFOConfigWithoutBlocking(t *testing.T) {
 }
 
 func TestRunCheckConfigEmitsStructuredDiagnostic(t *testing.T) {
-	configPath := filepath.Join(t.TempDir(), "audit2json.json")
+	configPath := filepath.Join(t.TempDir(), "aesirguard-audit.json")
 	if err := os.WriteFile(configPath, []byte(`{"version":1}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -640,7 +640,7 @@ func runFollowerUntilOutput(t *testing.T, inputPath, outputPath, checkpointPath 
 }
 
 func TestShippedRendererIsDisabledAndCLIOptInWorks(t *testing.T) {
-	data, err := os.ReadFile("../../configs/audit2json.example.json")
+	data, err := os.ReadFile("../../configs/aesirguard-audit.example.json")
 	if err != nil {
 		t.Fatal(err)
 	}

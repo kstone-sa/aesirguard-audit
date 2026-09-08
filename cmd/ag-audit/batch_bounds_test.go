@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kstone-sa/audit2json/internal/collector"
+	"github.com/kstone-sa/aesirguard-audit/internal/collector"
 )
 
 func TestBatchAndFollowPhysicalLineBounds(t *testing.T) {
@@ -103,7 +103,7 @@ func TestBatchSignalsInterruptIdleStdin(t *testing.T) {
 	for _, signal := range []os.Signal{os.Interrupt, syscall.SIGTERM} {
 		t.Run(signal.String(), func(t *testing.T) {
 			cmd := exec.Command(os.Args[0], "-test.run=^TestBatchSignalChild$")
-			cmd.Env = append(os.Environ(), "AUDIT2JSON_SIGNAL_CHILD=1")
+			cmd.Env = append(os.Environ(), "AESIRGUARD_AUDIT_SIGNAL_CHILD=1")
 			stdin, err := cmd.StdinPipe()
 			if err != nil {
 				t.Fatal(err)
@@ -154,10 +154,10 @@ func TestBatchSignalsInterruptIdleStdin(t *testing.T) {
 	}
 }
 func TestBatchSignalChild(t *testing.T) {
-	if os.Getenv("AUDIT2JSON_SIGNAL_CHILD") != "1" {
+	if os.Getenv("AESIRGUARD_AUDIT_SIGNAL_CHILD") != "1" {
 		return
 	}
-	os.Args = []string{"audit2json"}
+	os.Args = []string{"ag-audit"}
 	main()
 	os.Exit(0)
 }

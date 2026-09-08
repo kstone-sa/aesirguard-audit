@@ -11,7 +11,7 @@ The target collector prioritizes:
 5. minimal and bounded duplication;
 6. deterministic failure reporting.
 
-These guarantees apply to audit2json and its selected sink. End-to-end indexing guarantees depend on the backend and its acknowledgement model.
+These guarantees apply to AesirGuard Audit and its selected sink. End-to-end indexing guarantees depend on the backend and its acknowledgement model.
 
 ## Delivery semantics
 
@@ -19,7 +19,7 @@ The target delivery model is at-least-once.
 
 A successful stdout write confirms that bytes were accepted by the local pipe. It does not prove that a downstream SIEM has durably queued or indexed the event. Therefore exact end-to-end delivery cannot be promised by the stdout sink.
 
-After a crash, audit2json may replay events after the last durable checkpoint. Stable event identity allows a backend to identify duplicates.
+After a crash, AesirGuard Audit may replay events after the last durable checkpoint. Stable event identity allows a backend to identify duplicates.
 
 The file sink can provide a stronger local durability boundary by flushing and syncing event data before the input checkpoint advances.
 
@@ -35,7 +35,7 @@ No source record is intentionally dropped when all of the following hold:
 
 A malformed physical line is emitted as a canonical `parse_failure` event containing the original line in `audit.raw`. This exceptional fallback allows the checkpoint to advance without silently discarding input; normal events do not carry raw records.
 
-If a source generation is no longer present, audit2json reports a gap. It must not silently resume from the current file and imply continuity.
+If a source generation is no longer present, AesirGuard Audit reports a gap. It must not silently resume from the current file and imply continuity.
 
 Copytruncate rotation cannot provide a strict lossless guarantee because data written between copy and truncate may already be lost by the rotation procedure. It is detected and supported only on a best-effort basis.
 
@@ -123,8 +123,8 @@ For ambiguous events, use:
 
 This follows [audit-userspace 3.1.2 auditd.conf(5)](https://github.com/linux-audit/audit-userspace/blob/v3.1.2/docs/auditd.conf.5):
 interleaving is allowed, PROCTITLE ends the event, and sufficient event age in
-the processed stream establishes completion. The configured audit2json event
-timeout supplies the reorder window; audit2json does not read auditd.conf.
+the processed stream establishes completion. The configured AesirGuard Audit event
+timeout supplies the reorder window; AesirGuard Audit does not read auditd.conf.
 [Linux 6.17 audit_log_exit()](https://github.com/torvalds/linux/blob/v6.17/kernel/auditsc.c)
 emits auxiliary security records, paths and other syscall context before
 PROCTITLE, followed only by EOE. Kernel security families remain compound;
@@ -192,7 +192,7 @@ Diagnostics go to stderr. When safe and bounded, malformed source data is preser
 
 A managed output inode permits one cooperating writer, enforced with an advisory lock. Other programs must not append to or truncate that inode. Rename/create rotation remains supported. Opening either an existing output or a rotation replacement checks its last physical byte: a nonempty file must end with a newline. The encoder writes that newline only after the complete JSON object. A positive partial write poisons the sink, so subsequent writes and checkpoint commits fail.
 
-An incomplete tail fails closed without changing any output bytes or advancing source progress. This includes a complete-looking JSON object whose terminating newline was not written. Preserve the output and checkpoint, then deliberately repair the final incomplete line or quarantine the affected output before restarting; source events after the last checkpoint may replay. The collector never silently truncates evidence. This boundary check assumes previously completed lines were written by audit2json; it is not a validator for arbitrary preexisting JSON or storage corruption. Newly opened managed files and their pinned containing directories are synced so file creation is durable before checkpoint commitment.
+An incomplete tail fails closed without changing any output bytes or advancing source progress. This includes a complete-looking JSON object whose terminating newline was not written. Preserve the output and checkpoint, then deliberately repair the final incomplete line or quarantine the affected output before restarting; source events after the last checkpoint may replay. The collector never silently truncates evidence. This boundary check assumes previously completed lines were written by AesirGuard Audit; it is not a validator for arbitrary preexisting JSON or storage corruption. Newly opened managed files and their pinned containing directories are synced so file creation is durable before checkpoint commitment.
 
 ## Batch bounds and cancellation
 
