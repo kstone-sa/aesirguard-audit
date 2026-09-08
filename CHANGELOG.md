@@ -6,7 +6,6 @@ All notable changes will be documented in this file. The project has not yet pub
 
 - Rebrand product, repository/module, CLI (`ag-audit`), configuration, systemd,
   schema identity and release archives; see [migration](docs/rebranding.md).
-- Coordinate the Splunk TA app ID and sourcetype migration without changing CIM semantics.
 - Preserve canonical event schema 1.0, checkpoint schema 2, renderer version 5,
   configuration keys, and Go policy. No v0.10.0 tag or release is created here.
 

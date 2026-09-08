@@ -94,9 +94,6 @@ Stdout is the default sink for consumers such as a Splunk scripted input. An app
 
 ## Related projects
 
-[AesirGuard Audit Splunk TA](https://github.com/kstone-sa/splunk-ta-aesirguard-audit)
-provides the scripted input and downstream CIM mappings.
-
 [LAUREL](https://github.com/threathunters-io/laurel) addresses a closely related problem: it correlates Linux Audit records and emits structured JSON suitable for security analytics. Its normal deployment model integrates with the Linux Audit pipeline as an auditd/audisp-style processor and provides rich process-oriented enrichment.
 
 AesirGuard Audit deliberately takes a different operational approach. It can consume existing `audit.log` files without replacing `auditd`, installing an Audit plugin, or changing the host's Audit pipeline, which allows it to live in an existing collection layer such as a Splunk deployment. It also projects Audit evidence into a compact, backend-agnostic security schema rather than primarily preserving Audit's native record structure.

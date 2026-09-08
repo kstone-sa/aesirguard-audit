@@ -82,19 +82,13 @@ rejection. For rollback, stop the new collector first and use the saved old
 binary/configuration with the latest compatible v2 checkpoint, not a stale
 pre-cutover copy unless deliberate replay is wanted.
 
-## Repository and Splunk consumers
+## Repository URL
 
-Use [the new core URL](https://github.com/kstone-sa/aesirguard-audit) and
-[the new Splunk TA URL](https://github.com/kstone-sa/splunk-ta-aesirguard-audit).
-GitHub's old repository URLs may redirect after the maintainer renames the
-repositories, but consumers should update remotes, module imports, automation and
-cross-links to the new canonical URLs. The new URLs need not resolve before that
-separate repository rename. Neither repository is renamed by these content changes.
-
-The TA becomes **AesirGuard Audit Splunk TA**, app ID `TA-aesirguard-audit`, with
-`bin/ag-audit`, wrapper `bin/aesirguard-audit-wrapper.sh`, sourcetype
-`aesirguard:linux:audit` and source `aesirguard-audit`. Its migration guide covers
-historical indexed events and search updates; no dual-sourcetype alias is shipped.
+Use [the new canonical URL](https://github.com/kstone-sa/aesirguard-audit).
+GitHub's old repository URL may redirect after the maintainer renames the
+repository, but consumers should update remotes, module imports, automation and
+links to the new canonical URL. The new URL need not resolve before that separate
+repository rename. The repository is not renamed by these content changes.
 
 ## Retained historical evidence
 

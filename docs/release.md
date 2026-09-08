@@ -17,7 +17,7 @@ The first stable release will be `v1.0.0` after the empirical validation matrix 
 ## Publish
 
 Do not run publication as part of the rebranding pass. Obtain separate maintainer
-authorization after coordinated core/TA review and repository renaming. Never
+authorization after source review and repository renaming. Never
 republish v0.9.0 or v0.9.1 with renamed assets.
 
 The preferred publication path does not require a local Git or GitHub CLI installation:

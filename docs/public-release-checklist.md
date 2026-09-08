@@ -36,7 +36,7 @@ This is the authoritative operational gate for public pre-release publication an
 
 Published audit2json v0.9.0/v0.9.1 remain immutable historical releases. Further qualification continues under AesirGuard Audit; fixes in pre-1.0 releases do not imply stable compatibility.
 
-- [ ] Finish coordinated core/TA rebranding review and repository renames.
+- [ ] Finish source rebranding review and the repository rename.
 - [ ] Obtain separate maintainer approval before creating v0.10.0.
 
 ## Mandatory before stable v1.0.0
