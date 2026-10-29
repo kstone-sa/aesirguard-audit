@@ -45,8 +45,13 @@ type AssemblerLimits struct {
 // AssemblerLimitError reports a record that could not be retained without
 // exceeding a configured memory bound.
 type AssemblerLimitError struct {
-	Limit string
-	Value int
+	Limit           string
+	Value           int
+	AuditID         string
+	Node            string
+	NodePresent     bool
+	ObservedRecords int
+	CountComplete   bool
 }
 
 func (err *AssemblerLimitError) Error() string {
@@ -137,6 +142,15 @@ func (assembler *Assembler) addAt(record Record, observedAt time.Time) ([]Assemb
 	// An EOE without cached records contains no event data.
 	if record.Type != "EOE" || exists {
 		if err := assembler.checkLimits(record, pending, exists); err != nil {
+			limit := err.(*AssemblerLimitError)
+			limit.AuditID, limit.Node, limit.NodePresent = record.ID, record.Node, record.NodePresent
+			limit.ObservedRecords = 1
+			if exists {
+				limit.ObservedRecords += len(pending.records)
+			}
+			// Even a terminal record cannot prove that a producer will not reuse
+			// the key. This diagnostic is an observation at the limit boundary.
+			limit.CountComplete = false
 			return nil, err
 		}
 		if !exists {
