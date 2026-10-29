@@ -19,6 +19,8 @@ Counters are process-lifetime monotonic values:
 - `input_lines` and `input_bytes`: complete physical Audit input consumed;
 - `emitted_events`: canonical events accepted by the sink;
 - `parse_failures`: physical records rejected by the parser;
+- `assembler_limits`: isolated assembler admission failures;
+- `line_limits`: physical lines emitted with a retained prefix and omitted-byte count;
 - `replay_candidates`: events emitted between checkpoint resume and catching the live tail;
 - `gaps`: detected missing or truncated source generations;
 - `rotations`: completed input-generation switches.
@@ -37,3 +39,33 @@ information; opt in with `--render-message` or configuration only when useful.
 Routine unset login/session attribution adds no issue entries. LOGIN transitions
 retain explicit old/new unset semantics, and exceptional evidence still carries
 its existing issues. This compaction changes neither event delivery nor checkpoints.
+
+## Integrity incidents and limit diagnostics
+
+`assembler_limit_exceeded` is an error-level JSON diagnostic, followed by continued
+collection. It carries `audit_id`, `node_present` and (when present) `node`,
+`limit_name` (`max_records_per_event`, `max_pending_events`, `max_pending_bytes`),
+`configured_limit`, `observed_records` including the trigger, `count_complete=false`,
+source position, rejection-table gauges and `conservative_isolation`. It contains
+no raw Audit payload. For a configured record limit of 256 the first violation
+reports 257 physical records for that correlation key; unrelated nodes are not
+counted. This is an observed partial count, not the final logical event size.
+Exceptional physical-record evidence is canonical output, with explicit incomplete
+integrity. `physical_line_limit_exceeded` instead reports observed, retained and
+omitted byte counts; its retained raw prefix is marked incomplete.
+
+`source_gap` records a durable prepared incident and its decision to replay the
+oldest contiguous retained chain. Its `incident` includes prior checkpoint and
+resume identity/offset/anchor, number, reason, time and prepared state.
+`potential_data_loss=true` and `possible_duplicates=true` are deliberate warnings.
+`recovery_resumed_with_gap` confirms the new checkpoint lineage has committed.
+A failure to persist evidence or checkpoint state emits `fatal`; it is not recovery.
+
+`source_gap_history` exposes the last durable incident and cumulative count at
+startup. After a gap, heartbeats include `persistent_gaps` and
+`integrity="source_gap_recorded"` even when process-lifetime `counters.gaps` is zero.
+`health="ok"` means collection liveness, not lossless continuity. The ledger retains
+eight incidents plus a lifetime count; preserve it with checkpoint backups.
+Supervision, including Splunk `_internal` consumers, should alert on these stable
+JSON event names and integrity fields, while keeping stderr separate from canonical
+Audit output. No backend-specific code or configuration is required by the core.

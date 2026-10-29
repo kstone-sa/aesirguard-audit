@@ -75,9 +75,9 @@ Updates are batched by a configurable time or progress interval. Per-event sync 
 
 Checkpoint and lock paths are traversed component by component without symlinks; trusted ancestor directories are pinned by file descriptor. A root-owned sticky ancestor such as `/tmp` is permitted, but the final state directory must not be group- or world-writable. Missing state directories are created relative to validated descriptors. Checkpoint opens are nonblocking and accept only trusted regular files, at most 64 KiB. Temporary creation, rename, cleanup and directory sync use the same pinned directory. FIFOs, devices, unsafe ancestors and symlink targets fail promptly without being replaced.
 
-A corrupted, unsupported, or mismatched checkpoint causes an explicit startup error. It never causes an implicit jump to the current EOF. Recovery policies other than fail-closed remain planned.
+A corrupted, unsupported, or mismatched checkpoint causes an explicit startup error. It never causes an implicit jump to the current EOF. Missing generations and objectively detected truncations instead use the automatic recovery transition below; corruption, ambiguous identities, unsafe files, and content-anchor mismatches remain fatal.
 
-Checkpoint schema version 1 is the only currently implemented durable format. It is not rewritten into a different version implicitly. Interrupted temporary checkpoint files are ignored; the last atomically renamed checkpoint remains authoritative. Upgrade and rollback steps are documented in `runbook.md`.
+Checkpoint schema version 2 is the current durable format. It is not rewritten into a different version implicitly. Interrupted temporary checkpoint files are ignored; the last atomically renamed checkpoint remains authoritative. Upgrade and rollback steps are documented in `runbook.md`.
 
 ## Startup recovery
 
@@ -90,7 +90,7 @@ On startup:
 5. drain retained generations in descending numeric suffix order (`.2` before `.1`, then the active file);
 6. switch to and follow the current input path.
 
-If the checkpoint inode cannot be found, recovery fails closed with an explicit source-gap error. Compressed and non-numeric basename-prefixed files are not treated as input generations. Numeric suffixes establish generation order; modification times never do. Missing intermediate generations, duplicate suffix numbers, and inode aliases fail closed as ambiguous or gapped histories.
+If the checkpoint inode cannot be found, recovery records a durable source-gap incident and automatically establishes a new lineage. Compressed and non-numeric basename-prefixed files are not treated as input generations. Numeric suffixes establish generation order; modification times never do. Missing intermediate generations trigger automatic gap recovery. Duplicate suffix numbers and inode aliases remain fatal ambiguities. Available checkpoint content is verified before testing chain continuity, so a chain gap cannot mask an anchor mismatch.
 
 ## Rotation handling
 
@@ -107,7 +107,7 @@ For rename/create rotation:
 
 This permits a logical Audit event to span file generations.
 
-For truncation on the same inode, the collector detects that file size is smaller than the current offset and fails with an explicit source-gap error. It does not silently restart at zero. A configurable best-effort continuation policy remains future work.
+For truncation on the same inode, a size smaller than the consumed offset triggers the same durable source-gap transition at startup or during follow. Recovery starts at zero of the oldest contiguous retained suffix. Data erased by copytruncate cannot be recovered. Shrink and regrowth between observations may escape size-based detection; content-anchor checks remain mandatory at restart.
 
 ## Event completion and latency
 
@@ -133,8 +133,7 @@ their type alone does not justify premature completion.
 Wall-clock inactivity, EOF and shutdown provide no equivalent source completion
 guarantee. They retain `integrity.incomplete` on unresolved events. A valid
 boundary does not erase exceptional evidence such as incomplete EXECVE arguments
-or malformed-line fallback events. No boundary rule changes fail-closed source-gap
-handling, state limits, sink acceptance or safe checkpoint positioning.
+or malformed-line fallback events. No boundary rule bypasses source-gap recording, state limits, sink acceptance or safe checkpoint positioning.
 
 Watermarks operate within a continuous Audit-clock epoch. A forward jump exceeding the greater of one minute or twice the event timeout, or a rollback of at least the event timeout, starts a new epoch. Pending events from the previous epoch retain all records and expire only by inactivity or an explicit boundary. Invalid timestamp syntax cannot advance the watermark. Small out-of-order arrivals within the timeout retain the current watermark. This conservative heuristic cannot distinguish every legitimate clock change from bad source time; it prevents a large jump from permanently poisoning subsequent event assembly.
 
@@ -145,7 +144,7 @@ per-node clock history is retained.
 
 This avoids unnecessary delay during continuous historical backlog and bounds live-event latency when an explicit terminator is absent. Inactivity uses observation time (monotonic in the running process), independently of source timestamps.
 
-Pending events, records, and bytes have configured upper bounds. Reaching a bound produces a visible operational error; it never causes silent eviction.
+Pending events, records, and bytes retain configured upper bounds. Input-induced limit violations enter bounded isolation with explicit operational diagnostics and exceptional evidence; they never terminate subsequent collection or cause silent eviction. See the isolation contract below.
 
 ## Singleton and supervision
 
@@ -196,7 +195,7 @@ An incomplete tail fails closed without changing any output bytes or advancing s
 
 ## Batch bounds and cancellation
 
-`--max-line-bytes` counts physical bytes, including LF or CRLF when present, in both batch and follow modes. Exactly the limit is accepted; one byte more fails explicitly before that line is emitted. Batch accepts a final unterminated line within the same limit; follow retains it until a newline arrives. Buffer capacity does not override the configured bound.
+`--max-line-bytes` counts physical bytes, including LF or CRLF when present, in both batch and follow modes. Exactly the limit is accepted. Larger lines are drained to their physical boundary with a bounded retained prefix, then emitted as an incomplete `LINE_EXCEPTION` with explicit omitted-byte accounting. IO and counter-overflow failures remain fatal. Batch also handles final unterminated lines; follow awaits a newline, including while discarding an oversized suffix. Buffer capacity does not override the configured bound.
 
 Batch input paths must be regular files; use stdin for pipes and streams. SIGINT/SIGTERM interrupts an idle or partial stdin read, and busy processing checks cancellation between reads/lines. Already assembled records are flushed with a shutdown boundary. Parsing and output remain synchronous; cancellation does not bypass a blocked output consumer or promise interruption of an operating-system storage operation stuck in uninterruptible I/O.
 
@@ -243,3 +242,78 @@ sources. As with ordinary file I/O, cancellation cannot interrupt a kernel
 filesystem operation stuck in uninterruptible I/O; it does interrupt polling.
 
 Watermarks accept timestamps only from structurally valid Audit IDs, including a nonempty decimal uint64 serial. Malformed IDs remain visible with `invalid_audit_id` and no canonical timestamp; they cannot advance or reset event time. Inactivity expiry still applies normally.
+
+## Automatic source-gap transition
+
+Missing checkpoint generations, missing intermediate numeric rotations, and observed
+same-inode truncation recover automatically with existing configuration and v2 state.
+The collector selects the oldest safely readable contiguous retained suffix ending
+in the active file (`.N, ... .1, active`); if only active remains, it starts at zero.
+Older disconnected islands cannot be joined safely and are not claimed recovered.
+Retained inode aliases, duplicate suffix numbers, symlink/nonregular numeric sources,
+corrupt state, non-boundary offsets, anchor mismatches without proven shrink, unusable
+active inputs, and sink/storage failures remain explicit fatal errors.
+
+Before changing the checkpoint, an atomic, synced `<checkpoint.file>.recovery`
+ledger records the prior checkpoint, reason, detection time, incident number, chosen
+resume identity/anchor/offset, and a prepared flag. The ledger retains eight recent
+incidents plus a lifetime count, with strict 64 KiB, ownership, permission, no-symlink
+and directory-sync checks identical to checkpoint state. Superseded prepared decisions
+are labelled explicitly. This separate sidecar preserves the exact checkpoint v2 format.
+Without a configured checkpoint, the ledger is beside the chosen singleton lock;
+`checkpoint_disabled` still warns that durable replay progress is unavailable.
+
+Recovery flushes unresolved groups as incomplete (`source_gap`), drops partial
+physical lines across the unknown boundary with potential loss explicitly recorded,
+commits the sink, atomically saves the zero-offset v2 checkpoint, then commits the
+ledger decision and emits `recovery_resumed_with_gap`. The chosen file has already
+been opened and validated. A crash before checkpoint commit retains old evidence;
+a crash after it resumes the prepared decision idempotently. If the chosen source
+vanishes meanwhile, another incident records the newly missing generation. No new
+source events are read before the transition commits. IO failure at any durable
+boundary is fatal rather than a successful recovery claim.
+
+Ledger history is reported at startup and its lifetime gap count appears in
+heartbeats even after later restarts. Collection liveness does not imply recovered
+continuity: missing data remains irrecoverable, replay/duplication is possible, and
+stdout acceptance is only pipe acceptance. Do not delete the ledger to clear alerts.
+
+## Bounded input isolation
+
+For a records-per-event or pending-byte violation, only the affected key is
+removed from normal assembly. For pending-event pressure, the newly arriving key
+is rejected while existing groups are retained. All buffered records for the
+rejected key, the triggering record, and subsequent records through its boundary
+are emitted as individual `ASSEMBLY_EXCEPTION` physical-record evidence, preserving
+reversible `audit.raw`, Audit ID, node and source position. These are never normalized
+logical fragments: they contain no inferred success or argv, remain incomplete
+(`assembly_limit`), and must not be deduplicated solely by Audit ID. Physical output
+order and `(device,inode,offset,bytes)` source issues distinguish evidence records;
+replays can repeat them. Ordinary valid event output is unchanged outside isolation.
+
+A payload-free rejected-key table is bounded by `max_pending_events` entries and
+`max_pending_bytes` key-string bytes, separately from the unchanged payload budgets.
+A terminal EOE or PROCTITLE closes a rejected key; inactivity expires it. EOE may
+close a full normal group without allocating another evidence record because EOE
+contains no event payload. PROCTITLE carries evidence and cannot bypass the byte
+or record bound. At the first 256-record overflow diagnostic the observed count is
+257, including the trigger, and is explicitly partial, never a fabricated final total.
+
+If even rejected-key bookkeeping is exhausted, forgetting keys would allow false
+complete suffix events. Instead, untracked keys enter conservative per-record
+exception output until stream inactivity (`event_timeout`). Already retained groups
+continue independently. This deliberately sacrifices normal compaction for truthful
+bounded evidence under adversarial pressure; a continuous hostile stream can keep
+this conservative mode active. Metadata exhaustion is visible as
+`conservative_isolation=true`. No payload is silently discarded or buffered without
+bound. Replay remains pinned to the earliest isolated record until its boundary,
+inactivity fence, or clean shutdown. A forced crash before that fence may replay
+accepted evidence and later valid events, as with any unresolved interleaving window.
+
+Oversized physical lines preserve only the configured prefix and explicitly report
+the number of omitted physical bytes. A usable prefix envelope isolates that key;
+unknown correlation conservatively isolates unresolved groups and untracked future
+keys until inactivity. A partial physical line cannot be called complete. This loss
+is visible on stderr and in the exceptional canonical event. Normalization of an
+oversized logical group preserves every available physical line; only the physical
+line byte bound intentionally withholds suffix bytes.

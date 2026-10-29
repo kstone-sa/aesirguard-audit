@@ -50,3 +50,21 @@ Configuration reload is deliberately not implemented. A validated restart makes 
 Schema version 1 is the only configuration version released so far, so there is no historical transformation to perform. The process never rewrites its configuration automatically. Before an upgrade, validate a candidate file with the candidate binary and retain the previous binary and configuration for rollback.
 
 Future schema changes must provide an explicit, documented migration path. Unknown older or newer versions continue to fail closed rather than being interpreted approximately.
+
+## Automatic isolation and source-gap recovery
+
+v0.10.1 needs no new configuration fields or limit increases. Existing configuration
+v1 and checkpoint v2 are consumed directly, including state from failed deployments.
+Assembler bounds trigger incomplete physical-record evidence, not process exit.
+Physical lines exceeding `max_line_bytes` retain a bounded prefix, drain the rest,
+and report omitted bytes explicitly. `event_timeout` also bounds rejected-key
+inactivity; exceptional metadata has separate bounded budgets derived from the
+existing event-count and byte settings. See [Reliability](reliability.md).
+
+Ordinary retention gaps and detected truncation recover automatically by default.
+The service user needs write access to the existing checkpoint directory for the
+new `<checkpoint.file>.recovery` sidecar. Existing checkpoint directory security
+requirements already imply this access. No state path or option change is required;
+an unsafe or unwritable sidecar is a storage/security error. With checkpoints
+disabled, incident history is stored beside the singleton lock and durable replay
+progress remains unavailable. No changes to the shipped example config are needed.

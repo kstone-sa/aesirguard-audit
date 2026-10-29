@@ -53,15 +53,29 @@ A scheduled Splunk scripted input may invoke the binary repeatedly. The singleto
 
 Do not delete or edit a checkpoint to conceal a startup error. First preserve the checkpoint, active log, and retained rotations.
 
-- Missing checkpoint generation: restore the matching uncompressed rotation or explicitly accept a gap before starting a new state lineage.
+- Missing generation or intermediate rotation: v0.10.1 automatically records the incident, salvages the oldest contiguous retained chain, and commits a new checkpoint lineage. No checkpoint reset or configuration change is needed. Preserve `<checkpoint.file>.recovery` along with the checkpoint for investigation.
 - Corrupt or unsupported checkpoint: restore the last known-good checkpoint or roll back to the compatible binary. The collector fails closed.
 - Output failure: preserve the output and checkpoint, restore space and permissions, and inspect the final physical line. An incomplete tail deliberately blocks restart. Repair that incomplete line or quarantine the affected file only after preserving it; do not append a newline to an incomplete JSON object. Then restart. Events after the last durable checkpoint may replay.
-- Same-inode truncation: investigate the rotation policy. Do not treat an automatic restart at offset zero as lossless recovery.
+- Same-inode truncation: automatic recovery records potential data loss and replays from zero of the safest retained chain. Investigate the rotation policy; erased data is not recovered.
 
 ## Upgrade and rollback
 
-Before an upgrade, retain the previous binary and configuration, stop the process cleanly, back up the checkpoint, validate the existing configuration with the candidate binary, and inspect `ag-audit --version`.
+Before an upgrade, retain the previous binary and configuration, stop the process cleanly, back up the checkpoint and any recovery ledger, validate the existing configuration with the candidate binary, and inspect `ag-audit --version`. For installations already failed on assembler bounds or ordinary missing/truncated generations, replacing the binary and launching it with the existing arguments/configuration and checkpoint is sufficient. Do not reset checkpoints, change limits, or reinstall. See [the binary-only upgrade gate](recovery-upgrade.md).
 
 Configuration version 1 remains supported. Checkpoint version 2 adds a required content anchor; version 1 checkpoints are rejected and never implicitly migrated. To upgrade from checkpoint v1, retain all input generations, archive the old checkpoint, and explicitly replay the retained files from their beginnings into the downstream deduplication workflow before starting a new v2 follower checkpoint. Do not manufacture an anchor for an old offset: the historical identity cannot be established safely. A rollback to a v1-only binary likewise requires an explicit replay plan; it cannot consume v2 state. A release that cannot read an existing version must fail before collection. Rollback therefore consists of restoring the previous binary and its configuration; restore the checkpoint backup only if a release explicitly introduced a documented checkpoint migration.
 
 After restart, verify `started`, `recovery_started`, `recovery_caught_up`, heartbeat, lag, and gap counters before declaring the upgrade complete.
+
+## Fleet validation for v0.10.1
+
+First evaluate a small sanitized pilot, including an already failed host. Keep the
+existing configuration, checkpoint and managed output. Replace only `ag-audit`
+using the normal supervisor procedure. Confirm `assembler_limit_exceeded` yields
+incomplete raw evidence and subsequent normal events rather than a `fatal` loop.
+For missing source generations, confirm `source_gap`, durable ledger evidence,
+`recovery_resumed_with_gap`, increasing checkpoint offsets and newly appended events.
+Restart the process again and confirm new data is collected without a new copy of
+the same gap incident. Alert on persistent gap history and investigate actual loss;
+absence of a fresh error does not erase the historical incident. Observe sink
+availability, lag and exceptional output volume before widening the rollout.
+This procedure is an operational validation plan, not a deployment performed by CI.
