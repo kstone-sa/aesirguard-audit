@@ -30,6 +30,7 @@ func FuzzRecoveringAssemblerAccountsForPayload(f *testing.F) {
 		}
 		types := []string{"PATH", "PATH", "PROCTITLE", "EOE", "KERNEL"}
 		for _, b := range data {
+			now = now.Add(time.Duration(b%5) * 100 * time.Millisecond)
 			kind := types[int(b)%len(types)]
 			line := fmt.Sprintf("node=n%d type=%s msg=audit(100.1:%d): item=0 name=\"/safe\"", (b/5)%2, kind, (b/10)%4)
 			r, err := ParseRecord(line)

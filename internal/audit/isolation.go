@@ -7,7 +7,7 @@ import (
 
 // RejectPhysicalLine uses only a complete parsed envelope when available. If
 // correlation itself is missing/unsafe, all unresolved groups are potentially
-// affected; conservatively fence assembly until inactivity instead of joining
+// affected; conservatively fence assembly until untracked input expires instead of joining
 // untrustworthy tails. The retained prefix is emitted separately by the caller.
 func (a *Assembler) RejectPhysicalLine(prefix string, source SourcePosition, now time.Time) []AssembledEvent {
 	end := strings.Index(prefix, "):")
@@ -77,12 +77,32 @@ func (a *Assembler) expireRejected(now time.Time) {
 // API for callers that need explicit admission testing. The collector uses this
 // method and must deliver EVERY returned event before checkpoint advancement.
 // A returned limit is diagnostic, not a failure to account for the record.
-func (a *Assembler) AddRecovering(record Record, now time.Time) ([]AssembledEvent, *AssemblerLimitError) {
+func (a *Assembler) AddRecovering(record Record, now time.Time) (events []AssembledEvent, diagnostic *AssemblerLimitError) {
+	// Admission failure and conservative isolation bypass addAt's normal expiry.
+	// Collect stale evidence first on EVERY record, and deliver it even on those
+	// early-return paths. Merge using first-observed sequence, just as addAt does.
+	expired := a.expired(now)
+	defer func() {
+		if len(expired) == 0 {
+			return
+		}
+		for _, event := range events {
+			expired = append(expired, readyEvent{sequence: event.sequence, event: event})
+		}
+		events = orderedEvents(expired)
+	}()
 	a.expireRejected(now)
 	key := correlationKey{record.ID, record.Node, record.NodePresent}
 	terminal := isTerminalRecord(record.Type) || record.Type == "PROCTITLE"
+	pending, exists := a.pending[key]
 	exceptional := func(records []Record) AssembledEvent {
-		return AssembledEvent{ID: record.ID, Records: records, Exceptional: true, Completion: CompletionAssemblyLimit}
+		sequence := a.nextSequence
+		if exists {
+			sequence = pending.sequence
+		} else {
+			a.nextSequence++
+		}
+		return AssembledEvent{sequence: sequence, ID: record.ID, Records: records, Exceptional: true, Completion: CompletionAssemblyLimit}
 	}
 	if rejected := a.rejected[key]; rejected != nil {
 		rejected.lastSeen = now
@@ -92,7 +112,6 @@ func (a *Assembler) AddRecovering(record Record, now time.Time) ([]AssembledEven
 		}
 		return []AssembledEvent{exceptional([]Record{record})}, nil
 	}
-	pending, exists := a.pending[key]
 	// EOE carries no event evidence. At a full payload boundary it may close the
 	// group without allocating a 257th retained record or misreporting data loss.
 	if exists && record.Type == "EOE" && a.limits.MaxRecordsPerEvent > 0 &&
@@ -100,10 +119,26 @@ func (a *Assembler) AddRecovering(record Record, now time.Time) ([]AssembledEven
 		return orderedEvents([]readyEvent{a.finish(key, CompletionEOE, true)}), nil
 	}
 	// Once bounded rejected-key bookkeeping is exhausted, conservatively emit
-	// unknown keys as physical-record exceptions until an inactivity fence. Never
+	// unknown keys as physical-record exceptions until the untracked-input fence expires. Never
 	// forget a tainted key and later normalize its tail as a complete event.
 	if !exists && !a.spillSince.IsZero() {
-		a.spillSince = now
+		// A terminal record introduces no unresolved tail. If metadata room
+		// has recovered, track nonterminal keys individually instead of
+		// renewing a global fence for unrelated input. Pin those keys to the
+		// original spill boundary so a restart can replay their full prefix.
+		if !terminal {
+			keyBytes := len(key.ID) + len(key.Node)
+			if len(a.rejected) < a.limits.MaxPendingEvents && keyBytes <= a.limits.MaxPendingBytes-a.rejectionBytes {
+				if a.rejected == nil {
+					a.rejected = make(map[correlationKey]*rejectedEvent)
+				}
+				a.rejected[key] = &rejectedEvent{source: a.spillSource, lastSeen: now, keyBytes: keyBytes}
+				a.rejectionBytes += keyBytes
+			} else {
+				// Only genuinely untracked, unresolved input extends this fence.
+				a.startSpill(now, record.Source)
+			}
+		}
 		return []AssembledEvent{exceptional([]Record{record})}, nil
 	}
 	events, err := a.AddCheckedAt(record, now)

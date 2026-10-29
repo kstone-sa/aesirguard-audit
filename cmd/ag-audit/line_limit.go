@@ -8,6 +8,9 @@ import (
 )
 
 func (p *eventProcessor) rejectLine(prefix string, totalBytes int, source audit.SourcePosition) error {
+	if err := p.emit(p.assembler.FlushExpired(time.Now())); err != nil {
+		return err
+	}
 	p.diagnostics.counters.InputLines++
 	p.diagnostics.counters.InputBytes += uint64(totalBytes)
 	p.diagnostics.counters.LineLimits++

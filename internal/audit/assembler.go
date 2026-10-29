@@ -81,6 +81,7 @@ const (
 // AssembledEvent retains the physical records and their event boundary.
 // Normalizers decide how those records are represented in an output schema.
 type AssembledEvent struct {
+	sequence    uint64 // Internal emission ordering, never part of canonical output.
 	Exceptional bool
 	MixedNode   bool
 	ID          string
@@ -380,6 +381,7 @@ func orderedEvents(ready []readyEvent) []AssembledEvent {
 	})
 	events := make([]AssembledEvent, 0, len(ready))
 	for _, item := range ready {
+		item.event.sequence = item.sequence
 		events = append(events, item.event)
 	}
 	return events

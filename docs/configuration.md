@@ -58,7 +58,9 @@ v1 and checkpoint v2 are consumed directly, including state from failed deployme
 Assembler bounds trigger incomplete physical-record evidence, not process exit.
 Physical lines exceeding `max_line_bytes` retain a bounded prefix, drain the rest,
 and report omitted bytes explicitly. `event_timeout` also bounds rejected-key
-inactivity; exceptional metadata has separate bounded budgets derived from the
+inactivity independently for each key. Expiration runs during incoming-record
+processing, not just idle polls; unrelated valid events do not renew the global
+untracked-input fence. Exceptional metadata has separate bounded budgets derived from the
 existing event-count and byte settings. See [Reliability](reliability.md).
 
 Ordinary retention gaps and detected truncation recover automatically by default.

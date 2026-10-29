@@ -557,6 +557,11 @@ func (processor *eventProcessor) addSourceLine(line string, source audit.SourceP
 	processor.diagnostics.counters.InputBytes += uint64(lineBytes)
 	record, err := audit.ParseRecord(line)
 	if err != nil {
+		// Malformed lines bypass AddRecovering, but busy input must still expire
+		// pending evidence through the sink before any checkpoint can advance.
+		if emitErr := processor.emit(processor.assembler.FlushExpired(time.Now())); emitErr != nil {
+			return emitErr
+		}
 		processor.diagnostics.counters.ParseFailures++
 		if diagnosticErr := processor.diagnostics.log("warn", "parse_failure", map[string]any{"error": err.Error()}); diagnosticErr != nil {
 			return diagnosticErr

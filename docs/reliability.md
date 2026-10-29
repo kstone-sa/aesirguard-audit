@@ -301,19 +301,34 @@ or record bound. At the first 256-record overflow diagnostic the observed count 
 
 If even rejected-key bookkeeping is exhausted, forgetting keys would allow false
 complete suffix events. Instead, untracked keys enter conservative per-record
-exception output until stream inactivity (`event_timeout`). Already retained groups
-continue independently. This deliberately sacrifices normal compaction for truthful
-bounded evidence under adversarial pressure; a continuous hostile stream can keep
-this conservative mode active. Metadata exhaustion is visible as
-`conservative_isolation=true`. No payload is silently discarded or buffered without
-bound. Replay remains pinned to the earliest isolated record until its boundary,
-inactivity fence, or clean shutdown. A forced crash before that fence may replay
-accepted evidence and later valid events, as with any unresolved interleaving window.
+exception output with a fence timed from the last unresolved record that could
+not be tracked. Already retained groups continue independently. Every arriving
+record expires stale pending groups before admission, even if admission fails or
+spill isolation returns early. Expired evidence is emitted exactly once through
+the normal sink path, with timeout/watermark integrity and first-observed ordering.
+Malformed and oversized physical lines also service expiration without idle polling.
+
+Terminal records introduce no new unresolved tail and do not renew the global
+fence. Once metadata room returns, nonterminal keys are tracked individually,
+pinning them to the original spill source boundary so replay cannot lose their
+prefix. Their own activity refreshes only their own timeout, not the global fence.
+Thus unrelated completed or tracked events cannot prolong global isolation: after
+`event_timeout` without genuinely untrackable unresolved input, normal admission
+resumes even on a continuously busy stream. Active tainted tails remain exceptional
+until their own boundary or inactivity timeout. Continued hostile input that really
+exhausts bookkeeping can still require conservative output; this is distinguishable
+from a stale state held alive solely by unrelated valid traffic.
+
+Metadata exhaustion is visible as `conservative_isolation=true`. No payload is
+silently discarded or buffered without bound. Replay remains pinned to legitimate
+unresolved evidence boundaries until closure/expiry or clean shutdown. A forced
+crash before those boundaries clear may replay accepted evidence and later valid
+events, as with any unresolved interleaving window.
 
 Oversized physical lines preserve only the configured prefix and explicitly report
 the number of omitted physical bytes. A usable prefix envelope isolates that key;
 unknown correlation conservatively isolates unresolved groups and untracked future
-keys until inactivity. A partial physical line cannot be called complete. This loss
+keys until the untracked-input fence expires. A partial physical line cannot be called complete. This loss
 is visible on stderr and in the exceptional canonical event. Normalization of an
 oversized logical group preserves every available physical line; only the physical
 line byte bound intentionally withholds suffix bytes.
