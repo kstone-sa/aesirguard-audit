@@ -110,6 +110,11 @@ func SaveCheckpoint(path string, checkpoint Checkpoint) (returnErr error) {
 	if err := checkpoint.Validate(); err != nil {
 		return err
 	}
+	return saveState(path, checkpoint)
+}
+
+// saveState uses the checkpoint security and durability boundary for small state documents.
+func saveState(path string, value any) (returnErr error) {
 	directory, err := openStateDirectory(filepath.Dir(path), "checkpoint", true)
 	if err != nil {
 		return err
@@ -145,7 +150,7 @@ func SaveCheckpoint(path string, checkpoint Checkpoint) (returnErr error) {
 	}()
 	encoder := json.NewEncoder(temporary)
 	encoder.SetEscapeHTML(false)
-	if err := encoder.Encode(checkpoint); err != nil {
+	if err := encoder.Encode(value); err != nil {
 		return err
 	}
 	if err := temporary.Sync(); err != nil {

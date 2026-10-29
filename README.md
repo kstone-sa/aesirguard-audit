@@ -16,8 +16,8 @@ This project was designed and developed by Kstone SA with assistance from OpenAI
 
 ## Pre-release status
 
-AesirGuard Audit is the new pre-1.0 product name; **v0.10.0 is the intended first
-release under this name and has not been published by this pass**. Published
+AesirGuard Audit is the new pre-1.0 product name; **v0.10.0 is the published
+pre-release baseline and v0.10.1 is the intended reliability-fix release**. Published
 audit2json v0.9.0 and v0.9.1 retain their original names and assets. This branch's
 commands use the new naming; see [the migration guide](docs/rebranding.md).
 Qualification builds are for controlled evaluation, with no stable distribution
@@ -49,7 +49,8 @@ The current `main` branch provides:
 - locate a checkpoint generation among retained numeric rotations such as `audit.log.1`;
 - drain rename/create rotations before following the replacement inode;
 - preserve pending events and partial physical lines across generations;
-- detect same-inode truncation as an explicit source gap;
+- detect same-inode truncation, durably report source gaps and automatically resume retained-source collection;
+- isolate assembler-limit events as incomplete physical-record evidence without halting subsequent ingestion;
 - reopen a managed output file automatically after rename rotation;
 - load strict versioned JSON configuration with command-line overrides;
 - emit structured operational diagnostics, counters, and heartbeats on stderr.
@@ -59,7 +60,7 @@ The current `main` branch provides:
 - report embedded build version, commit, and date metadata;
 - produce reproducible Linux amd64/arm64 release archives with SHA-256 checksums.
 
-Batch mode still exits at EOF. Follow mode waits at EOF, recovers through retained uncompressed generations, and follows rename/create rotation. Compressed historical logs are not decoded; if the checkpoint inode is no longer available as an uncompressed file, startup fails explicitly.
+Batch mode still exits at EOF. Follow mode waits at EOF, recovers through retained uncompressed generations, and follows rename/create rotation. Compressed historical logs are not decoded. A missing checkpoint generation triggers durable gap reporting and automatic replay from the oldest safe contiguous retained chain; lost generations are not claimed recovered.
 
 See `ROADMAP.md` for planned validation and future work, `docs/performance.md` for the synthetic validation model, and `docs/security-event-coverage.md` for security-relevant Audit families beyond the CIS rule profile.
 
@@ -192,7 +193,7 @@ Enable crash recovery with an explicit durable checkpoint path:
   /var/log/audit/audit.log
 ```
 
-Checkpoint updates sync a managed output file before advancing input progress. With stdout, a successful write confirms only that the local pipe accepted the bytes; replay after a crash is therefore expected and delivery remains at-least-once. If the checkpoint inode is not the current input, AesirGuard Audit searches retained uncompressed numeric rotations and drains them in descending numeric suffix order (`.2` before `.1`, then the active file). Missing intermediate generations, duplicate suffix numbers, and inode aliases fail closed; non-numeric siblings are not input generations. If it cannot locate the inode, or its saved content anchor does not match, it fails explicitly instead of skipping to the current file. Checkpoint v1 is rejected; see the runbook for explicit replay migration and the reliability document for the sampled anchor guarantee and limitations.
+Checkpoint updates sync a managed output file before advancing input progress. With stdout, a successful write confirms only that the local pipe accepted the bytes; replay after a crash is therefore expected and delivery remains at-least-once. If the checkpoint inode is not the current input, AesirGuard Audit searches retained uncompressed numeric rotations and drains them in descending numeric suffix order (`.2` before `.1`, then the active file). Missing generations or intermediate rotations automatically record a durable integrity incident and resume from zero of the oldest safe contiguous retained chain. Duplicate suffix numbers, inode aliases and content-anchor mismatches remain explicit fatal integrity errors; non-numeric siblings are not input generations. Checkpoint v1 is rejected; see the runbook for explicit replay migration and the reliability document for the sampled anchor guarantee and limitations.
 
 For live rename/create rotation, the old descriptor must remain at a stable EOF for `--rotation-drain-interval` (default `500ms`) before the collector switches. Same-inode shrink, including copytruncate, is detected and reported as a gap; automatic continuation is intentionally not claimed lossless.
 

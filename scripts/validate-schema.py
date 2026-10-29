@@ -23,6 +23,10 @@ validator = Draft202012Validator(schema, format_checker=FormatChecker())
 count = 0
 features = set()
 inputs = [(str(p.relative_to(root)), p.read_bytes()) for p in sorted((root / "testdata").rglob("*.audit"))]
+inputs += [("assembly limit", b"".join(
+    f'type=PATH msg=audit(100.1:900): item={i} name="/safe"\n'.encode()
+    for i in range(300)) + b"type=EOE msg=audit(100.1:900):\n"),
+    ("line limit", b"x" * (1024 * 1024 + 1) + b"\n")]
 inputs += [("malformed bytes", b"\xff\n"), ("malformed text", b"not an audit record\n")]
 for name, data in inputs:
     completed = subprocess.run([binary, "--render-message"], input=data, capture_output=True, check=True)

@@ -68,6 +68,7 @@ func runBatch(ctx context.Context, options commandOptions, stdin io.Reader, proc
 	}
 	reader := bufio.NewReaderSize(input, 64*1024)
 	var partial []byte
+	lineBytes := 0
 	for {
 		if ctx.Err() != nil {
 			return processor.flushAll(audit.CompletionShutdown)
@@ -76,10 +77,15 @@ func runBatch(ctx context.Context, options commandOptions, stdin io.Reader, proc
 		if ctx.Err() != nil {
 			return processor.flushAll(audit.CompletionShutdown)
 		}
-		if len(fragment) > options.maxLineBytes-len(partial) {
-			return fmt.Errorf("physical line exceeds %d bytes", options.maxLineBytes)
+		if len(fragment) > int(^uint(0)>>1)-lineBytes {
+			return fmt.Errorf("physical line byte counter exhausted")
 		}
-		partial = append(partial, fragment...)
+		lineBytes += len(fragment)
+		retain := len(fragment)
+		if retain > options.maxLineBytes-len(partial) {
+			retain = options.maxLineBytes - len(partial)
+		}
+		partial = append(partial, fragment[:retain]...)
 		if errors.Is(err, bufio.ErrBufferFull) {
 			continue
 		}
@@ -87,12 +93,24 @@ func runBatch(ctx context.Context, options commandOptions, stdin io.Reader, proc
 			return err
 		}
 		if len(partial) > 0 {
+			if lineBytes > options.maxLineBytes {
+				if err := processor.rejectLine(string(partial), lineBytes, audit.SourcePosition{}); err != nil {
+					return err
+				}
+				partial = partial[:0]
+				lineBytes = 0
+				if errors.Is(err, io.EOF) {
+					return processor.flushAll(audit.CompletionEOF)
+				}
+				continue
+			}
 			line := bytes.TrimSuffix(partial, []byte{'\n'})
 			line = bytes.TrimSuffix(line, []byte{'\r'})
 			if err := processor.addLine(string(line)); err != nil {
 				return err
 			}
 			partial = partial[:0]
+			lineBytes = 0
 		}
 		if errors.Is(err, io.EOF) {
 			return processor.flushAll(audit.CompletionEOF)

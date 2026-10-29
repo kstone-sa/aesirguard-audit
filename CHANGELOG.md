@@ -2,12 +2,24 @@
 
 All notable changes will be documented in this file. The project has not yet published a stable release.
 
-## Unreleased — intended v0.10.0 (AesirGuard Audit)
+## Unreleased — intended v0.10.1
+
+- Isolate assembler record, pending-event and byte bounds without fatal collection
+  stops, preserving affected physical records as explicit incomplete raw evidence.
+- Report Audit ID/node, configured limit and trigger-inclusive partial record count.
+- Recover ordinary missing generations, rotation gaps and detected truncation
+  automatically using a bounded durable incident ledger and anchored v2 lineage.
+- Verify binary-only recovery from real v0.10.0 failed checkpoints for oversized
+  events, missing generations, and both combined, including subsequent forced restarts.
+- Preserve configuration v1 and checkpoint v2. Extend canonical v1 integrity reasons
+  for isolation/gaps; no existing normal fields change. No release tag is created.
+
+## v0.10.0 — 2026-09-08 (AesirGuard Audit)
 
 - Rebrand product, repository/module, CLI (`ag-audit`), configuration, systemd,
   schema identity and release archives; see [migration](docs/rebranding.md).
 - Preserve canonical event schema 1.0, checkpoint schema 2, renderer version 5,
-  configuration keys, and Go policy. No v0.10.0 tag or release is created here.
+  configuration keys, and Go policy.
 
 ## v0.9.1 - 2026-09-07 (audit2json)
 

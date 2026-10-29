@@ -40,7 +40,7 @@ A local rule key is never used as a portable event type.
 
 ## Audit envelope and source
 
-`audit.id` preserves the original `timestamp:serial` identifier used to correlate the physical records. `audit.time` is its UTC RFC 3339 representation. `audit.raw` appears only on malformed-line fallback events.
+`audit.id` preserves the original `timestamp:serial` identifier used to correlate the physical records. `audit.time` is its UTC RFC 3339 representation. `audit.raw` appears on malformed-line fallback and exceptional physical-record evidence.
 
 An invalid ID remains in `audit.id`; `audit.time` is omitted and `event.issues` reports `invalid_audit_id`.
 
@@ -68,6 +68,15 @@ Normal EOE, correlated PROCTITLE, known single-record and valid event-time water
 ```
 
 Unknown result values and unsupported record families are reported explicitly without copying their arbitrary fields.
+
+Incomplete reasons also include `assembly_limit`, `line_limit`, and `source_gap`
+for bounded isolation or recovery. Exceptional `ASSEMBLY_EXCEPTION` and
+`LINE_EXCEPTION` records use existing raw/issue fields and never represent an
+independent complete logical event. `source_record` issues identify physical
+position; multiple evidence records sharing an Audit ID must remain distinct.
+A line-limit event explicitly reports omitted bytes, and `audit.raw` is only
+the retained prefix. This is an additive widening of v1 integrity reasons; strict
+consumers using an older enum must use the updated schema. Checkpoint v2 is unchanged.
 
 `integrity.incomplete` denotes an unresolved assembly/delivery boundary, not the
 normal absence of EOE in audit.log. Completion is not a proof that every expected

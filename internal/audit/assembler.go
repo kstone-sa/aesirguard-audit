@@ -10,6 +10,10 @@ import (
 
 // Assembler groups interleaved records and emits deterministic logical events.
 type Assembler struct {
+	rejected          map[correlationKey]*rejectedEvent
+	rejectionBytes    int
+	spillSince        time.Time
+	spillSource       SourcePosition
 	timeout           time.Duration
 	limits            AssemblerLimits
 	pending           map[correlationKey]*pendingEvent
@@ -45,8 +49,13 @@ type AssemblerLimits struct {
 // AssemblerLimitError reports a record that could not be retained without
 // exceeding a configured memory bound.
 type AssemblerLimitError struct {
-	Limit string
-	Value int
+	Limit           string
+	Value           int
+	AuditID         string
+	Node            string
+	NodePresent     bool
+	ObservedRecords int
+	CountComplete   bool
 }
 
 func (err *AssemblerLimitError) Error() string {
@@ -57,23 +66,28 @@ func (err *AssemblerLimitError) Error() string {
 type Completion string
 
 const (
-	CompletionEOE          Completion = "eoe"
-	CompletionProctitle    Completion = "proctitle"
-	CompletionSingleRecord Completion = "single_record"
-	CompletionWatermark    Completion = "watermark"
-	CompletionTimeout      Completion = "timeout"
-	CompletionEOF          Completion = "eof"
-	CompletionShutdown     Completion = "shutdown"
+	CompletionEOE           Completion = "eoe"
+	CompletionProctitle     Completion = "proctitle"
+	CompletionSingleRecord  Completion = "single_record"
+	CompletionWatermark     Completion = "watermark"
+	CompletionTimeout       Completion = "timeout"
+	CompletionEOF           Completion = "eof"
+	CompletionAssemblyLimit Completion = "assembly_limit"
+	CompletionLineLimit     Completion = "line_limit"
+	CompletionShutdown      Completion = "shutdown"
+	CompletionSourceGap     Completion = "source_gap"
 )
 
 // AssembledEvent retains the physical records and their event boundary.
 // Normalizers decide how those records are represented in an output schema.
 type AssembledEvent struct {
-	MixedNode  bool
-	ID         string
-	Records    []Record
-	Complete   bool
-	Completion Completion
+	sequence    uint64 // Internal emission ordering, never part of canonical output.
+	Exceptional bool
+	MixedNode   bool
+	ID          string
+	Records     []Record
+	Complete    bool
+	Completion  Completion
 }
 
 type readyEvent struct {
@@ -137,6 +151,15 @@ func (assembler *Assembler) addAt(record Record, observedAt time.Time) ([]Assemb
 	// An EOE without cached records contains no event data.
 	if record.Type != "EOE" || exists {
 		if err := assembler.checkLimits(record, pending, exists); err != nil {
+			limit := err.(*AssemblerLimitError)
+			limit.AuditID, limit.Node, limit.NodePresent = record.ID, record.Node, record.NodePresent
+			limit.ObservedRecords = 1
+			if exists {
+				limit.ObservedRecords += len(pending.records)
+			}
+			// Even a terminal record cannot prove that a producer will not reuse
+			// the key. This diagnostic is an observation at the limit boundary.
+			limit.CountComplete = false
 			return nil, err
 		}
 		if !exists {
@@ -169,6 +192,7 @@ func (assembler *Assembler) addAt(record Record, observedAt time.Time) ([]Assemb
 
 // FlushExpired emits events whose watermark or inactivity timeout has elapsed.
 func (assembler *Assembler) FlushExpired(now time.Time) []AssembledEvent {
+	assembler.expireRejected(now)
 	return orderedEvents(assembler.expired(now))
 }
 
@@ -179,6 +203,10 @@ func (assembler *Assembler) FlushAll() []AssembledEvent {
 
 // FlushAllWith emits all pending events with the supplied incomplete boundary.
 func (assembler *Assembler) FlushAllWith(completion Completion) []AssembledEvent {
+	assembler.rejected = nil
+	assembler.rejectionBytes = 0
+	assembler.spillSince = time.Time{}
+	assembler.spillSource = SourcePosition{}
 	ready := make([]readyEvent, 0, len(assembler.pending))
 	for id := range assembler.pending {
 		ready = append(ready, assembler.finish(id, completion, false))
@@ -211,6 +239,17 @@ func (assembler *Assembler) SafeSourcePosition(fallback SourcePosition) SourcePo
 				safe = candidate
 			}
 		}
+	}
+	for _, rejected := range assembler.rejected {
+		candidate := rejected.source
+		candidate.End = candidate.Start
+		if candidate.Valid && (!safe.Valid || sourcePositionBefore(candidate, safe)) {
+			safe = candidate
+		}
+	}
+	if candidate := assembler.spillSource; candidate.Valid && (!safe.Valid || sourcePositionBefore(candidate, safe)) {
+		candidate.End = candidate.Start
+		safe = candidate
 	}
 	return safe
 }
@@ -250,7 +289,7 @@ func (assembler *Assembler) checkLimits(record Record, pending *pendingEvent, ex
 	if exists && len(pending.records) >= assembler.limits.MaxRecordsPerEvent {
 		return &AssemblerLimitError{Limit: "records per event", Value: assembler.limits.MaxRecordsPerEvent}
 	}
-	if assembler.pendingBytes+record.SourceBytes > assembler.limits.MaxPendingBytes {
+	if record.SourceBytes > assembler.limits.MaxPendingBytes-assembler.pendingBytes {
 		return &AssemblerLimitError{Limit: "pending bytes", Value: assembler.limits.MaxPendingBytes}
 	}
 	return nil
@@ -342,6 +381,7 @@ func orderedEvents(ready []readyEvent) []AssembledEvent {
 	})
 	events := make([]AssembledEvent, 0, len(ready))
 	for _, item := range ready {
+		item.event.sequence = item.sequence
 		events = append(events, item.event)
 	}
 	return events

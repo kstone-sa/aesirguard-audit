@@ -16,9 +16,10 @@ const defaultReadBufferBytes = 64 * 1024
 
 // FollowerOptions controls polling and the maximum retained physical line.
 type FollowerOptions struct {
-	PollInterval time.Duration
-	MaxLineBytes int
-	Generation   uint64
+	PollInterval      time.Duration
+	MaxLineBytes      int
+	Generation        uint64
+	RecoverLineLimits bool
 }
 
 // FileIdentity is stable for one opened file generation.
@@ -29,6 +30,7 @@ type FileIdentity struct {
 
 // SourceLine is one newline-terminated physical record and its byte range.
 type SourceLine struct {
+	OmittedBytes    int
 	Text            string
 	Identity        FileIdentity
 	Generation      uint64
@@ -44,21 +46,23 @@ type SourceLine struct {
 // FileFollower reads complete lines from a growing file. It deliberately stays
 // attached to the opened inode; input rotation is a separate state machine.
 type FileFollower struct {
-	path         string
-	file         *os.File
-	reader       *bufio.Reader
-	pollInterval time.Duration
-	maxLineBytes int
-	partial      []byte
-	identity     FileIdentity
-	generation   uint64
-	readOffset   int64
-	lineStart    int64
-	completeEnd  int64
-	origin       FileIdentity
-	originGen    uint64
-	originOffset int64
-	originAnchor string
+	path              string
+	file              *os.File
+	reader            *bufio.Reader
+	pollInterval      time.Duration
+	maxLineBytes      int
+	partial           []byte
+	lineBytes         int
+	recoverLineLimits bool
+	identity          FileIdentity
+	generation        uint64
+	readOffset        int64
+	lineStart         int64
+	completeEnd       int64
+	origin            FileIdentity
+	originGen         uint64
+	originOffset      int64
+	originAnchor      string
 }
 
 // OpenFileFollower opens path at offset zero and prepares to wait at EOF.
@@ -111,7 +115,7 @@ func OpenFileFollowerAt(path string, options FollowerOptions, offset int64, expe
 	}
 	if len(anchors) > 0 && anchors[0] != anchor {
 		_ = file.Close()
-		return nil, fmt.Errorf("checkpoint content anchor mismatch: %w", &SourceGapError{Identity: identity})
+		return nil, &ContentAnchorMismatchError{Gap: SourceGapError{Identity: identity}}
 	}
 	if offset > 0 {
 		if _, err := file.Seek(offset-1, io.SeekStart); err != nil {
@@ -133,21 +137,22 @@ func OpenFileFollowerAt(path string, options FollowerOptions, offset int64, expe
 		return nil, err
 	}
 	return &FileFollower{
-		path:         path,
-		file:         file,
-		reader:       bufio.NewReaderSize(file, defaultReadBufferBytes),
-		pollInterval: options.PollInterval,
-		maxLineBytes: options.MaxLineBytes,
-		partial:      make([]byte, 0, defaultReadBufferBytes),
-		identity:     identity,
-		generation:   options.Generation,
-		readOffset:   offset,
-		lineStart:    offset,
-		completeEnd:  offset,
-		origin:       identity,
-		originGen:    options.Generation,
-		originOffset: offset,
-		originAnchor: anchor,
+		path:              path,
+		file:              file,
+		reader:            bufio.NewReaderSize(file, defaultReadBufferBytes),
+		pollInterval:      options.PollInterval,
+		maxLineBytes:      options.MaxLineBytes,
+		recoverLineLimits: options.RecoverLineLimits,
+		partial:           make([]byte, 0, defaultReadBufferBytes),
+		identity:          identity,
+		generation:        options.Generation,
+		readOffset:        offset,
+		lineStart:         offset,
+		completeEnd:       offset,
+		origin:            identity,
+		originGen:         options.Generation,
+		originOffset:      offset,
+		originAnchor:      anchor,
 	}, nil
 }
 
@@ -166,23 +171,36 @@ func (follower *FileFollower) NextSource(ctx context.Context) (line SourceLine, 
 		}
 		fragment, readErr := follower.reader.ReadSlice('\n')
 		if len(fragment) > 0 {
-			if len(follower.partial)+len(fragment) > follower.maxLineBytes {
+			if len(fragment) > int(^uint(0)>>1)-follower.lineBytes {
+				return SourceLine{}, false, fmt.Errorf("physical line byte counter exhausted")
+			}
+			follower.lineBytes += len(fragment)
+			if follower.lineBytes > follower.maxLineBytes && !follower.recoverLineLimits {
 				return SourceLine{}, false, fmt.Errorf("physical line in %s exceeds %d bytes", follower.path, follower.maxLineBytes)
 			}
-			follower.partial = append(follower.partial, fragment...)
+			retain := len(fragment)
+			if retain > follower.maxLineBytes-len(follower.partial) {
+				retain = follower.maxLineBytes - len(follower.partial)
+			}
+			follower.partial = append(follower.partial, fragment[:retain]...)
 			follower.readOffset += int64(len(fragment))
 		}
 
 		switch {
 		case readErr == nil:
-			complete := bytes.TrimSuffix(follower.partial, []byte{'\n'})
-			complete = bytes.TrimSuffix(complete, []byte{'\r'})
+			omitted := follower.lineBytes - len(follower.partial)
+			complete := follower.partial
+			if omitted == 0 {
+				complete = bytes.TrimSuffix(complete, []byte{'\n'})
+				complete = bytes.TrimSuffix(complete, []byte{'\r'})
+			}
 			endAnchor, anchorErr := ContentAnchor(follower.file, follower.readOffset)
 			if anchorErr != nil {
 				return SourceLine{}, false, anchorErr
 			}
 			line = SourceLine{
 				StartAnchor: follower.originAnchor, EndAnchor: endAnchor,
+				OmittedBytes:    omitted,
 				Text:            string(complete),
 				Identity:        follower.identity,
 				Generation:      follower.generation,
@@ -190,7 +208,7 @@ func (follower *FileFollower) NextSource(ctx context.Context) (line SourceLine, 
 				StartGeneration: follower.originGen,
 				Start:           follower.originOffset,
 				End:             follower.readOffset,
-				SourceBytes:     len(follower.partial),
+				SourceBytes:     follower.lineBytes,
 			}
 			follower.completeEnd = follower.readOffset
 			follower.lineStart = follower.readOffset
@@ -199,6 +217,7 @@ func (follower *FileFollower) NextSource(ctx context.Context) (line SourceLine, 
 			follower.originOffset = follower.readOffset
 			follower.originAnchor = endAnchor
 			follower.partial = follower.partial[:0]
+			follower.lineBytes = 0
 			return line, true, nil
 		case errors.Is(readErr, bufio.ErrBufferFull):
 			continue
@@ -239,6 +258,8 @@ func (follower *FileFollower) transferPartialTo(next *FileFollower) error {
 		return fmt.Errorf("physical line in %s exceeds %d bytes", follower.path, next.maxLineBytes)
 	}
 	next.partial = append(next.partial, follower.partial...)
+	next.lineBytes = follower.lineBytes
+	follower.lineBytes = 0
 	next.origin = follower.origin
 	next.originGen = follower.originGen
 	next.originOffset = follower.originOffset
