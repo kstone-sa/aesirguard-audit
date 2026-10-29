@@ -32,6 +32,7 @@ type RotationOptions struct {
 // SourceGapError means the checkpoint generation is no longer retained.
 type SourceGapError struct {
 	Identity FileIdentity
+	Reason   string
 }
 
 func (err *SourceGapError) Error() string {
@@ -108,14 +109,15 @@ func OpenRotatingFollower(inputPath string, options RotationOptions, checkpoint 
 	if index < 0 {
 		return nil, &SourceGapError{Identity: expected}
 	}
-	if err := validateGenerationChain(candidates[index:]); err != nil {
-		return nil, err
-	}
 	first := candidates[index]
 	followerOptions := options.FollowerOptions
 	followerOptions.Generation = 0
 	follower, err := OpenFileFollowerAt(first.path, followerOptions, checkpoint.Offset, &expected, checkpoint.Anchor)
 	if err != nil {
+		return nil, err
+	}
+	if err := validateGenerationChain(candidates[index:]); err != nil {
+		follower.Close()
 		return nil, err
 	}
 	return &RotatingFollower{
@@ -414,14 +416,14 @@ func discoverCandidates(inputPath string, excludes []string) ([]sourceCandidate,
 			continue
 		}
 		if entry.Type()&os.ModeSymlink != 0 {
-			continue
+			return nil, fmt.Errorf("unsafe source generation symlink: %s", path)
 		}
 		info, err := entry.Info()
 		if err != nil {
 			return nil, err
 		}
 		if !info.Mode().IsRegular() {
-			continue
+			return nil, fmt.Errorf("unsupported source generation: regular file required: %s", path)
 		}
 		identity, err := identityFromFileInfo(info)
 		if err != nil {
@@ -473,7 +475,7 @@ func validateGenerationChain(candidates []sourceCandidate) error {
 			expected = newer.number
 		}
 		if older.current || older.number == 0 || older.number-1 != expected {
-			return fmt.Errorf("source generation gap between %s and %s: %w", older.path, newer.path, &SourceGapError{Identity: older.identity})
+			return fmt.Errorf("source generation gap between %s and %s: %w", older.path, newer.path, &SourceGapError{Identity: older.identity, Reason: "missing_intermediate_generation"})
 		}
 	}
 	return nil

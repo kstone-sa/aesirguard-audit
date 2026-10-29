@@ -22,8 +22,12 @@ func TestBatchAndFollowPhysicalLineBounds(t *testing.T) {
 			for _, delta := range []int{-1, 0, 1} {
 				t.Run(fmt.Sprintf("%d/%q/%d", limit, ending, delta), func(t *testing.T) {
 					input := strings.Repeat("x", limit+delta-len(ending)) + ending
-					err := run([]string{"--max-line-bytes", fmt.Sprint(limit)}, strings.NewReader(input), io.Discard, io.Discard)
-					if (err != nil) != (delta > 0) {
+					var output bytes.Buffer
+					err := run([]string{"--max-line-bytes", fmt.Sprint(limit)}, strings.NewReader(input), &output, io.Discard)
+					if delta > 0 && !bytes.Contains(output.Bytes(), []byte(`"reason":"line_limit"`)) {
+						t.Fatal("oversized line lacks explicit incomplete evidence")
+					}
+					if err != nil {
 						t.Fatalf("batch size=%d limit=%d err=%v", len(input), limit, err)
 					}
 					if ending == "" {

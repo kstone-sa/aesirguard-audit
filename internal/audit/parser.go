@@ -19,6 +19,7 @@ type Field struct {
 
 // Record is one raw auditd record parsed into key/value fields.
 type Record struct {
+	Raw                string // Original physical line, retained only within configured assembler bounds.
 	Conflicts          map[string]bool
 	Node               string
 	NodePresent        bool
@@ -57,6 +58,7 @@ func ParseRecord(line string) (Record, error) {
 	}
 
 	r := Record{
+		Raw:         line,
 		Fields:      fields,
 		Values:      values,
 		AllFields:   allFields,

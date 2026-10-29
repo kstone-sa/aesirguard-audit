@@ -65,7 +65,7 @@
       "required": ["state", "reason"],
       "properties": {
         "state": {"const": "incomplete"},
-        "reason": {"enum": ["watermark", "timeout", "eof", "shutdown"]}
+        "reason": {"enum": ["watermark", "timeout", "eof", "shutdown", "source_gap", "assembly_limit", "line_limit"]}
       }
     },
     "issue": {

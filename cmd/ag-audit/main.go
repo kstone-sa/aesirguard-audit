@@ -302,37 +302,53 @@ func runFollower(ctx context.Context, options commandOptions, processor *eventPr
 	if err != nil {
 		return err
 	}
-	var startPosition audit.SourcePosition
-	if checkpoint != nil {
-		startPosition = audit.SourcePosition{
-			Device: checkpoint.Device, Inode: checkpoint.Inode,
-			Start: checkpoint.Offset, End: checkpoint.Offset, Valid: true, Anchor: checkpoint.Anchor,
-		}
-	}
-	follower, err := collector.OpenRotatingFollower(options.inputPath, collector.RotationOptions{
-		FollowerOptions: collector.FollowerOptions{PollInterval: options.pollInterval, MaxLineBytes: options.maxLineBytes},
-		DrainInterval:   options.rotationDrain,
-		ExcludePaths:    []string{options.outputPath, options.checkpointPath, options.lockPath},
-	}, checkpoint)
+	recovery, err := openGapRecovery(options, inputPath, processor.diagnostics)
 	if err != nil {
-		return errors.Join(err, recordSourceGap(processor.diagnostics, err))
+		return err
 	}
-	defer follower.Close()
-	if checkpoint == nil {
-		position := follower.CompletePosition()
-		startPosition = audit.SourcePosition{
-			Device: position.Identity.Device, Inode: position.Identity.Inode,
-			Generation: position.Generation, Start: position.Offset, End: position.Offset, Valid: true, Anchor: position.Anchor,
+	rotationOptions := collector.RotationOptions{
+		FollowerOptions: collector.FollowerOptions{PollInterval: options.pollInterval, MaxLineBytes: options.maxLineBytes, RecoverLineLimits: true},
+		DrainInterval:   options.rotationDrain, ExcludePaths: []string{options.outputPath, options.checkpointPath, options.lockPath, recovery.path},
+	}
+	pending, err := recovery.pending(checkpoint)
+	if err != nil {
+		return err
+	}
+	openingCheckpoint := checkpoint
+	if pending != nil {
+		openingCheckpoint = pending
+	}
+	follower, err := collector.OpenRotatingFollower(options.inputPath, rotationOptions, openingCheckpoint)
+	if err != nil {
+		if !collector.RecoverableSourceGap(err) {
+			return errors.Join(err, recordSourceGap(processor.diagnostics, err))
+		}
+		cause := err
+		follower, err = collector.OpenRecoveryFollower(options.inputPath, rotationOptions)
+		if err != nil {
+			return err
+		}
+		if err = recovery.prepare(checkpoint, follower.CompletePosition(), cause); err != nil {
+			follower.Close()
+			return err
+		}
+		pending = &recovery.ledger.Incidents[len(recovery.ledger.Incidents)-1].Resume
+	}
+	defer func() { _ = follower.Close() }()
+	if pending != nil {
+		if err := recovery.commit(processor); err != nil {
+			return err
 		}
 	}
-	checkpointWriter := newCheckpointWriter(options, inputPath, startPosition, checkpoint != nil, processor.sink)
+	startPosition := sourcePosition(follower.CompletePosition())
+	checkpointWriter := newCheckpointWriter(options, inputPath, startPosition, checkpoint != nil || pending != nil, processor.sink)
 	if err := checkpointWriter.persist(startPosition, true); err != nil {
 		return err
 	}
 	rotationCount := follower.RotationCount()
-	processor.replayWindow = checkpoint != nil
-	if checkpoint != nil {
-		if err := processor.diagnostics.log("info", "recovery_started", map[string]any{"device": checkpoint.Device, "inode": checkpoint.Inode, "offset": checkpoint.Offset}); err != nil {
+	processor.replayWindow = checkpoint != nil || pending != nil
+	if processor.replayWindow {
+		if err := processor.diagnostics.log("info", "recovery_started", map[string]any{"device": startPosition.Device, "inode": startPosition.Inode, "offset": startPosition.End}); err != nil {
 			return err
 		}
 	}
@@ -346,7 +362,37 @@ func runFollower(ctx context.Context, options commandOptions, processor *eventPr
 			return checkpointWriter.persist(sourcePosition(follower.CompletePosition()), true)
 		}
 		if err != nil {
-			return errors.Join(err, recordSourceGap(processor.diagnostics, err))
+			if !collector.RecoverableSourceGap(err) {
+				return errors.Join(err, recordSourceGap(processor.diagnostics, err))
+			}
+			cause := err
+			next, err := collector.OpenRecoveryFollower(options.inputPath, rotationOptions)
+			if err != nil {
+				return err
+			}
+			previous, err := loadConfiguredCheckpoint(options.checkpointPath, inputPath)
+			if err != nil {
+				next.Close()
+				return err
+			}
+			if err := recovery.prepare(previous, next.CompletePosition(), cause); err != nil {
+				next.Close()
+				return err
+			}
+			if err := recovery.commit(processor); err != nil {
+				next.Close()
+				return err
+			}
+			if err := follower.Close(); err != nil {
+				next.Close()
+				return err
+			}
+			follower = next
+			start := sourcePosition(follower.CompletePosition())
+			checkpointWriter = newCheckpointWriter(options, inputPath, start, true, processor.sink)
+			rotationCount = follower.RotationCount()
+			processor.replayWindow = true
+			continue
 		}
 		if ok {
 			source := audit.SourcePosition{
@@ -354,8 +400,14 @@ func runFollower(ctx context.Context, options commandOptions, processor *eventPr
 				Generation: line.StartGeneration, Start: line.Start, End: line.Start,
 				Bytes: line.SourceBytes, Valid: true, Anchor: line.StartAnchor,
 			}
-			if err := processor.addSourceLine(line.Text, source); err != nil {
-				return err
+			var lineErr error
+			if line.OmittedBytes > 0 {
+				lineErr = processor.rejectLine(line.Text, line.SourceBytes, source)
+			} else {
+				lineErr = processor.addSourceLine(line.Text, source)
+			}
+			if lineErr != nil {
+				return lineErr
 			}
 			safe := processor.assembler.SafeSourcePosition(sourcePosition(follower.CompletePosition()))
 			if err := checkpointWriter.persist(safe, false); err != nil {
@@ -519,9 +571,20 @@ func (processor *eventProcessor) addSourceLine(line string, source audit.SourceP
 			record.SourceBytes = int(source.End - source.Start)
 		}
 	}
-	events, err := processor.assembler.AddChecked(record)
-	if err != nil {
-		return err
+	events, limit := processor.assembler.AddRecovering(record, time.Now())
+	if limit != nil {
+		processor.diagnostics.counters.AssemblerLimits++
+		fields := map[string]any{"audit_id": limit.AuditID, "node_present": limit.NodePresent, "limit_name": map[string]string{"records per event": "max_records_per_event", "pending events": "max_pending_events", "pending bytes": "max_pending_bytes"}[limit.Limit],
+			"configured_limit": limit.Value, "observed_records": limit.ObservedRecords, "count_complete": limit.CountComplete,
+			"decision": "physical_record_evidence", "source": source}
+		if limit.NodePresent {
+			fields["node"] = limit.Node
+		}
+		keys, keyBytes, spill := processor.assembler.RejectionTracking()
+		fields["rejected_keys"], fields["rejected_key_bytes"], fields["conservative_isolation"] = keys, keyBytes, spill
+		if err := processor.diagnostics.log("error", "assembler_limit_exceeded", fields); err != nil {
+			return err
+		}
 	}
 	return processor.emit(events)
 }
@@ -532,6 +595,14 @@ func (processor *eventProcessor) flushAll(completion audit.Completion) error {
 
 func (processor *eventProcessor) emit(events []audit.AssembledEvent) error {
 	for _, event := range events {
+		if event.Exceptional {
+			for _, record := range event.Records {
+				if err := processor.emitCanonical(audit.BuildAssemblyException(record, processor.canonical)); err != nil {
+					return err
+				}
+			}
+			continue
+		}
 		output := audit.BuildCanonicalEvent(event, processor.canonical)
 		if processor.renderMessage {
 			output = audit.WithHumanMessage(output)

@@ -7,6 +7,8 @@ import (
 )
 
 type operationCounters struct {
+	LineLimits       uint64 `json:"line_limits"`
+	AssemblerLimits  uint64 `json:"assembler_limits"`
 	InputLines       uint64 `json:"input_lines"`
 	InputBytes       uint64 `json:"input_bytes"`
 	EmittedEvents    uint64 `json:"emitted_events"`
@@ -22,6 +24,7 @@ type operationalDiagnostics struct {
 	heartbeatInterval time.Duration
 	nextHeartbeat     time.Time
 	counters          operationCounters
+	persistentGaps    uint64
 }
 
 func newOperationalDiagnostics(writer io.Writer, heartbeatInterval time.Duration) *operationalDiagnostics {
@@ -53,6 +56,10 @@ func (diagnostics *operationalDiagnostics) heartbeat(processor *eventProcessor, 
 		"counters":       diagnostics.counters,
 		"pending_events": processor.assembler.Pending(),
 		"pending_bytes":  processor.assembler.PendingBytes(),
+	}
+	if diagnostics.persistentGaps > 0 {
+		fields["integrity"] = "source_gap_recorded"
+		fields["persistent_gaps"] = diagnostics.persistentGaps
 	}
 	if lagBytes >= 0 {
 		fields["input_lag_bytes"] = lagBytes
